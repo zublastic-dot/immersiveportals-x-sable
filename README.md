@@ -1,4 +1,15 @@
-# v0.5.0
+# Zublastic maintenance fork
+
+Based on [GaMiR9195's 0.5.0 fork](https://github.com/GaMiR9195/immersiveportals-x-sable).
+Version `0.5.1-zublastic.1` repairs chunk-loading throttling and ticket cleanup;
+it preserves the upstream Sable/portal integration. It does not claim to fix all
+rendering or compatibility issues. See [evidence and build notes](docs/ZUBLASTIC_CHUNK_TICKETS.md).
+
+Operators can run `imm_ptl_chunk_tickets` to inspect admitted, completed,
+pending and failed requests per dimension. A persistent request gets a bounded
+warning after 60 seconds; real failed futures still report their cause.
+
+## Upstream v0.5.0 notes
 1) Better Sodium compatibility (same dimension + recursion stuff).
 2) Fixed clipping-through-walls: it used to stop at portal size. Now it doesn’t. Ever.
 3) HUGE amount of rendering bug fixes.

@@ -1,0 +1,47 @@
+{
+  "schema_version": 2,
+  "work_id": "ip-sable-chunk-tickets-20260925",
+  "lease_id": "ip-sable-chunk-tickets-20260925",
+  "worker_id": "codex-ip-sable-chunk-tickets-20260925",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-ip-sable-chunk-tickets-20260925/ip-sable-chunk-tickets-20260925",
+  "base_commit": "f5e0471d59407a99c4abd0f084d5a4f2e236f2b8",
+  "resources": [
+    "artifact:owner-pc:ip-sable-chunk-tickets-20260925",
+    "desktop:owner-pc:ip-sable-build",
+    "domain:modautomator:compatibility/ip-sable-chunk-loading",
+    "repo:zublastic-dot/immersiveportals-x-sable:.github/workflows/zublastic-verify.yml",
+    "repo:zublastic-dot/immersiveportals-x-sable:AGENTS.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:README.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:build.gradle",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_CHUNK_TICKETS.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:settings.gradle",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/gametest",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/chunk_loading",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/mixin/common/chunk_sync",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/chunk_loading"
+  ],
+  "paths": [
+    "AGENTS.md",
+    "README.md",
+    "src/main/java/qouteall/imm_ptl/core/chunk_loading",
+    "src/main/java/qouteall/imm_ptl/core/mixin/common/chunk_sync",
+    "src/test/java/qouteall/imm_ptl/core/chunk_loading",
+    "src/gametest",
+    "docs/ZUBLASTIC_CHUNK_TICKETS.md",
+    "build.gradle",
+    "gradle.properties",
+    "settings.gradle",
+    ".github/workflows/zublastic-verify.yml"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Repair and verify IP/Sable chunk-ticket errors that obscure generation health and break loading throttling.",
+    "acceptance": [
+      "Preserve the mod lineup and upstream integration while fixing confirmed ticket-state defects.",
+      "Regression tests retain loading slots for transient states and preserve genuine failure evidence.",
+      "Record exact source, artifact, and runtime acceptance or remaining limitations without claiming all IP/Sable defects are solved."
+    ]
+  }
+}

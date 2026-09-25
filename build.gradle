@@ -25,6 +25,17 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 // Each repository is scoped (exclusiveContent) to the groups it actually serves,
 // so Gradle never probes the wrong host and resolution stays deterministic.
 repositories {
+    exclusiveContent {
+        forRepository { maven { url 'https://maven.squiddev.cc' } }
+        filter { includeGroup 'cc.tweaked' }
+    }
+    mavenCentral {
+        content {
+            includeGroupByRegex 'org\\.junit.*'
+            includeGroup 'org.opentest4j'
+            includeGroup 'org.apiguardian'
+        }
+    }
     mavenLocal()
     exclusiveContent {
         forRepository {
@@ -210,7 +221,7 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 // The locally supplied patched Rapier DLL is packaged where IplNativesOverrideMixin
 // loads it from. Keep the binary at the project root for easy replacement.
 processResources {
-    from('sable_rapier_x86_64_windows.dll') {
+    from(providers.gradleProperty('iplNativeResource').getOrElse('sable_rapier_x86_64_windows.dll')) {
         into 'natives_ipl'
     }
 }
@@ -224,6 +235,9 @@ mixin {
 }
 
 dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation "net.neoforged:neoforge:${neo_version}"
 
     // Sodium 0.8+ publishes native NeoForge artifacts. The release jar players
@@ -283,6 +297,13 @@ dependencies {
 }
 
 tasks.named('build').configure { dependsOn('jarJar') }
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    maxHeapSize = '512m'
+    maxParallelForks = 1
+    testLogging { events 'passed', 'skipped', 'failed' }
+}
 
 // This block of code expands all declared replace properties in the specified resource targets.
 // A missing property will result in an error. Properties are expanded using ${} Groovy notation.
