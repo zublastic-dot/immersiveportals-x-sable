@@ -66,8 +66,7 @@ public final class IplSubLevelUniformRegistry {
 
     /**
      * Drop a program from the registry (e.g., when the GL program is
-     * deleted). Currently unused -- we never delete from the cache --
-     * but exposed for future cleanup hooks.
+     * deleted or relinked through Mojang's GL entry points).
      */
     public static void unregister(int programId) {
         SUB_LEVEL_LOC_BY_PROGRAM.remove(programId);

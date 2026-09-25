@@ -28,20 +28,16 @@ public class FrontClipping {
     public static final double ADJUSTMENT = 0.01;
     
     public static void disableClipping() {
-        if (IPGlobal.enableClippingMechanism) {
-            if (isClippingEnabled) {
-                GL11.glDisable(GL11.GL_CLIP_PLANE0);
-                isClippingEnabled = false;
-            }
-        }
+        // Bind hooks and post-effects change physical GL state independently
+        // of this logical flag. A disable must always reach GL.
+        GL11.glDisable(GL11.GL_CLIP_PLANE0);
+        isClippingEnabled = false;
     }
     
     private static void enableClipping() {
         if (IPGlobal.enableClippingMechanism) {
-            if (!isClippingEnabled) {
-                GL11.glEnable(GL11.GL_CLIP_PLANE0);
-                isClippingEnabled = true;
-            }
+            GL11.glEnable(GL11.GL_CLIP_PLANE0);
+            isClippingEnabled = true;
         }
     }
     
