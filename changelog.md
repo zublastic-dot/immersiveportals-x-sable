@@ -6,6 +6,14 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic client clipping candidate
+
+- Keep IP/Sable clip distances disabled for copy shaders that do not write them;
+  restore the correct planes for geometry and both Sable cuts.
+- Make explicit clipping resets reach GL and invalidate uniform locations on
+  Mojang program deletion/relink. Visual acceptance remains pending; see
+  `docs/ZUBLASTIC_PORTAL_RENDERING.md`.
+
 Atlas hardening since the 0.5.0 merge (PR #15):
 
 ### Fixed

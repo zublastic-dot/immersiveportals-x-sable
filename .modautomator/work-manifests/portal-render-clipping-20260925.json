@@ -1,0 +1,48 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-render-clipping-20260925",
+  "lease_id": "portal-render-clipping-20260925",
+  "worker_id": "codex-portal-render-20260925",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-render-20260925/portal-render-clipping-20260925",
+  "base_commit": "348f5e0efc8f73289d59479a3254e54195ba9124",
+  "resources": [
+    "artifact:owner-pc:euphoria-portals-20260925",
+    "artifact:owner-pc:portal-render-20260925",
+    "desktop:owner-pc:gregtest",
+    "domain:modautomator:compatibility/ip-sable-rendering",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/ipl/sable/render",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/ipl/sable/mixin/client",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/render",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java",
+    "repo:zublastic-dot/immersiveportals-x-sable:build.gradle",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_PORTAL_RENDERING.md",
+    "repo:zublastic-dot/zublastic-context:history/2026-09-25-portal-render-clipping.md",
+    "repo:zublastic-dot/zublastic-context:projects/modautomator.md",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md"
+  ],
+  "paths": [
+    "src/main/java/ipl/sable/render",
+    "src/main/java/ipl/sable/mixin/client",
+    "src/main/java/qouteall/imm_ptl/core/render",
+    "src/main/java/qouteall/imm_ptl/core/compat",
+    "src/test/java",
+    "build.gradle",
+    "gradle.properties",
+    "changelog.md",
+    "docs/ZUBLASTIC_PORTAL_RENDERING.md"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Restore destination-world portal rendering while preserving recovered FPS and Sable clipping.",
+    "acceptance": [
+      "Production regression coverage of clipping boundaries and GL-program lifetime.",
+      "Exact artifact and source identities with bounded build.",
+      "Record shader and shaderless visual acceptance separately from FPS."
+    ]
+  }
+}

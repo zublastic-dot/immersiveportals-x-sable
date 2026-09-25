@@ -72,6 +72,11 @@ public final class IplProgramRegistry {
         return v != null && v;
     }
 
+    public static void unregister(int programId) {
+        ENTITY_STYLE_BY_PROGRAM.remove(programId);
+        VANILLA_SUBLEVEL_INPUT_BY_PROGRAM.remove(programId);
+    }
+
     /** Vanilla Sable chunks feed slot-1 plot-local, camera-relative vertices. */
     public static boolean usesVanillaSubLevelInputSpace(int programId) {
         Boolean v = VANILLA_SUBLEVEL_INPUT_BY_PROGRAM.get(programId);

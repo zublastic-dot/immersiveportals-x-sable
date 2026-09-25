@@ -8,6 +8,7 @@ import org.lwjgl.opengl.GL41;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import qouteall.imm_ptl.core.render.FrontClipping;
+import qouteall.imm_ptl.core.IPGlobal;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,7 +41,7 @@ import java.util.concurrent.ConcurrentMap;
  * traditional way.
  *
  * <p>Idempotency: {@link #onBind(int)} is safe to call multiple times for
- * the same bind. {@link #IPL$LOC_CACHE} dedupes uniform-location lookups
+ * the same bind. The shared binding cache dedupes uniform-location lookups
  * and {@link IplSubLevelUniformRegistry} dedupes registry inserts;
  * uniform writes via {@code glProgramUniform4f} are idempotent (same value
  * writes a no-op). So if both mixins fire for one logical bind, we just
@@ -56,11 +57,29 @@ public final class IplProgramBindHook {
      * either slot means "not present on this program" — we still cache the
      * negative result to avoid re-querying.
      */
-    public static final ConcurrentMap<Integer, int[]> IPL$LOC_CACHE = new ConcurrentHashMap<>();
+    private static final ClipProgramBindings BINDINGS = new ClipProgramBindings(
+        new ClipProgramBindings.Driver() {
+            public int uniformLocation(int program, String name) {
+                return GL20.glGetUniformLocation(program, name);
+            }
+
+            public void clipDistance(int slot, boolean enabled) {
+                if (enabled) GL11.glEnable(GL30.GL_CLIP_DISTANCE0 + slot);
+                else GL11.glDisable(GL30.GL_CLIP_DISTANCE0 + slot);
+            }
+        }
+    );
 
     private static final ConcurrentMap<Integer, Boolean> IPL$LOGGED_PROGRAMS = new ConcurrentHashMap<>();
 
     private IplProgramBindHook() {}
+
+    public static void forgetProgram(int program) {
+        BINDINGS.forget(program);
+        IPL$LOGGED_PROGRAMS.remove(program);
+        IplSubLevelUniformRegistry.unregister(program);
+        IplProgramRegistry.unregister(program);
+    }
 
     /**
      * Called by any program-bind chokepoint hook. {@code program} is the GL
@@ -77,20 +96,18 @@ public final class IplProgramBindHook {
         // Cache + log on first encounter REGARDLESS of clipping state, so the
         // log shows every program that carries iportal_ClippingEquation -- even
         // ones bound only when clipping is disabled.
-        int[] locs = IPL$LOC_CACHE.get(program);
-        if (locs == null) {
-            int iportalLoc = GL20.glGetUniformLocation(program, "iportal_ClippingEquation");
-            int subLevelLoc = GL20.glGetUniformLocation(program, "ipl_subLevelClipEquation");
-            int subLevelLoc2 = GL20.glGetUniformLocation(program, "ipl_subLevelClipEquation[1]");
-            locs = new int[]{iportalLoc, subLevelLoc, subLevelLoc2};
-            IPL$LOC_CACHE.put(program, locs);
+        ClipProgramBindings.Locations locs = BINDINGS.locations(program);
+        if (IPL$LOGGED_PROGRAMS.putIfAbsent(program, Boolean.TRUE) == null) {
+            int iportalLoc = locs.portal();
+            int subLevelLoc = locs.subLevel();
+            int subLevelLoc2 = locs.secondSubLevel();
 
             // Register slot-1 carriers so SubLevelClipUniformPatcher.patchForSubLevel
             // can spray the equation to all known programs at bracket entry,
             // not just whatever shader is bound at that moment.
             IplSubLevelUniformRegistry.register(program, subLevelLoc, subLevelLoc2);
 
-            if (iportalLoc >= 0 && IPL$LOGGED_PROGRAMS.putIfAbsent(program, Boolean.TRUE) == null) {
+            if (iportalLoc >= 0) {
                 LOG.info(
                     "[IPL-GLUSE-WRITE] programId={} iportalLoc={} subLevelLoc={} clippingEnabledOnFirstBind={}",
                     program, iportalLoc, subLevelLoc, FrontClipping.isClippingEnabled
@@ -98,30 +115,15 @@ public final class IplProgramBindHook {
             }
         }
 
-        boolean haveActive = FrontClipping.isClippingEnabled;
-        boolean inPortalRender = PortalRendering.isRendering();
-        boolean inSubLevelBracket = SubLevelClipUniformPatcher.getCurrentSubLevelEqWorld() != null;
+        boolean haveActive = IPGlobal.enableClippingMechanism && FrontClipping.isClippingEnabled;
+        boolean inPortalRender = IPGlobal.enableClippingMechanism && PortalRendering.isRendering();
+        boolean inSubLevelBracket = IPGlobal.enableClippingMechanism
+            && SubLevelClipUniformPatcher.getCurrentSubLevelEqWorld() != null;
+        BINDINGS.configure(locs, haveActive || inPortalRender, inSubLevelBracket);
         if (haveActive) {
             IplClipEquationCache.refreshFromActive();
         } else if (!inPortalRender && !inSubLevelBracket) {
             return;
-        }
-
-        // Defensive re-enable of CLIP_PLANE0 (== CLIP_DISTANCE0): Veil bloom
-        // disables it mid-portal-through and never restores it.
-        if (haveActive || inPortalRender) {
-            GL11.glEnable(GL11.GL_CLIP_PLANE0);
-        }
-
-        // CLIP_DISTANCE1 only re-enabled when a sub-level bracket is active.
-        // Outside brackets, CD1 stays off and slot-1 writes are
-        // rasterizer-ignored even if uniform values are stale.
-        if (locs[1] >= 0 && inSubLevelBracket) {
-            GL11.glEnable(GL30.GL_CLIP_DISTANCE1);
-            // Slot 2 = second sub-level cut (was folded into slot 1 via min(),
-            // which the rasterizer interpolated linearly and bent into a
-            // triangular wedge at the portal plane). Enable it with slot 1.
-            if (locs.length > 2 && locs[2] >= 0) GL11.glEnable(GL30.GL_CLIP_DISTANCE2);
         }
 
         boolean entityStyle = IplProgramRegistry.isEntityStyleProgram(program);
@@ -133,7 +135,7 @@ public final class IplProgramBindHook {
 
         // Slot 0 (portal clip): write only if we have an equation (portal
         // context active).
-        int iportalLoc = locs[0];
+        int iportalLoc = locs.portal();
         if (iportalLoc >= 0 && eq != null) {
             GL41.glProgramUniform4f(
                 program, iportalLoc,
@@ -147,7 +149,7 @@ public final class IplProgramBindHook {
         // Sable applies the BE pose before these entity shaders evaluate their
         // vertices, so their slot-1 dot uses the same eye-space convention as
         // IP slot 0.
-        int subLevelLoc = locs[1];
+        int subLevelLoc = locs.subLevel();
         if (subLevelLoc >= 0) {
             float[] subEq;
             if (IplProgramRegistry.usesVanillaSubLevelInputSpace(program)) {
@@ -173,6 +175,19 @@ public final class IplProgramBindHook {
                         subEq[0], subEq[1], subEq[2], subEq[3]
                     );
                 }
+            }
+        }
+        // Both bind paths preserve Sable's second independent cut.
+        if (locs.secondSubLevel() >= 0) {
+            float[] eq2 = IplProgramRegistry.usesVanillaSubLevelInputSpace(program)
+                ? SubLevelClipUniformPatcher.getCurrentSubLevelEqVanillaInput2()
+                : entityStyle ? SubLevelClipUniformPatcher.getCurrentSubLevelEqEye2()
+                : SubLevelClipUniformPatcher.getCurrentSubLevelEqWorld2();
+            if (eq2 == null) {
+                GL41.glProgramUniform4f(program, locs.secondSubLevel(), 0f, 0f, 0f, 1f);
+            } else {
+                GL41.glProgramUniform4f(program, locs.secondSubLevel(),
+                    eq2[0], eq2[1], eq2[2], eq2[3]);
             }
         }
     }
