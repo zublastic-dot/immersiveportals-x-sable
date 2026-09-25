@@ -4,6 +4,7 @@ import net.neoforged.fml.loading.LoadingModList;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+import qouteall.imm_ptl.core.compat.iris_compatibility.EuphoriaCompatibility;
 
 import java.util.List;
 import java.util.Set;
@@ -24,6 +25,11 @@ public class IPCompatMixinPlugin implements IMixinConfigPlugin {
 
 
         LoadingModList modList = LoadingModList.get();
+        if (mixinClassName.contains("Euphoria")) {
+            return EuphoriaCompatibility.supports(
+                version(modList, "euphoria_patcher"), version(modList, "iris")
+            );
+        }
         if (mixinClassName.contains("IrisSodium")) {
             boolean sodiumLoaded = modList.getModFileById("embeddium") != null || modList.getModFileById("sodium") != null;
             boolean irisLoaded = modList.getModFileById("iris") != null;
@@ -51,6 +57,13 @@ public class IPCompatMixinPlugin implements IMixinConfigPlugin {
         }
         
         return false;
+    }
+
+    private static String version(LoadingModList modList, String modId) {
+        var file = modList.getModFileById(modId);
+        if (file == null) return null;
+        return file.getMods().stream().filter(mod -> mod.getModId().equals(modId))
+            .map(mod -> mod.getVersion().toString()).findFirst().orElse(null);
     }
     
     @Override

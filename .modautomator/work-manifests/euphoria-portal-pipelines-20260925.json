@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "work_id": "euphoria-portal-pipelines-20260925",
+  "lease_id": "euphoria-portal-pipelines-20260925",
+  "worker_id": "codex-euphoria-portals-20260925",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-euphoria-portals-20260925/euphoria-portal-pipelines-20260925",
+  "base_commit": "7d992856f8dbddd81dccaf3885747850f698787f",
+  "resources": [
+    "artifact:owner-pc:euphoria-portals-20260925",
+    "domain:modautomator:compatibility/ip-sable-rendering",
+    "desktop:owner-pc:gregtest",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/resources/imm_ptl_compat.mixins.json",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java",
+    "repo:zublastic-dot/immersiveportals-x-sable:build.gradle",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_EUPHORIA_PIPELINES.md",
+    "repo:zublastic-dot/zublastic-context:history/2026-09-25-euphoria-portal-pipelines.md",
+    "repo:zublastic-dot/zublastic-context:projects/modautomator.md",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md"
+  ],
+  "paths": [
+    "src/main/java/qouteall/imm_ptl/core/compat",
+    "src/main/resources/imm_ptl_compat.mixins.json",
+    "src/test/java",
+    "build.gradle",
+    "gradle.properties",
+    "docs/ZUBLASTIC_EUPHORIA_PIPELINES.md"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Prevent Euphoria dimension refresh from destroying active portal shader pipelines; preserve dimension defines and genuine reloads.",
+    "acceptance": [
+      "Regression coverage of dimension switching, reload invalidation and optional-mod absence.",
+      "Exact source and binary identities; bounded build.",
+      "Runtime validation reported separately from static proof."
+    ]
+  }
+}
