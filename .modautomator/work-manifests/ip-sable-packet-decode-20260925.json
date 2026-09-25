@@ -1,0 +1,61 @@
+{
+  "schema_version": 2,
+  "work_id": "ip-sable-packet-decode-20260925",
+  "lease_id": "ip-sable-packet-decode-20260925",
+  "worker_id": "codex-ip-sable-packet-decode-20260925",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-ip-sable-packet-decode-20260925/ip-sable-packet-decode-20260925",
+  "base_commit": "2b2778c7e74cf63d006b4bd901c6e2ab861a3e14",
+  "resources": [
+    "artifact:owner-pc:ip-sable-chunk-tickets-20260925",
+    "desktop:owner-pc:companion",
+    "desktop:owner-pc:gregtest",
+    "desktop:owner-pc:ip-sable-build",
+    "domain:modautomator:compatibility/ip-sable-chunk-loading",
+    "repo:zublastic-dot/immersiveportals-x-sable:.github/workflows/zublastic-verify.yml",
+    "repo:zublastic-dot/immersiveportals-x-sable:AGENTS.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:README.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:build.gradle",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_CHUNK_TICKETS.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:settings.gradle",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/gametest",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/chunk_loading",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/mixin/common/chunk_sync",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/chunk_loading",
+    "repo:zublastic-dot/modautomator:docs/LIVE_STATE.md",
+    "repo:zublastic-dot/zublastic-context:history/2026-09-25-ip-sable-chunk-tickets.md",
+    "repo:zublastic-dot/zublastic-context:projects/modautomator.md",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:README.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md",
+    "repo:zublastic-dot/zublastic-ideas:modautomator/README.md",
+    "server:kinetic-main:deployment",
+    "server:kinetic-main:lifecycle",
+    "server:kinetic-main:test-mode",
+    "server:kinetic-main:world-mutation",
+    "server:modautomator-control:modsync"
+  ],
+  "paths": [
+    "AGENTS.md",
+    "README.md",
+    "src/main/java/qouteall/imm_ptl/core/chunk_loading",
+    "src/main/java/qouteall/imm_ptl/core/mixin/common/chunk_sync",
+    "src/test/java/qouteall/imm_ptl/core/chunk_loading",
+    "src/gametest",
+    "docs/ZUBLASTIC_CHUNK_TICKETS.md",
+    "build.gradle",
+    "gradle.properties",
+    "settings.gradle",
+    ".github/workflows/zublastic-verify.yml"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Capture and isolate repeatable chunk-packet decoding failures while preserving valid server terrain.",
+    "acceptance": [
+      "Keep genuine decode errors visible and preserve the world and mod lineup.",
+      "Bound packet capture size, count and buffer access; verify meaningful regressions.",
+      "Record exact evidence and distinguish a diagnostic build from a proven repair."
+    ]
+  }
+}

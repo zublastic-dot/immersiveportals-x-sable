@@ -218,10 +218,12 @@ public class ImmPtlClientChunkMap extends ClientChunkCache {
         LevelChunk worldChunk,
         Consumer<ClientboundLevelChunkPacketData.BlockEntityTagOutput> consumer
     ) {
+        int packetStart = buf.readerIndex();
         try {
             worldChunk.replaceWithPacketData(buf, nbt, consumer);
         }
         catch (Exception e) {
+            ChunkPacketDiagnostics.clientFailure(worldChunk, buf, packetStart, e);
             LOGGER.error(
                 "Error deserializing chunk packet {} {}",
                 worldChunk.getLevel().dimension().location(),

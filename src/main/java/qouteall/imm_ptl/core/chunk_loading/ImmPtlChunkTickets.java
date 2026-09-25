@@ -70,6 +70,8 @@ public class ImmPtlChunkTickets {
     public static final WeakHashMap<ServerLevel, ImmPtlChunkTickets> BY_DIMENSION = new WeakHashMap<>();
     
     public static void init() {
+        NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class,
+            event -> ChunkPacketDiagnostics.register(event.getDispatcher()));
         NeoForge.EVENT_BUS.addListener(DimensionEvents.BeforeRemovingDimensionEvent.class,
                 beforeRemovingDimensionEvent -> ImmPtlChunkTickets.onDimensionRemove(beforeRemovingDimensionEvent.dimension));
 
