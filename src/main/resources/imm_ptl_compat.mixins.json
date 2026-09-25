@@ -25,6 +25,11 @@
     "sodium.MixinSodiumViewport",
     "sodium.MixinSodiumWorldRenderer"
   ],
+  "client": [
+    "iris.IEIrisEuphoriaShaderPack",
+    "iris.MixinIrisEuphoriaPipelineManager",
+    "iris.MixinEuphoriaDimensionShaderRefresh"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
