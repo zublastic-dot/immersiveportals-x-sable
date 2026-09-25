@@ -7,26 +7,23 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongPredicate;
-import net.minecraft.server.MinecraftServer;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
-import net.minecraft.server.level.ChunkResult;
 import net.minecraft.server.level.ChunkTaskPriorityQueue;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.server.level.DistanceManager;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.Ticket;
 import net.minecraft.server.level.TicketType;
-import net.minecraft.util.SortedArraySet;
 import net.minecraft.util.thread.ProcessorMailbox;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.apache.commons.lang3.Validate;
 import org.slf4j.Logger;
 import qouteall.imm_ptl.core.IPGlobal;
 import qouteall.imm_ptl.core.ducks.IEChunkMap;
-import qouteall.imm_ptl.core.ducks.IEDistanceManager;
 import qouteall.imm_ptl.core.ducks.IEServerChunkCache;
 import qouteall.imm_ptl.core.ducks.IEWorld;
 import qouteall.imm_ptl.core.platform_specific.IPConfig;
@@ -35,9 +32,9 @@ import qouteall.q_misc_util.my_util.RateStat;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.List;
 import java.util.WeakHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Each {@link ImmPtlChunkTickets} manages ImmPtl chunk ticket for one dimension.
@@ -77,11 +74,30 @@ public class ImmPtlChunkTickets {
                 beforeRemovingDimensionEvent -> ImmPtlChunkTickets.onDimensionRemove(beforeRemovingDimensionEvent.dimension));
 
         NeoForge.EVENT_BUS.addListener(ServerCleanupEvent.class, ImmPtlChunkTickets::cleanup);
+        NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, event ->
+            event.getDispatcher().register(Commands.literal("imm_ptl_chunk_tickets")
+                .requires(source -> source.hasPermission(2))
+                .executes(context -> {
+                    for (ServerLevel level : context.getSource().getServer().getAllLevels()) {
+                        ImmPtlChunkTickets manager = BY_DIMENSION.get(level);
+                        if (manager != null) {
+                            context.getSource().sendSuccess(() -> Component.literal(
+                                level.dimension().location() + " " + manager.describe()
+                            ), false);
+                        }
+                    }
+                    return 1;
+                })));
     }
     
     public static class ChunkTicketInfo {
         public int lastUpdateGeneration;
         public int distanceToSource;
+        // Zero means queued, with no ticket admitted yet. Never use a later config
+        // value to remove an existing ticket or choose the future it requested.
+        int loadingRadius;
+        long startedNanos;
+        long nextStallReportNanos;
         
         public ChunkTicketInfo(int lastUpdateGeneration, int distanceToSource) {
             this.lastUpdateGeneration = lastUpdateGeneration;
@@ -98,8 +114,14 @@ public class ImmPtlChunkTickets {
     private boolean isValid = true;
     
     public final int throttlingLimit = 4;
+
+    static final long STALL_REPORT_INTERVAL = TimeUnit.SECONDS.toNanos(60);
+    private long admittedCount;
+    private long completedCount;
+    private long failedCount;
+    private long stallReportCount;
     
-    private ImmPtlChunkTickets() {
+    ImmPtlChunkTickets() {
     
     }
     
@@ -159,7 +181,9 @@ public class ImmPtlChunkTickets {
      * This method uses the chunk holder's future, so it should be called after
      * {@link DistanceManager#runAllUpdates(ChunkMap)}
      * (as it calls {@link ChunkHolder#updateFutures(ChunkMap, Executor)}).
-     * Before updating the future, the chunk's entity ticking future may be a future that immediately returns {@link ChunkHolder.ChunkLoadingFailure} result.
+     * Before promotion, the holder can return {@link ChunkHolder#UNLOADED_LEVEL_CHUNK}.
+     * C2ME also exposes that sentinel while its status/ticket changes propagate.
+     * It is not evidence of a completed generation failure.
      * Each task to {@link net.minecraft.server.level.ServerChunkCache.MainThreadExecutor} will trigger
      * {@link DistanceManager#runAllUpdates(ChunkMap)}.
      */
@@ -184,30 +208,41 @@ public class ImmPtlChunkTickets {
             return;
         }
         
-        DistanceManager distanceManager = getDistanceManager(world);
-        Executor mainThreadExecutor = ((qouteall.imm_ptl.core.mixin.common.chunk_sync.IEDistanceManager) distanceManager).ip_getMainThreadExecutor();
-        
-        // clear the already loaded chunks
+        flushThrottling(new WorldTicketAccess(world), System.nanoTime(),
+            getLoadingRadius(), IPConfig.getConfig().enableImmPtlChunkLoading);
+    }
+
+    // The same scheduler is used by the server and the deterministic regression
+    // harness. The access object is short-lived; it must not retain a level here.
+    void flushThrottling(TicketAccess access, long now, int loadingRadius, boolean enabled) {
+        if (!isValid || !enabled) {
+            return;
+        }
+
         waitingForLoading.removeIf((long chunkPos) -> {
-            ChunkHolder chunkHolder = getChunkHolder(world, chunkPos);
-            if (chunkHolder == null) {
+            ChunkTicketInfo info = chunkPosToTicketInfo.get(chunkPos);
+            if (info == null) {
                 return true;
             }
-            
-            ChunkResult<LevelChunk> resultNow = chunkHolder.getEntityTickingChunkFuture()
-                .getNow(null);
-            
-            if (resultNow == null) {
+
+            ChunkLoadObservation observation = access.poll(chunkPos, info.loadingRadius);
+            if (observation.state() == ChunkLoadObservation.State.WAITING) {
+                if (now - info.nextStallReportNanos >= 0) {
+                    stallReportCount++;
+                    access.reportStall(chunkPos, info.loadingRadius,
+                        TimeUnit.NANOSECONDS.toSeconds(now - info.startedNanos));
+                    info.nextStallReportNanos = now + STALL_REPORT_INTERVAL;
+                }
                 return false;
             }
-            
-            if (!resultNow.isSuccess()) {
-                LOGGER.error(
-                    "Chunk loading failure {} {} {}",
-                    world, new ChunkPos(chunkPos)
-                );
+
+            if (observation.state() == ChunkLoadObservation.State.FAILED) {
+                failedCount++;
+                access.reportFailure(chunkPos, info.loadingRadius, observation);
             }
-            
+            else {
+                completedCount++;
+            }
             return true;
         });
         
@@ -220,9 +255,13 @@ public class ImmPtlChunkTickets {
                     }
                     
                     long chunkPos = queue.removeFirstLong();
-                    if (chunkPosToTicketInfo.containsKey(chunkPos)) {
-                        addTicket(distanceManager, chunkPos);
-                        
+                    ChunkTicketInfo info = chunkPosToTicketInfo.get(chunkPos);
+                    if (info != null) {
+                        access.add(chunkPos, loadingRadius);
+                        info.loadingRadius = loadingRadius;
+                        info.startedNanos = now;
+                        info.nextStallReportNanos = now + STALL_REPORT_INTERVAL;
+                        admittedCount++;
                         waitingForLoading.add(chunkPos);
                     }
                     else {
@@ -233,27 +272,14 @@ public class ImmPtlChunkTickets {
         }
     }
     
-    private static void addTicket(DistanceManager distanceManager, long chunkPos) {
-        if (!IPConfig.getConfig().enableImmPtlChunkLoading) {
-            return;
-        }
-        
-        ChunkPos chunkPosObj = new ChunkPos(chunkPos);
-        distanceManager.addRegionTicket(
-            TICKET_TYPE, chunkPosObj, getLoadingRadius(), chunkPosObj
-        );
-        
-        if (enableDebugRateStat) {
-            debugRateStat.hit();
-        }
-    }
-    
     public void purge(
         ServerLevel world,
         LongPredicate shouldKeepLoadingFunc
     ) {
-        DistanceManager distanceManager = getDistanceManager(world);
-        
+        purge(new WorldTicketAccess(world), shouldKeepLoadingFunc);
+    }
+
+    void purge(TicketAccess access, LongPredicate shouldKeepLoadingFunc) {
         chunkPosToTicketInfo.long2ObjectEntrySet().removeIf(e -> {
             long chunkPos = e.getLongKey();
             ChunkTicketInfo ticketInfo = e.getValue();
@@ -263,14 +289,10 @@ public class ImmPtlChunkTickets {
             if (!keepLoading) {
                 waitingForLoading.remove(chunkPos);
                 
-                boolean pendingTicketAdding = getQueueByDistance(ticketInfo.distanceToSource)
-                    .remove(chunkPos);
-                
-                if (!pendingTicketAdding) {
-                    ChunkPos chunkPosObj = new ChunkPos(chunkPos);
-                    distanceManager.removeRegionTicket(
-                        TICKET_TYPE, chunkPosObj, getLoadingRadius(), chunkPosObj
-                    );
+                getQueueByDistance(ticketInfo.distanceToSource).remove(chunkPos);
+
+                if (ticketInfo.loadingRadius != 0) {
+                    access.remove(chunkPos, ticketInfo.loadingRadius);
                 }
                 return true;
             }
@@ -291,27 +313,72 @@ public class ImmPtlChunkTickets {
             return;
         }
         
-        removeAllTicketsInWorld(world, dimTicketManager);
+        dimTicketManager.invalidate(new WorldTicketAccess(world));
     }
-    
-    private static void removeAllTicketsInWorld(ServerLevel world, ImmPtlChunkTickets dimTicketManager) {
-        DistanceManager ticketManager = getDistanceManager(world);
-        
-        dimTicketManager.chunkPosToTicketInfo.keySet().forEach((long pos) -> {
-            SortedArraySet<Ticket<?>> tickets = ((IEDistanceManager) getDistanceManager(world))
-                .portal_getTicketSet(pos);
-            
-            // avoid removing ticket when iterating the ticket set
-            List<Ticket<?>> toRemove = tickets.stream()
-                .filter(t -> t.getType() == TICKET_TYPE).toList();
-            
+
+    void invalidate(TicketAccess access) {
+        // removeRegionTicket takes a radius, NOT the absolute ticket level.
+        purge(access, pos -> false);
+        isValid = false;
+    }
+
+    String describe() {
+        int queued = chunksToAddTicketByDistance.stream().mapToInt(q -> q == null ? 0 : q.size()).sum();
+        return "tracked=" + chunkPosToTicketInfo.size() + " queued=" + queued +
+            " waiting=" + waitingForLoading.size() + "/" + throttlingLimit +
+            " admitted=" + admittedCount + " completed=" + completedCount +
+            " failed=" + failedCount + " stall_reports=" + stallReportCount;
+    }
+
+    interface TicketAccess {
+        void add(long pos, int radius);
+        void remove(long pos, int radius);
+        ChunkLoadObservation poll(long pos, int radius);
+        void reportFailure(long pos, int radius, ChunkLoadObservation result);
+        void reportStall(long pos, int radius, long seconds);
+    }
+
+    private record WorldTicketAccess(ServerLevel world) implements TicketAccess {
+        @Override
+        public void add(long pos, int radius) {
             ChunkPos chunkPos = new ChunkPos(pos);
-            for (Ticket<?> ticket : toRemove) {
-                ticketManager.removeRegionTicket(TICKET_TYPE, chunkPos, ticket.getTicketLevel(), chunkPos);
+            getDistanceManager(world).addRegionTicket(TICKET_TYPE, chunkPos, radius, chunkPos);
+            if (enableDebugRateStat) {
+                debugRateStat.hit();
             }
-        });
-        
-        dimTicketManager.isValid = false;
+        }
+
+        @Override
+        public void remove(long pos, int radius) {
+            ChunkPos chunkPos = new ChunkPos(pos);
+            getDistanceManager(world).removeRegionTicket(TICKET_TYPE, chunkPos, radius, chunkPos);
+        }
+
+        @Override
+        public ChunkLoadObservation poll(long pos, int radius) {
+            ChunkHolder holder = getChunkHolder(world, pos);
+            // A ticket can exist before its holder is published to the visible map.
+            if (holder == null) {
+                return ChunkLoadObservation.WAITING;
+            }
+            return ChunkLoadObservation.poll(radius >= 2 ? holder.getEntityTickingChunkFuture() :
+                holder.getTickingChunkFuture(), ChunkHolder.UNLOADED_LEVEL_CHUNK);
+        }
+
+        @Override
+        public void reportFailure(long pos, int radius, ChunkLoadObservation result) {
+            LOGGER.error("Chunk loading failure world={} chunk={} radius={} reason={}",
+                world.dimension().location(), new ChunkPos(pos), radius, result.error(), result.cause());
+        }
+
+        @Override
+        public void reportStall(long pos, int radius, long seconds) {
+            ChunkHolder holder = getChunkHolder(world, pos);
+            LOGGER.warn("Chunk loading still pending world={} chunk={} radius={} age={}s holder={} ticket_level={}",
+                world.dimension().location(), new ChunkPos(pos), radius, seconds,
+                holder == null ? "absent" : holder.getClass().getName(),
+                holder == null ? "unknown" : holder.getTicketLevel());
+        }
     }
     
     public static int getLoadingRadius() {
@@ -332,7 +399,6 @@ public class ImmPtlChunkTickets {
     }
     
     private static void cleanup(ServerCleanupEvent event) {
-        MinecraftServer server = event.server;
         for (ImmPtlChunkTickets immPtlChunkTickets : BY_DIMENSION.values()) {
             immPtlChunkTickets.isValid = false;
         }
