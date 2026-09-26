@@ -49,10 +49,40 @@ The optional pseudo-mixin intercepts RealCameraCore, not Minecraft camera order:
 
 Production-hook regression tests exercise main-view pass-through, nested camera
 suppression, initialization preservation, recursive depth and stack unwinding.
-They do not prove framebuffer output. Exact-candidate Portal Lab results are
-recorded below after execution; visual acceptance is pending at implementation.
+They do not prove framebuffer output. The subsequent owner test below provides
+bounded visual acceptance for the installed candidate.
 
 The full 59-root-JAR Portal Lab stack was restored before this repair, keeping
 the owner's shader/configuration settings and replacing only IP `.4` with `.5`.
 Its startup succeeded. The previous native observation was stopped by physical
 Escape, so that run did not establish a full-stack visual pass.
+
+## Owner test of the .6 candidate
+
+Built implementation: `ce52ce6034845674359dcfd75cbe0b2bc4d2b72c`.
+JAR SHA-256: `6e3d14e46f7dfb47a51d520e035a7cfee17455a4021583519284f202f2ab818d`.
+All 41 regression tests and the bounded Java 21 build pass; the Sable native DLL
+is unchanged. Installation retained all 58 other root artifacts in the 59-JAR
+Portal Lab. Real Camera is enabled and ordinary Complementary Unbound r5.9.3 is
+selected, with Sodium 0.8.13, Iris 1.8.14-beta.1 and DH 2.4.5-b present.
+
+The owner built a new obsidian frame, assembled it into a Sable sublevel while
+unlit, ignited it, crossed into the Nether, and looked back. The post-traversal
+image visibly shows the Overworld coast through the portal. The owner separately
+confirmed that the Nether also rendered correctly before crossing with Real
+Camera enabled. The running log records the new isolation hook executing at
+19:27:34.002 UTC, and the saved Real Camera feature remains enabled at 19:38:27.
+
+This is owner-supplied acceptance of first ignition, one traversal and destination
+rendering in both directions in this exact full Portal Lab stack. It is not an
+agent-controlled same-view remove/restore test or acceptance of every portal
+behavior. The native control attempt ended on physical Escape before this owner
+test. Moving/scaled sublevels, repeated traversal, Euphoria and shaderless controls,
+other versions/GPUs, and GregTest/Kinetic deployment remain unverified.
+
+The existing DH event error, `An override already exists with the priority [10]`,
+continues during this session; its repair and any performance claim are outside
+this candidate. The AutoSeamBlend fix is retained, but a new full-stack occlusion
+control was not supplied. Exact owner images, log snapshots/config and provenance
+remain local under `M:/PortalRealCamera-20260926/owner-first-ignition/` and
+`owner-return-view/`. Source PR 6 remains stacked above PRs 5 and 4.
