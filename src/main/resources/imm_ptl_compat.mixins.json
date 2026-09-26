@@ -26,6 +26,7 @@
     "sodium.MixinSodiumWorldRenderer"
   ],
   "client": [
+    "real_camera.MixinRealCameraCore",
     "iris.IEIrisEuphoriaShaderPack",
     "iris.MixinIrisEuphoriaPipelineManager",
     "iris.MixinEuphoriaDimensionShaderRefresh"

@@ -6,6 +6,15 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic Real Camera portal isolation
+
+- Preserve Real Camera's normal first-person camera while excluding its player-bound
+  camera and body pass from IP's nested world views. Keep its main-view state intact
+  when recursive rendering calls its initialization hook.
+- The optional client hook targets Real Camera 0.7.8-beta on NeoForge 1.21.1 and
+  retains the packed-depth fix. See `docs/ZUBLASTIC_REAL_CAMERA.md` for evidence
+  and the current visual validation boundary.
+
 ### Zublastic packed portal depth compatibility
 
 - Match IP's portal scratch depth/stencil format to a packed source changed by
