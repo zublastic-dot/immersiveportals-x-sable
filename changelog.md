@@ -6,6 +6,15 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic packed portal depth compatibility
+
+- Match IP's portal scratch depth/stencil format to a packed source changed by
+  UI integrations, including AutoSeamBlend's bundled ApricityUI. This preserves
+  foreground depth instead of attempting incompatible depth copies.
+- Query actual texture storage even when IDs stay unchanged, retain the source
+  image and restore texture/framebuffer bindings. See `docs/ZUBLASTIC_PORTAL_DEPTH.md`
+  for verification boundaries and runtime acceptance.
+
 ### Zublastic client clipping candidate
 
 - Keep IP/Sable clip distances disabled for copy shaders that do not write them;

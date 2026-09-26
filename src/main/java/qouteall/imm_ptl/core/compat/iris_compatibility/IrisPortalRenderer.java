@@ -125,6 +125,7 @@ public class IrisPortalRenderer extends PortalRenderer {
             CHelper.doCheckGlError();
             
             // copy depth from mc fb to deferred fb
+            PortalDepthStencilCompatibility.prepareCopy(mcFrameBuffer, deferredFbs[portalLayer].fb);
             GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, mcFrameBuffer.frameBufferId);
             GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, deferredFbs[portalLayer].fb.frameBufferId);
             GL30.glBlitFramebuffer(
