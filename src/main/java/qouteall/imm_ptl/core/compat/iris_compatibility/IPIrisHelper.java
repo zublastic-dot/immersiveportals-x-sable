@@ -55,6 +55,7 @@ public class IPIrisHelper {
     public static void newCopyDepthStencil(
         RenderTarget from, RenderTarget to
     ) {
+        PortalDepthStencilCompatibility.prepareCopy(from, to);
         GL43C.glCopyImageSubData(
             from.getDepthTextureId(),
             GL43C.GL_TEXTURE_2D,

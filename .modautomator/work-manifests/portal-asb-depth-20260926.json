@@ -1,0 +1,40 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-asb-depth-20260926",
+  "lease_id": "portal-asb-depth-20260926",
+  "worker_id": "codex-portal-asb-depth-20260926",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-asb-depth-20260926/portal-asb-depth-20260926",
+  "base_commit": "fef11c46b7c7d56f79fccade98a69920752f83d7",
+  "resources": [
+    "artifact:owner-pc:portal-asb-depth-20260926",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:compatibility/ip-sable-rendering",
+    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_PORTAL_DEPTH.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/iris_compatibility",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/compat/iris_compatibility",
+    "repo:zublastic-dot/zublastic-context:history/2026-09-26-portal-asb-depth.md",
+    "repo:zublastic-dot/zublastic-context:projects/modautomator.md",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md"
+  ],
+  "paths": [
+    "src/main/java/qouteall/imm_ptl/core/compat/iris_compatibility",
+    "src/test/java/qouteall/imm_ptl/core/compat/iris_compatibility",
+    "docs/ZUBLASTIC_PORTAL_DEPTH.md",
+    "gradle.properties",
+    "changelog.md"
+  ],
+  "value_case": {
+    "category": "material_future_work_reduction",
+    "statement": "Repair the repeatable AutoSeamBlend packed-depth conflict inside IP/Sable without requiring another maintained fork.",
+    "acceptance": [
+      "Preserve source depth and adapt IP-owned scratch format before depth copies.",
+      "Run production-policy regression tests and exact-artifact native portal visual controls with AutoSeamBlend enabled.",
+      "Record scope, source/artifact identities and limits in canonical context and ideas."
+    ]
+  }
+}
