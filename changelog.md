@@ -6,6 +6,16 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic dual moving portal endpoints
+
+- Give each physical portal frame its own Sable attachment and derive one coherent
+  mapping from both carrier poses on the server and client. Preserve the two faces
+  of each frame, single-end behavior, and the prior camera/depth corrections.
+- Retain the surviving endpoint's current destination when the other detaches,
+  and save attachment snapshots independently of runtime teardown.
+- Candidate .7 passes 56 code tests and a native-preserving build; in-game dual-end
+  acceptance remains pending. See `docs/ZUBLASTIC_DUAL_ENDPOINTS.md`.
+
 ### Zublastic Real Camera portal isolation
 
 - Preserve Real Camera's normal first-person camera while excluding its player-bound

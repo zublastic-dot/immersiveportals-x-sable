@@ -1,0 +1,42 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-dual-endpoints-20260927",
+  "lease_id": "portal-dual-endpoints-20260927",
+  "worker_id": "codex-portal-dual-endpoints-20260927",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-dual-endpoints-20260927/portal-dual-endpoints-20260927",
+  "base_commit": "b9a26d855125ca0f5dfb48b057e7ad496701c653",
+  "resources": [
+    "artifact:owner-pc:portal-dual-endpoints-20260927",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:compatibility/ip-sable-rendering",
+    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_DUAL_ENDPOINTS.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/ipl/sable/client/IplClientShipPortalAnchor.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/ipl/sable/transit",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/ipl/sable/transit",
+    "repo:zublastic-dot/zublastic-context:history/2026-09-27-portal-dual-anchor.md",
+    "repo:zublastic-dot/zublastic-context:projects/modautomator.md",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md"
+  ],
+  "paths": [
+    "src/main/java/ipl/sable/transit",
+    "src/main/java/ipl/sable/client/IplClientShipPortalAnchor.java",
+    "src/test/java/ipl/sable/transit",
+    "docs/ZUBLASTIC_DUAL_ENDPOINTS.md",
+    "gradle.properties",
+    "changelog.md"
+  ],
+  "value_case": {
+    "category": "material_future_work_reduction",
+    "statement": "Make both ends of one linked portal connection follow independently assembled Sable frames inside the existing IP/Sable fork.",
+    "acceptance": [
+      "Test both assembly orders, both face orientations, movement of either or both ends, detach/reload and single-end compatibility.",
+      "Retain camera/depth fixes and native payload; build an exact reviewable candidate.",
+      "Record source, tests and live-test limits in canonical knowledge and ideas."
+    ]
+  }
+}

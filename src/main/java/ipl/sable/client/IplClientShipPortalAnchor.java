@@ -1,6 +1,8 @@
 package ipl.sable.client;
 
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
+import ipl.sable.transit.ShipPortalMotion;
+import qouteall.imm_ptl.core.portal.PortalExtension;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
@@ -48,7 +50,11 @@ public final class IplClientShipPortalAnchor {
         Vector3d plotPos,
         DQuaternion localOrient,
         DQuaternion destLock
-    ) {}
+    ) {
+        ClientAnchor withDestLock(DQuaternion lock) {
+            return new ClientAnchor(flippedId, reverseId, parallelId, shipId, plotPos, localOrient, lock);
+        }
+    }
 
     /** Portal UUID → anchor. Client thread only. */
     private static final Map<UUID, ClientAnchor> ANCHORS = new HashMap<>();
@@ -90,57 +96,64 @@ public final class IplClientShipPortalAnchor {
             || net.minecraft.client.Minecraft.getInstance().level == null) {
             return;
         }
-        for (Map.Entry<UUID, ClientAnchor> entry : ANCHORS.entrySet()) {
-            ClientAnchor a = entry.getValue();
-
+        // Snapshot BOTH carrier render poses before changing any of the four faces.
+        Map<UUID, ShipPortalMotion.Pose> poses = new HashMap<>();
+        ANCHORS.forEach((id, a) -> {
             ClientSubLevel ship = findShip(a.shipId());
-            if (ship == null || ship.isRemoved()) continue;
-            Portal portal = findPortal(entry.getKey());
-            if (portal == null) continue;
-
-            // The weld: portal pose from the ship's per-frame interpolated pose,
-            // through the FULL pose transform — the same map block vertices use.
+            if (ship == null || ship.isRemoved()) return;
             Pose3dc pose = ship.renderPose();
-            Quaterniond shipRot = new Quaterniond(pose.orientation());
-            Vec3 originNow = pose.transformPosition(
-                new Vec3(a.plotPos().x, a.plotPos().y, a.plotPos().z));
-            DQuaternion shipD = new DQuaternion(shipRot.x, shipRot.y, shipRot.z, shipRot.w);
-            DQuaternion oNow = shipD.hamiltonProduct(a.localOrient());
-            DQuaternion rtNow = a.destLock().hamiltonProduct(oNow.getConjugated());
+            Vec3 position = pose.transformPosition(new Vec3(a.plotPos().x, a.plotPos().y, a.plotPos().z));
+            DQuaternion rotation = DQuaternion.fromMcQuaternion(new Quaterniond(pose.orientation()));
+            poses.put(id, new ShipPortalMotion.Pose(position, rotation.hamiltonProduct(a.localOrient())));
+        });
+        java.util.Set<UUID> driven = new java.util.HashSet<>();
+        for (UUID id : ANCHORS.keySet().toArray(new UUID[0])) {
+            if (driven.contains(id)) continue;
+            ClientAnchor a = ANCHORS.get(id);
+            ShipPortalMotion.Pose origin = poses.get(id);
+            Portal portal = findPortal(id);
+            if (origin == null || portal == null) continue;
+            PortalExtension ext = PortalExtension.get(portal);
+            UUID flipped = a.flippedId() != null ? a.flippedId() : ext.flippedPortalId;
+            UUID reverse = a.reverseId() != null ? a.reverseId() : ext.reversePortalId;
+            UUID parallel = a.parallelId() != null ? a.parallelId() : ext.parallelPortalId;
+            ShipPortalMotion.Partner other = ShipPortalMotion.otherEnd(reverse, parallel, ANCHORS::containsKey);
+            ShipPortalMotion.Mapping mapping = ShipPortalMotion.resolve(id, other, poses, portal.getDestPos(), a.destLock());
+            if (mapping == null) continue;
 
-            portal.setOriginPos(originNow);
-            portal.setOrientationRotation(oNow);
-            portal.setRotation(rtNow);
-
-            if (a.flippedId() != null) {
-                Portal flipped = findPortal(a.flippedId());
-                if (flipped != null) {
-                    flipped.setOriginPos(originNow);
-                    flipped.setOrientation(portal.getAxisW().scale(-1), portal.getAxisH());
-                    flipped.setRotation(rtNow);
-                }
+            portal.setOriginPos(origin.position());
+            portal.setOrientationRotation(origin.orientation());
+            portal.setDestination(mapping.destination());
+            portal.setRotation(mapping.rotation());
+            Portal twin = flipped == null ? null : findPortal(flipped);
+            if (twin != null) {
+                twin.setOriginPos(origin.position());
+                twin.setOrientation(portal.getAxisW().scale(-1), portal.getAxisH());
+                twin.setDestination(mapping.destination());
+                twin.setRotation(mapping.rotation());
             }
-
-            // Dest-side members (cross-dim clusters): their DESTINATION points at the
-            // moving origin — server rectify + entity sync lags a tick+, so the view
-            // and return trip through the far side swim. Weld them per frame too;
-            // their own origin/orientation are static (the far frame doesn't move).
-            DQuaternion rtInverse = rtNow.getConjugated();
-            if (a.reverseId() != null) {
-                Portal reverse = findPortal(a.reverseId());
-                if (reverse != null) {
-                    reverse.setDestination(originNow);
-                    reverse.setRotation(rtInverse);
-                }
-            }
-            if (a.parallelId() != null) {
-                Portal parallel = findPortal(a.parallelId());
-                if (parallel != null) {
-                    parallel.setDestination(originNow);
-                    parallel.setRotation(rtInverse);
-                }
+            applyFarFace(reverse, mapping.returning(true));
+            applyFarFace(parallel, mapping.returning(false));
+            driven.add(id);
+            if (other != null) {
+                driven.add(other.id());
+                // Keep a current fixed-end fallback if a subsequent clear removes
+                // either carrier. The remaining endpoint must not jump to ignition.
+                ANCHORS.put(id, a.withDestLock(mapping.destinationBasis()));
+                ClientAnchor b = ANCHORS.get(other.id());
+                ANCHORS.put(other.id(), b.withDestLock(mapping.rotation().getConjugated()
+                    .hamiltonProduct(poses.get(other.id()).orientation())));
             }
         }
+    }
+
+    private static void applyFarFace(UUID id, ShipPortalMotion.Mapping mapping) {
+        Portal far = id == null ? null : findPortal(id);
+        if (far == null) return;
+        far.setOriginPos(mapping.origin().position());
+        far.setDestination(mapping.destination());
+        far.setOrientationRotation(mapping.origin().orientation());
+        far.setRotation(mapping.rotation());
     }
 
     /** Resolved portal entities (client Level.getEntities() is protected — scan once, cache). */
