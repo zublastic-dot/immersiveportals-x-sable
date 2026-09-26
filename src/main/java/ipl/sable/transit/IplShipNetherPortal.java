@@ -114,9 +114,9 @@ public final class IplShipNetherPortal {
                 reconcilePlaceholders(level, worldShape, breakable.blockPortalShape);
             }
 
-            // One anchor per cluster: the tick driver rectifies flipped/reverse/parallel
-            // from the primary; a second independent anchor would fight the rectify.
-            if (isClusterAnchored(portal)) continue;
+            // One attachment per physical frame (two faces), not per connection.
+            // The opposite frame may have its own carrier and is sampled together.
+            if (IplShipPortalAnchor.isCarrierPortalFace(portal)) continue;
 
             // The portal entity's world pose is STALE by however far the ship
             // fell/drifted between assembly and this (post-rehome) capture — but the
@@ -185,23 +185,6 @@ public final class IplShipNetherPortal {
                         .add(worldGoal.getCenter())))
                 .collect(Collectors.toSet()),
             mappedAxis);
-    }
-
-    /**
-     * Is this portal — or any same-cluster member — already anchored? Resolved
-     * through the extension's persisted cluster UUIDs (entity refs as fallback):
-     * the refs bind lazily after world load and can be null while the IDs are
-     * already present from NBT.
-     */
-    private static boolean isClusterAnchored(Portal portal) {
-        if (IplShipPortalAnchor.isAnchored(portal.getUUID())) return true;
-        PortalExtension ext = PortalExtension.get(portal);
-        return (ext.flippedPortalId != null && IplShipPortalAnchor.isAnchored(ext.flippedPortalId))
-            || (ext.reversePortalId != null && IplShipPortalAnchor.isAnchored(ext.reversePortalId))
-            || (ext.parallelPortalId != null && IplShipPortalAnchor.isAnchored(ext.parallelPortalId))
-            || (ext.flippedPortal != null && IplShipPortalAnchor.isAnchored(ext.flippedPortal.getUUID()))
-            || (ext.reversePortal != null && IplShipPortalAnchor.isAnchored(ext.reversePortal.getUUID()))
-            || (ext.parallelPortal != null && IplShipPortalAnchor.isAnchored(ext.parallelPortal.getUUID()));
     }
 
     /**

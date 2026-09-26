@@ -29,27 +29,21 @@ import java.util.UUID;
  * <p>An anchored portal's origin end is glued to a sub-level at a ship-local pose.
  * Every server tick, immediately after the fused step publishes fresh physics poses,
  * the portal entity is re-posed from the ship: origin = shipPose(localPos),
- * orientation = shipRot ∘ localOrient. The rotation TRANSFORM is re-derived so the
- * (static) destination end stays fixed: with D₀ = R_t(0) ∘ O(0) locked at anchor
- * time, R_t(now) = D₀ ∘ O(now)⁻¹. {@link PortalExtension#rectifyClusterPortals}
- * then propagates everything to the flipped/reverse/parallel cluster members and
- * syncs clients.
+ * orientation = shipRot ∘ localOrient. Each physical frame owns one attachment;
+ * its flipped face shares that attachment. Both carrier poses are sampled before
+ * updating any entities, then one driver rectifies the four faces from the pair.
+ * An unattached end retains its last world pose. Server SavedData retains the
+ * attachments across restarts; clients use their own interpolated carrier poses.
  *
- * <p>Physics follows for free: straddle sessions re-derive their isometry from the
- * portal each tick (M5a) and push it to the image collider; rims re-anchor from the
- * same movement check; the router and entity layers read the refreshed mapping.
- * Within a tick the isometry is frozen — the kinematic-frame fiat (§2.8): traversal
+ * <p>Physics sessions read the refreshed portal mapping. The existing kinematic
+ * frame policy remains: no carrier traverses its own connection and traversal
  * impulses do not back-react on the anchor ship.
- *
- * <p>V1 scope: origin end on a ship, destination end static; anchors are runtime
- * state (not persisted across restarts); the anchor ship straddling its OWN portal
- * is physics-safe (engine same-parent filter) but not a supported gameplay loop.
  */
 public final class IplShipPortalAnchor {
 
     private static final Logger LOG = LoggerFactory.getLogger("ipl-ship-portal");
 
-    private record Anchor(
+    record Anchor(
         UUID shipId,
         ResourceKey<Level> portalDim,
         /**
@@ -61,9 +55,13 @@ public final class IplShipPortalAnchor {
          */
         Vector3d plotPos,
         DQuaternion localOrient,
-        /** D₀ = R_t(0) ∘ O(0): the dest end's orientation lock. */
+        /** Last destination basis, retained if the other carrier detaches. */
         DQuaternion destLock
-    ) {}
+    ) {
+        Anchor withDestLock(DQuaternion lock) {
+            return new Anchor(shipId, portalDim, plotPos, localOrient, lock);
+        }
+    }
 
     /** Portal UUID → anchor. Server-thread only. */
     private static final Map<UUID, Anchor> ANCHORS = new HashMap<>();
@@ -96,8 +94,13 @@ public final class IplShipPortalAnchor {
 
     public static final class AnchorSavedData extends net.minecraft.world.level.saveddata.SavedData {
 
-        /** Parsed-but-not-yet-applied anchor tags from disk (applied on first tickAll). */
-        private net.minecraft.nbt.ListTag loaded = new net.minecraft.nbt.ListTag();
+        // Persistent snapshot, independent of shutdown clearing the runtime maps.
+        private net.minecraft.nbt.ListTag snapshot = new net.minecraft.nbt.ListTag();
+
+        void capture(Map<UUID, Anchor> anchors) {
+            snapshot = encodeAnchors(anchors);
+            setDirty();
+        }
 
         public static AnchorSavedData get(ServerLevel overworld) {
             return overworld.getDataStorage().computeIfAbsent(
@@ -105,7 +108,7 @@ public final class IplShipPortalAnchor {
                     AnchorSavedData::new,
                     (nbt, registries) -> {
                         AnchorSavedData data = new AnchorSavedData();
-                        data.loaded = nbt.getList("anchors", 10).copy();
+                        data.snapshot = nbt.getList("anchors", 10).copy();
                         return data;
                     },
                     null),
@@ -116,55 +119,61 @@ public final class IplShipPortalAnchor {
         public net.minecraft.nbt.CompoundTag save(
             net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries
         ) {
-            net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
-            for (Map.Entry<UUID, Anchor> entry : ANCHORS.entrySet()) {
-                Anchor a = entry.getValue();
-                net.minecraft.nbt.CompoundTag t = new net.minecraft.nbt.CompoundTag();
-                t.putUUID("portalId", entry.getKey());
-                t.putUUID("shipId", a.shipId());
-                t.putString("dim", a.portalDim().location().toString());
-                t.putDouble("plotX", a.plotPos().x);
-                t.putDouble("plotY", a.plotPos().y);
-                t.putDouble("plotZ", a.plotPos().z);
-                putQuat(t, "lo", a.localOrient());
-                putQuat(t, "dl", a.destLock());
-                list.add(t);
-            }
-            tag.put("anchors", list);
+            tag.put("anchors", snapshot.copy());
             return tag;
         }
+    }
+
+    static net.minecraft.nbt.ListTag encodeAnchors(Map<UUID, Anchor> anchors) {
+        net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+        anchors.forEach((id, a) -> {
+            net.minecraft.nbt.CompoundTag t = new net.minecraft.nbt.CompoundTag();
+            t.putUUID("portalId", id);
+            t.putUUID("shipId", a.shipId());
+            t.putString("dim", a.portalDim().location().toString());
+            t.putDouble("plotX", a.plotPos().x);
+            t.putDouble("plotY", a.plotPos().y);
+            t.putDouble("plotZ", a.plotPos().z);
+            putQuat(t, "lo", a.localOrient());
+            putQuat(t, "dl", a.destLock());
+            list.add(t);
+        });
+        return list;
+    }
+
+    static Map<UUID, Anchor> decodeAnchors(net.minecraft.nbt.ListTag list) {
+        Map<UUID, Anchor> result = new HashMap<>();
+        for (int i = 0; i < list.size(); i++) {
+            try {
+                var t = list.getCompound(i);
+                result.put(t.getUUID("portalId"), new Anchor(
+                    t.getUUID("shipId"), ResourceKey.create(
+                        net.minecraft.core.registries.Registries.DIMENSION,
+                        net.minecraft.resources.ResourceLocation.parse(t.getString("dim"))),
+                    new Vector3d(t.getDouble("plotX"), t.getDouble("plotY"), t.getDouble("plotZ")),
+                    getQuat(t, "lo"), getQuat(t, "dl")));
+            } catch (RuntimeException ex) {
+                LOG.error("[IPL-SHIP-PORTAL] bad persisted anchor entry {}", i, ex);
+            }
+        }
+        return result;
     }
 
     /** Applied lazily on the first tickAll of a server instance. */
     private static void restoreFromDisk(MinecraftServer server) {
         AnchorSavedData data = AnchorSavedData.get(server.overworld());
-        for (int i = 0; i < data.loaded.size(); i++) {
-            try {
-                net.minecraft.nbt.CompoundTag t = data.loaded.getCompound(i);
-                UUID portalId = t.getUUID("portalId");
-                ANCHORS.put(portalId, new Anchor(
-                    t.getUUID("shipId"),
-                    ResourceKey.create(
-                        net.minecraft.core.registries.Registries.DIMENSION,
-                        net.minecraft.resources.ResourceLocation.parse(t.getString("dim"))),
-                    new Vector3d(
-                        t.getDouble("plotX"), t.getDouble("plotY"), t.getDouble("plotZ")),
-                    getQuat(t, "lo"),
-                    getQuat(t, "dl")));
-                RESTORE_PENDING.put(portalId, RESTORE_GRACE_TICKS);
-                LOG.info("[IPL-SHIP-PORTAL] restored anchor for portal {} (ship {}, pending resolve)",
-                    portalId, t.getUUID("shipId"));
-            } catch (Throwable th) {
-                LOG.error("[IPL-SHIP-PORTAL] bad persisted anchor entry {}", i, th);
-            }
-        }
-        data.loaded = new net.minecraft.nbt.ListTag();
+        decodeAnchors(data.snapshot).forEach((id, anchor) -> {
+            ANCHORS.put(id, anchor);
+            RESTORE_PENDING.put(id, RESTORE_GRACE_TICKS);
+            LOG.info("[IPL-SHIP-PORTAL] restored anchor for portal {} (ship {}, pending resolve)",
+                id, anchor.shipId());
+        });
     }
 
     /** Mark the anchor set changed — vanilla persists it at the next save point. */
     private static void markDirty(MinecraftServer server) {
         if (!PERSISTENCE_ENABLED || server == null) return;
-        AnchorSavedData.get(server.overworld()).setDirty();
+        AnchorSavedData.get(server.overworld()).capture(ANCHORS);
     }
 
     private static void putQuat(net.minecraft.nbt.CompoundTag tag, String prefix, DQuaternion q) {
@@ -187,6 +196,7 @@ public final class IplShipPortalAnchor {
         ANCHORS.clear();
         RESTORE_PENDING.clear();
         restoredFor = null;
+        syncCounter = 0;
     }
 
     public static boolean isAnchored(UUID portalId) {
@@ -289,9 +299,8 @@ public final class IplShipPortalAnchor {
         // plot-frame orientation is the portal's current orientation verbatim.
         DQuaternion localOrient = portal.getOrientationRotation();
         String result = register(portal, ship, plotOrigin, localOrient);
-        Anchor anchor = ANCHORS.get(portal.getUUID());
-        if (anchor != null) {
-            drivePortal(portal, ship, anchor); // snap out of the stale world pose now
+        if (portal.level() instanceof ServerLevel level && isAnchored(portal.getUUID())) {
+            drivePortal(portal, samplePoses(level.getServer()), true);
         }
         return result;
     }
@@ -300,6 +309,8 @@ public final class IplShipPortalAnchor {
         Portal portal, ServerSubLevel ship, Vec3 plotOrigin, DQuaternion localOrient
     ) {
         if (!(portal.level() instanceof ServerLevel level)) return "server side only";
+        if (isCarrierPortalFace(portal)) return "this frame is already anchored";
+        resolveCluster(portal);
         Vector3d localPos = new Vector3d(plotOrigin.x, plotOrigin.y, plotOrigin.z);
         DQuaternion o0 = portal.getOrientationRotation();
         DQuaternion rt0 = portal.getRotation() == null ? DQuaternion.identity : portal.getRotation();
@@ -321,16 +332,21 @@ public final class IplShipPortalAnchor {
         return "anchored portal to ship " + ship.getUniqueId();
     }
 
-    /** Detach the portal; it stays wherever the ship last carried it. */
+    /** Detach just this physical endpoint, freezing it at the last carried pose. */
     public static String unanchor(Portal portal) {
-        Anchor removed = ANCHORS.remove(portal.getUUID());
-        RESTORE_PENDING.remove(portal.getUUID());
-        if (removed == null) return "portal was not anchored";
-        applyCarrierSideEffects(portal, null, false);
-        if (portal.level() instanceof ServerLevel sl) {
-            markDirty(sl.getServer());
-            syncClearToClients(sl.getServer(), portal.getUUID());
+        UUID id = endpointAnchor(portal);
+        if (id == null || !(portal.level() instanceof ServerLevel level)) {
+            return "portal was not anchored";
         }
+        Portal primary = level.getEntity(id) instanceof Portal p ? p : null;
+        if (primary != null) drivePortal(primary, samplePoses(level.getServer()), true);
+        ANCHORS.remove(id);
+        RESTORE_PENDING.remove(id);
+        applyCarrierSideEffects(portal, null, false);
+        markDirty(level.getServer());
+        syncClearToClients(level.getServer(), id);
+        // The survivor's last destination basis is now its fixed-end lock.
+        for (UUID remaining : ANCHORS.keySet()) syncToClients(level.getServer(), remaining);
         return "unanchored";
     }
 
@@ -390,18 +406,26 @@ public final class IplShipPortalAnchor {
 
     /**
      * True for the anchored origin face and its same-level flipped face. These are the
-     * carrier's physical aperture faces; reverse and parallel faces are destination-world
-     * portals and keep their ordinary world block frame.
+     * carrier's physical aperture faces; the other endpoint can have its own attachment.
      */
     public static boolean isCarrierPortalFace(Portal portal) {
-        Anchor direct = ANCHORS.get(portal.getUUID());
-        if (direct != null) return true;
+        return endpointAnchor(portal) != null;
+    }
+
+    private static UUID endpointAnchor(Portal portal) {
         PortalExtension ext = PortalExtension.get(portal);
-        Anchor flipped = ext.flippedPortalId == null ? null : ANCHORS.get(ext.flippedPortalId);
-        if (flipped == null && ext.flippedPortal != null) {
-            flipped = ANCHORS.get(ext.flippedPortal.getUUID());
-        }
-        return flipped != null && portal.level().dimension().equals(flipped.portalDim());
+        return ShipPortalMotion.sameEnd(portal.getUUID(),
+            memberId(ext.flippedPortalId, ext.flippedPortal), ANCHORS::containsKey);
+    }
+
+    private static UUID memberId(UUID saved, Portal resolved) {
+        return saved != null ? saved : resolved == null ? null : resolved.getUUID();
+    }
+
+    private static ShipPortalMotion.Partner partner(Portal portal) {
+        PortalExtension ext = PortalExtension.get(portal);
+        return ShipPortalMotion.otherEnd(memberId(ext.reversePortalId, ext.reversePortal),
+            memberId(ext.parallelPortalId, ext.parallelPortal), ANCHORS::containsKey);
     }
 
     /**
@@ -424,6 +448,7 @@ public final class IplShipPortalAnchor {
             }
         }
 
+        boolean removedAttachment = false;
         Iterator<Map.Entry<UUID, Anchor>> it = ANCHORS.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<UUID, Anchor> entry = it.next();
@@ -436,7 +461,9 @@ public final class IplShipPortalAnchor {
             if (!(entity instanceof Portal portal) || portal.isRemoved()) {
                 LOG.info("[IPL-SHIP-PORTAL] portal {} gone — anchor dropped", entry.getKey());
                 syncClearToClients(server, entry.getKey());
+                RESTORE_PENDING.remove(entry.getKey());
                 it.remove();
+                removedAttachment = true;
                 markDirty(server);
                 continue;
             }
@@ -454,6 +481,7 @@ public final class IplShipPortalAnchor {
                 applyCarrierSideEffects(portal, null, false);
                 syncClearToClients(server, entry.getKey());
                 it.remove();
+                removedAttachment = true;
                 markDirty(server);
                 continue;
             }
@@ -467,42 +495,103 @@ public final class IplShipPortalAnchor {
                     entry.getKey(), a.shipId());
             }
 
-            Pose3dc pose = ship.logicalPose();
-            Quaterniond shipRot = new Quaterniond(pose.orientation());
-            Vec3 originNow = pose.transformPosition(
-                new Vec3(a.plotPos().x, a.plotPos().y, a.plotPos().z));
-            DQuaternion shipD = new DQuaternion(shipRot.x, shipRot.y, shipRot.z, shipRot.w);
-            DQuaternion oNow = shipD.hamiltonProduct(a.localOrient());
+        }
 
-            // Cheap static-ship skip: pose unchanged within epsilon.
-            DQuaternion oCur = portal.getOrientationRotation();
-            boolean moved = portal.getOriginPos().distanceToSqr(originNow) > 1.0e-10
-                || Math.abs(oCur.getX() * oNow.getX() + oCur.getY() * oNow.getY()
-                    + oCur.getZ() * oNow.getZ() + oCur.getW() * oNow.getW()) < 1.0 - 1.0e-10;
-            if (!moved) continue;
+        if (removedAttachment) {
+            for (UUID id : ANCHORS.keySet()) syncToClients(server, id);
+        }
 
-            drivePortal(portal, ship, a);
+        Map<UUID, ShipPortalMotion.Pose> poses = samplePoses(server);
+        java.util.Set<UUID> driven = new java.util.HashSet<>();
+        for (UUID id : ANCHORS.keySet().toArray(new UUID[0])) {
+            if (driven.contains(id)) continue;
+            Anchor anchor = ANCHORS.get(id);
+            ServerLevel level = server.getLevel(anchor.portalDim());
+            if (level == null || !(level.getEntity(id) instanceof Portal portal)) continue;
+            ShipPortalMotion.Partner other = partner(portal);
+            if (drivePortal(portal, poses, false)) {
+                driven.add(id);
+                if (other != null) driven.add(other.id());
+            }
         }
     }
 
-    /** Re-pose {@code portal} from the ship's CURRENT pose (tick driver + anchor snap). */
-    private static void drivePortal(Portal portal, ServerSubLevel ship, Anchor a) {
-        Pose3dc pose = ship.logicalPose();
-        Quaterniond shipRot = new Quaterniond(pose.orientation());
-        Vec3 originNow = pose.transformPosition(
-            new Vec3(a.plotPos().x, a.plotPos().y, a.plotPos().z));
-        DQuaternion shipD = new DQuaternion(shipRot.x, shipRot.y, shipRot.z, shipRot.w);
-        DQuaternion oNow = shipD.hamiltonProduct(a.localOrient());
-        DQuaternion rtNow = a.destLock().hamiltonProduct(oNow.getConjugated());
+    private static Map<UUID, ShipPortalMotion.Pose> samplePoses(MinecraftServer server) {
+        Map<UUID, ShipPortalMotion.Pose> poses = new HashMap<>();
+        ANCHORS.forEach((id, a) -> {
+            ServerSubLevel ship = findShip(server, a.shipId());
+            if (ship == null || ship.isRemoved()) return;
+            Pose3dc pose = ship.logicalPose();
+            Vec3 position = pose.transformPosition(new Vec3(a.plotPos().x, a.plotPos().y, a.plotPos().z));
+            DQuaternion rotation = DQuaternion.fromMcQuaternion(new Quaterniond(pose.orientation()));
+            poses.put(id, new ShipPortalMotion.Pose(position, rotation.hamiltonProduct(a.localOrient())));
+        });
+        return poses;
+    }
 
-        portal.setOriginPos(originNow);
-        portal.setOrientationRotation(oNow);
-        portal.setRotation(rtNow);
+    /** One coherent mapping drives all four faces, independent of map iteration order. */
+    private static boolean drivePortal(
+        Portal portal, Map<UUID, ShipPortalMotion.Pose> poses, boolean force
+    ) {
+        Anchor a = ANCHORS.get(portal.getUUID());
+        ShipPortalMotion.Pose origin = poses.get(portal.getUUID());
+        if (a == null || origin == null) return false;
+        ShipPortalMotion.Partner other = partner(portal);
+        // An attached but unresolved carrier is not a fixed endpoint. Wait rather
+        // than snapping back to its old lock during join/chunk loading.
+        ShipPortalMotion.Mapping mapping = ShipPortalMotion.resolve(portal.getUUID(), other, poses,
+            portal.getDestPos(), a.destLock());
+        if (mapping == null) return false;
+        resolveCluster(portal);
+        PortalExtension ext = PortalExtension.get(portal);
+        // A counterpart can reload with an older entity pose while both carriers
+        // are stationary. It still needs rectification before we mark the pair done.
+        if (!force && !needsUpdate(portal, mapping)
+            && !needsUpdate(ext.flippedPortal, mapping.flipped())
+            && !needsUpdate(ext.reversePortal, mapping.returning(true))
+            && !needsUpdate(ext.parallelPortal, mapping.returning(false))) return true;
+        portal.setOriginPos(origin.position());
+        portal.setOrientationRotation(origin.orientation());
+        portal.setDestination(mapping.destination());
+        portal.setRotation(mapping.rotation());
         portal.reloadAndSyncToClientNextTick();
         PortalExtension.get(portal).rectifyClusterPortals(portal, true);
-        // Weld the physical rim at the same point that welds the portal aperture to
-        // the ship. Rectification moves the same-level flipped face too.
         followCarrierRims(portal);
+        if (other != null) {
+            Anchor b = ANCHORS.get(other.id());
+            ANCHORS.put(portal.getUUID(), a.withDestLock(mapping.destinationBasis()));
+            DQuaternion returnBasis = mapping.rotation().getConjugated()
+                .hamiltonProduct(poses.get(other.id()).orientation());
+            ANCHORS.put(other.id(), b.withDestLock(returnBasis));
+            ServerLevel far = portal.getServer().getLevel(b.portalDim());
+            if (far != null && far.getEntity(other.id()) instanceof Portal partner) {
+                followCarrierRims(partner);
+            }
+            markDirty(portal.getServer());
+        }
+        return true;
+    }
+
+    private static boolean needsUpdate(Portal portal, ShipPortalMotion.Mapping mapping) {
+        return portal != null && ShipPortalMotion.changed(mapping,
+            new ShipPortalMotion.Pose(portal.getOriginPos(), portal.getOrientationRotation()),
+            portal.getDestPos(), portal.getRotation() == null ? DQuaternion.identity : portal.getRotation());
+    }
+
+    /** Bind loaded members by persisted UUID too; lazy IP references may lag assembly/rejoin. */
+    private static void resolveCluster(Portal portal) {
+        if (!(portal.level() instanceof ServerLevel level)) return;
+        PortalExtension ext = PortalExtension.get(portal);
+        ServerLevel far = level.getServer().getLevel(portal.getDestDim());
+        ext.flippedPortal = resolveMember(level, ext.flippedPortalId, ext.flippedPortal);
+        ext.reversePortal = resolveMember(far, ext.reversePortalId, ext.reversePortal);
+        ext.parallelPortal = resolveMember(far, ext.parallelPortalId, ext.parallelPortal);
+    }
+
+    private static Portal resolveMember(ServerLevel level, UUID id, Portal fallback) {
+        if (id != null && level != null && level.getEntity(id) instanceof Portal portal
+            && !portal.isRemoved()) return portal;
+        return fallback != null && !fallback.isRemoved() ? fallback : null;
     }
 
     /** Create/update both same-level carrier-face rims from their rectified portal poses. */
@@ -545,9 +634,12 @@ public final class IplShipPortalAnchor {
         String parallelId = "";
         if (level != null && level.getEntity(portalId) instanceof Portal portal) {
             PortalExtension ext = PortalExtension.get(portal);
-            if (ext.flippedPortal != null) flippedId = ext.flippedPortal.getUUID().toString();
-            if (ext.reversePortal != null) reverseId = ext.reversePortal.getUUID().toString();
-            if (ext.parallelPortal != null) parallelId = ext.parallelPortal.getUUID().toString();
+            UUID flipped = memberId(ext.flippedPortalId, ext.flippedPortal);
+            UUID reverse = memberId(ext.reversePortalId, ext.reversePortal);
+            UUID parallel = memberId(ext.parallelPortalId, ext.parallelPortal);
+            if (flipped != null) flippedId = flipped.toString();
+            if (reverse != null) reverseId = reverse.toString();
+            if (parallel != null) parallelId = parallel.toString();
         }
         String localPos = a.plotPos().x + "," + a.plotPos().y + "," + a.plotPos().z;
         String localOrient = a.localOrient().getX() + "," + a.localOrient().getY() + ","
