@@ -1,0 +1,44 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-real-camera-20260926",
+  "lease_id": "portal-real-camera-20260926",
+  "worker_id": "codex-portal-real-camera-20260926",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-real-camera-20260926/portal-real-camera-20260926",
+  "base_commit": "066c05bb3bf84c0a5929902fec3c16f72b3c4cac",
+  "resources": [
+    "artifact:owner-pc:portal-full-stack-20260926",
+    "artifact:owner-pc:portal-real-camera-20260926",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:compatibility/ip-sable-rendering",
+    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_REAL_CAMERA.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/resources/imm_ptl_compat.mixins.json",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/compat",
+    "repo:zublastic-dot/zublastic-context:history/2026-09-26-portal-asb-depth.md",
+    "repo:zublastic-dot/zublastic-context:history/2026-09-26-portal-real-camera.md",
+    "repo:zublastic-dot/zublastic-context:projects/modautomator.md",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md"
+  ],
+  "paths": [
+    "src/main/java/qouteall/imm_ptl/core/compat",
+    "src/test/java/qouteall/imm_ptl/core/compat",
+    "src/main/resources/imm_ptl_compat.mixins.json",
+    "docs/ZUBLASTIC_REAL_CAMERA.md",
+    "gradle.properties",
+    "changelog.md"
+  ],
+  "value_case": {
+    "category": "material_future_work_reduction",
+    "statement": "Preserve Real Camera in the main view while isolating its player-bound state from IP portal views, inside the IP/Sable fork.",
+    "acceptance": [
+      "Regression tests for main versus nested camera state and version/absence guards.",
+      "Build with the unchanged Sable native resource and test the exact candidate in Portal Lab.",
+      "Preserve the AutoSeamBlend fix and record visual limits and source identities in canonical context and ideas."
+    ]
+  }
+}
