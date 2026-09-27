@@ -43,6 +43,9 @@ public class IPConfig implements ConfigData {
     @ConfigEntry.Category("client")
     public boolean netherPortalOverlay = false;
     @ConfigEntry.Category("client")
+    @ConfigEntry.Gui.Tooltip
+    public boolean showPortalSurfaceOutline = true;
+    @ConfigEntry.Category("client")
     public boolean enableNetherPortalEffect = true;
     @ConfigEntry.Category("client")
     @ConfigEntry.Gui.Tooltip

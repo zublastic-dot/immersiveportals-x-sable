@@ -6,6 +6,15 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic portal surface outline preference
+
+- Add the client setting "Show Portal Surface Outline", enabled by default.
+  Turn it off to hide only the invisible portal surface's selection outline;
+  normal block outlines and targeting remain unchanged. Save to apply in-game.
+- Expose the existing config screen through NeoForge's Mods menu. The existing
+  `/imm_ptl_client_debug config` command also opens it. See
+  `docs/ZUBLASTIC_PORTAL_OUTLINE.md` for behavior and validation scope.
+
 ### Zublastic Iris portal fog sampling
 
 - Sample shader eye lighting at the transformed destination camera during nested
