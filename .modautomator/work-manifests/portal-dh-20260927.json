@@ -1,0 +1,52 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-dh-20260927",
+  "lease_id": "portal-dh-20260927",
+  "worker_id": "codex-portal-dh-20260927",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-dh-20260927/portal-dh-20260927",
+  "base_commit": "4a5812a1514f45cb700c4249741db3f036588f5c",
+  "resources": [
+    "artifact:owner-pc:portal-dh-20260927",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:compatibility/ip-sable-rendering",
+    "repo:zublastic-dot/immersiveportals-x-sable:build.gradle",
+    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_DH.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/ClientWorldLoader.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/IPModMainClient.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/IPCompatMixinPlugin.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/dh_compatibility",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/mixin/dh",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/resources/imm_ptl_compat.mixins.json",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/compat/dh_compatibility",
+    "repo:zublastic-dot/zublastic-context:history/2026-09-27-portal-dh.md",
+    "repo:zublastic-dot/zublastic-context:projects/modautomator.md",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md"
+  ],
+  "paths": [
+    "build.gradle",
+    "gradle.properties",
+    "changelog.md",
+    "docs/ZUBLASTIC_DH.md",
+    "src/main/java/qouteall/imm_ptl/core/compat/dh_compatibility",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/dh",
+    "src/main/java/qouteall/imm_ptl/core/compat/IPCompatMixinPlugin.java",
+    "src/main/java/qouteall/imm_ptl/core/IPModMainClient.java",
+    "src/main/java/qouteall/imm_ptl/core/ClientWorldLoader.java",
+    "src/main/resources/imm_ptl_compat.mixins.json",
+    "src/test/java/qouteall/imm_ptl/core/compat/dh_compatibility"
+  ],
+  "value_case": {
+    "category": "material_future_work_reduction",
+    "statement": "Repair DH 3.3.2 destination LOD rendering from inside IP/Sable, retaining exact integration evidence and reusable regression coverage.",
+    "acceptance": [
+      "Bind diagnosis and candidate to installed DH/IP/Sable versions and source.",
+      "Exercise portal-view isolation and retained camera/depth/moving-frame behavior without forking DH.",
+      "Separate build/code validation from owner visual acceptance and preserve rollback evidence."
+    ]
+  }
+}

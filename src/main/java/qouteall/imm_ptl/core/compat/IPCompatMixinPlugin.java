@@ -6,6 +6,7 @@ import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import qouteall.imm_ptl.core.compat.iris_compatibility.EuphoriaCompatibility;
 import qouteall.imm_ptl.core.compat.real_camera.RealCameraCompatibility;
+import qouteall.imm_ptl.core.compat.dh_compatibility.DhCompatibility;
 
 import java.util.List;
 import java.util.Set;
@@ -26,6 +27,9 @@ public class IPCompatMixinPlugin implements IMixinConfigPlugin {
 
 
         LoadingModList modList = LoadingModList.get();
+        if (mixinClassName.contains(".dh.")) {
+            return DhCompatibility.supports(version(modList, "distanthorizons"));
+        }
         if (mixinClassName.contains("RealCamera")) {
             return RealCameraCompatibility.supports(version(modList, "realcamera"));
         }

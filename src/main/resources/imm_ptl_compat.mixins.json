@@ -26,6 +26,17 @@
     "sodium.MixinSodiumWorldRenderer"
   ],
   "client": [
+    "dh.MixinDhPortalCancellation",
+    "dh.MixinDhRenderParams",
+    "dh.MixinDhClientApi",
+    "dh.MixinDhClientLevel",
+    "dh.MixinDhIntegratedLevel",
+    "dh.MixinDhClientWrapper",
+    "dh.MixinDhRenderWrapper",
+    "dh.MixinDhWorldRender",
+    "dh.MixinDhLodRenderer",
+    "dh.MixinDhAntiAliasing",
+    "dh.MixinDhTerrainAntiAliasing",
     "real_camera.MixinRealCameraCore",
     "iris.IEIrisEuphoriaShaderPack",
     "iris.MixinIrisEuphoriaPipelineManager",

@@ -9,6 +9,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import qouteall.imm_ptl.core.collision.CollisionHelper;
 import qouteall.imm_ptl.core.commands.ClientDebugCommand;
 import qouteall.imm_ptl.core.compat.IPFlywheelCompat;
+import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalTextureSnapshots;
 import qouteall.imm_ptl.core.compat.sodium_compatibility.SodiumInterface;
 import qouteall.imm_ptl.core.miscellaneous.DubiousThings;
 import qouteall.imm_ptl.core.miscellaneous.GcMonitor;
@@ -130,6 +131,7 @@ public class IPModMainClient {
 
         NeoForge.EVENT_BUS.addListener(ClientCleanupEvent.class, e -> {
             IPGlobal.CLIENT_TASK_LIST.forceClearTasks();
+            DhPortalTextureSnapshots.clear();
         });
 
         DimensionIntId.initClient();
