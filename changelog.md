@@ -10,8 +10,11 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 - Add optional DH 3.3.2 integration inside IP/Sable: destination LOD ticks,
   dimension-correct wrappers/lightmaps, scoped rendering and portal-plane clipping.
+- Keep DH's cached combined/inverse matrices consistent with portal clipping,
+  correcting the stale distance reconstruction found in the .8 cloud comparison.
 - Preserve the actual-player view and previous camera/depth/moving-frame code.
-  Candidate .8 passes 67 code tests; live rendering acceptance is pending.
+  Candidate .9 adds cloud/terrain depth reconstruction coverage; live rendering
+  acceptance is pending.
   See `docs/ZUBLASTIC_DH.md` for evidence, limits and the Portal Lab trial.
 
 ### Zublastic dual moving portal endpoints

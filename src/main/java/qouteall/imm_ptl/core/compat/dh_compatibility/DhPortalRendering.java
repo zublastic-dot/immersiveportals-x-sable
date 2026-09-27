@@ -56,7 +56,7 @@ public final class DhPortalRendering {
         }
         DhMat4f result = new DhMat4f();
         result.set(clipped);
-        params.dhProjectionMatrix.set(result);
+        DhPortalMatrices.applyProjection(params, result);
         params.apiCopy.update(params);
     }
 

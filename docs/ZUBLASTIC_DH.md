@@ -83,3 +83,25 @@ Local evidence: `M:/PortalDH-20260927/` (input hashes, bounded log excerpts,
 owner screenshot, decompiled inspection, build logs, build proof and candidate).
 The currently running Lab must be closed before replacement. Keep .7 for rollback.
 No GregTest/Kinetic/Companion or ModSync inventory change is part of this trial.
+
+## .9 correction: cloud fog after portal clipping
+
+The .8 runtime submitted nonempty destination LOD buffers in both dimensions.
+The owner's no-shader comparison then showed dense, sharply visible distant
+clouds through the Nether-to-Overworld portal, fading away after crossing at
+nearly the same facing angles. This is a visual discrepancy, not acceptance.
+
+The installed DH 3.3.2 `DhApiRenderParam.update` caches the combined projection/
+model-view matrix and its inverse. Our .8 tail hook replaced only the projection
+and refreshed the API copy. DH's terrain and generic cloud shaders built their
+draw matrix from the new projection, but `GlDhFogRenderer_neoforge.render` passed
+the stale combined matrix to the fog shader for depth reconstruction. This is a
+confirmed code defect consistent with the cloud comparison; live validation of
+the correction is still required.
+
+Candidate .9 updates the projection, combined matrix and cached inverse together
+before refreshing the API copy. Two regression cases use the actual DH matrix
+types and forward/reverse depth projections: the stale matrix misreconstructs
+distant cloud/terrain positions by over 100 blocks, while the corrected matrices
+and API copy recover them within one block. The change preserves the existing
+DH fog policy, cloud settings and all other portal behavior for this comparison.
