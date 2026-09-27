@@ -1,0 +1,48 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-outline-20260927",
+  "lease_id": "portal-outline-20260927",
+  "worker_id": "codex-portal-outline-20260927",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-outline-20260927/portal-outline-20260927",
+  "base_commit": "0b170a9d7a9daeda55e81d2a5fa4f2175be370e6",
+  "resources": [
+    "artifact:owner-pc:portal-outline-20260927",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:compatibility/ip-sable-rendering",
+    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_PORTAL_OUTLINE.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/mixin/client/render/MixinPortalSurfaceOutline.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/platform_specific/IPConfig.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/platform_specific/IPModEntry.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/platform_specific/IPModEntryClient.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/resources/assets/immersive_portals/lang/en_us.json",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/resources/imm_ptl.mixins.json",
+    "repo:zublastic-dot/zublastic-context:history/2026-09-27-portal-outline.md",
+    "repo:zublastic-dot/zublastic-context:projects/modautomator.md",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md"
+  ],
+  "paths": [
+    "gradle.properties",
+    "changelog.md",
+    "docs/ZUBLASTIC_PORTAL_OUTLINE.md",
+    "src/main/java/qouteall/imm_ptl/core/platform_specific/IPConfig.java",
+    "src/main/java/qouteall/imm_ptl/core/platform_specific/IPModEntry.java",
+    "src/main/java/qouteall/imm_ptl/core/platform_specific/IPModEntryClient.java",
+    "src/main/java/qouteall/imm_ptl/core/mixin/client/render/MixinPortalSurfaceOutline.java",
+    "src/main/resources/imm_ptl.mixins.json",
+    "src/main/resources/assets/immersive_portals/lang/en_us.json"
+  ],
+  "value_case": {
+    "category": "material_future_work_reduction",
+    "statement": "Let each player choose whether the invisible portal surface has a block selection outline through an in-game client toggle.",
+    "acceptance": [
+      "Persist an in-game client option without changing normal block targeting or outlines.",
+      "Preserve current outline behavior by default and support Sable frames with or without shaders.",
+      "Build a native-preserving candidate and distinguish runtime acceptance from build validation."
+    ]
+  }
+}

@@ -4,8 +4,10 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import qouteall.imm_ptl.core.CHelper;
 import qouteall.imm_ptl.core.IPGlobal;
 import qouteall.imm_ptl.core.IPMcHelper;
@@ -62,7 +64,9 @@ public class IPModEntryClient {
         
     }
 
-    public void onInitializeClient(IEventBus modEventBus) {
+    public void onInitializeClient(IEventBus modEventBus, ModContainer modContainer) {
+        modContainer.registerExtensionPoint(IConfigScreenFactory.class,
+            (container, parent) -> IPConfigGUI.createClothConfigScreen(parent));
         IPModMainClient.init();
 
         modEventBus.addListener(EntityRenderersEvent.RegisterRenderers.class, IPModEntryClient::initPortalRenderers);

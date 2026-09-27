@@ -3,6 +3,7 @@ package qouteall.imm_ptl.core.platform_specific;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLDedicatedServerSetupEvent;
@@ -21,7 +22,7 @@ public class IPModEntry {
 
     public static final String MODID = "immersive_portals_core";
 
-    public IPModEntry(IEventBus modEventBus) {
+    public IPModEntry(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(RegisterEvent.class, registerEvent ->
                 registerEvent.register(BuiltInRegistries.ENTITY_TYPE.key(), IPModMain::registerEntityTypesForge));
         modEventBus.addListener(RegisterEvent.class, registerEvent ->
@@ -30,7 +31,7 @@ public class IPModEntry {
         modEventBus.addListener(FMLDedicatedServerSetupEvent.class, event -> new IPModEntryDedicatedServer().onInitializeServer());
 
         if (FMLEnvironment.dist.isClient()) {
-            new IPModEntryClient().onInitializeClient(modEventBus);
+            new IPModEntryClient().onInitializeClient(modEventBus, modContainer);
         }
 
         onInitialize(modEventBus);
