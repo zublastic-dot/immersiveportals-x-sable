@@ -6,6 +6,15 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic Iris portal fog sampling
+
+- Sample shader eye lighting at the transformed destination camera during nested
+  world views. Iris previously queried destination light at the source character's
+  coordinates, which can suppress Complementary fog over distant DH terrain.
+- Retain normal-view sampling and Iris smoothing; enable the optional hook only
+  for the inspected Iris 1.8.14-beta.1+mc1.21.1. Candidate .12 awaits the owner's
+  same-hill comparison. See `docs/ZUBLASTIC_IRIS_DH.md` for evidence and limits.
+
 ### Zublastic Distant Horizons destination views
 
 - Add optional DH 3.3.2 integration inside IP/Sable: destination LOD ticks,
@@ -18,8 +27,8 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
   preventing its late vanilla fade from reading the portal destination's images.
 - Preserve the actual-player view and previous camera/depth/moving-frame code.
   The owner confirmed .9's cloud correction and .10's stationary LOD stability.
-  Candidate .11 addresses clouds/terrain leaking outside the portal; in-game
-  acceptance is pending after 88 passing tests including seven GPU pixel cases.
+  The owner also accepted .11's tested no-shader cloud boundary after 88 passing
+  tests including seven GPU pixel cases. Shader compatibility is a separate test.
   See `docs/ZUBLASTIC_DH.md` for evidence, limits and the Portal Lab trial.
 
 ### Zublastic dual moving portal endpoints

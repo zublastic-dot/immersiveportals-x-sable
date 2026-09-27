@@ -38,6 +38,7 @@
     "dh.MixinDhAntiAliasing",
     "dh.MixinDhTerrainAntiAliasing",
     "real_camera.MixinRealCameraCore",
+    "iris.MixinIrisPortalEyeBrightness",
     "iris.IEIrisEuphoriaShaderPack",
     "iris.MixinIrisEuphoriaPipelineManager",
     "iris.MixinEuphoriaDimensionShaderRefresh"
