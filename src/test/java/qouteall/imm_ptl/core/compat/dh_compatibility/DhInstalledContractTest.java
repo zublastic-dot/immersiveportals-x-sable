@@ -35,4 +35,24 @@ class DhInstalledContractTest {
         hasMethod("common/render/openGl/postProcessing/antialiasing/GlDhTaaRenderer_neoforge", "render",
             "(Lcom/seibel/distanthorizons/core/render/RenderParams;)V");
     }
+
+    @Test void inspectedTerrainShaderSupportsUnjitteredUniformAndPhaseRestoration() throws IOException {
+        String owner = "common/render/openGl/terrain/GlDhTerrainShaderProgram_neoforge";
+        hasMethod(owner, "fillUniformData",
+            "(Lcom/seibel/distanthorizons/api/methods/events/sharedParameterObjects/DhApiRenderParam;)V");
+        try (var stream = getClass().getResourceAsStream("/com/seibel/distanthorizons/" + owner + ".class")) {
+            assertNotNull(stream);
+            var node = new ClassNode();
+            new ClassReader(stream).accept(node, ClassReader.SKIP_CODE);
+            for (String field : new String[]{"frameIndexMod8", "uFrameMod8"}) {
+                assertTrue(node.fields.stream().anyMatch(f -> f.name.equals(field) && f.desc.equals("I")), field);
+            }
+        }
+        try (var stream = getClass().getResourceAsStream("/assets/distanthorizons/shaders/terrain/gl/vert.vert")) {
+            assertNotNull(stream);
+            String shader = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            assertTrue(shader.contains("if (uFrameMod8 > 0)"));
+            assertTrue(shader.contains("gl_Position.xy = TAAJitter(gl_Position.xy, gl_Position.w)"));
+        }
+    }
 }

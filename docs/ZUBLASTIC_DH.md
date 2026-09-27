@@ -105,3 +105,44 @@ types and forward/reverse depth projections: the stale matrix misreconstructs
 distant cloud/terrain positions by over 100 blocks, while the corrected matrices
 and API copy recover them within one block. The change preserves the existing
 DH fog policy, cloud settings and all other portal behavior for this comparison.
+
+The owner subsequently confirmed "Clouds now match" after .9 was installed and
+started in Portal Lab. This accepts the no-shader Nether-to-Overworld cloud
+comparison; it does not accept all terrain, shader and moving-frame behavior.
+
+## .10 candidate: stationary terrain flicker
+
+The owner then reported Overworld LOD flicker while standing in the Nether,
+including when the camera and both frames stay stationary. The screenshot
+locates the affected terrain but cannot establish its temporal behavior. The
+live client remains .9 with DH 3.3.2, shaders disabled and DH anti-aliasing on.
+
+Code inspection found an incomplete pairing in the .8/.9 integration:
+`MixinDhAntiAliasing` cancels the shared-history TAA resolve inside portals,
+but DH's `GlDhTerrainShaderProgram_neoforge.fillUniformData` still advances
+`frameIndexMod8` and uploads it to `uFrameMod8`. The terrain vertex shader uses
+that index for subpixel jitter even when the camera is stationary. Animated
+samples without temporal accumulation are a concrete code defect consistent
+with the reported flicker, not yet a visually verified sole cause.
+
+The .10 candidate uploads DH's unjittered sentinel (-1) after portal terrain
+uniform setup. It restores the normal view's phase in `finally`, including
+failed uploads. Ordinary views execute the original method unchanged. DH's
+settings, JAR, per-view fog correction and prior portal repairs are retained.
+This does not implement independent temporal-history buffers for each portal.
+
+Regression tests execute the compiled production wrapper with only the live
+portal flag and GL upload replaced by test boundaries. They cover all initial
+sample phases, repeated portal passes, normal-view continuation and exception
+propagation/restoration. Installed-artifact contracts check the exact fields,
+method and shader's jitter guard. These tests do not constitute GPU acceptance.
+
+Live comparison: stationary view with DH anti-aliasing enabled, then camera and
+frame motion, both portal directions and crossing. The owner was also asked
+whether temporarily disabling DH anti-aliasing stops the .9 flicker. Record
+that result separately; do not globally disable the owner's option as a fix.
+Evidence and candidate: `M:/PortalDH-20260927/flicker-repair/`.
+
+All **81 tests** and the Java 21 native-preserving build pass. Candidate .10
+SHA-256: `49ab34175d55a73020861ddb794b6f6fc70b4a684171b2d59f215174ca967421`.
+The candidate is not installed or visually accepted at this capture.

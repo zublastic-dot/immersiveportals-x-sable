@@ -36,6 +36,7 @@
     "dh.MixinDhWorldRender",
     "dh.MixinDhLodRenderer",
     "dh.MixinDhAntiAliasing",
+    "dh.MixinDhTerrainAntiAliasing",
     "real_camera.MixinRealCameraCore",
     "iris.IEIrisEuphoriaShaderPack",
     "iris.MixinIrisEuphoriaPipelineManager",

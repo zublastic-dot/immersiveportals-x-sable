@@ -12,9 +12,11 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
   dimension-correct wrappers/lightmaps, scoped rendering and portal-plane clipping.
 - Keep DH's cached combined/inverse matrices consistent with portal clipping,
   correcting the stale distance reconstruction found in the .8 cloud comparison.
+- Disable DH terrain sample jitter inside portals where shared temporal history
+  is skipped; preserve the normal view's anti-aliasing phase and settings.
 - Preserve the actual-player view and previous camera/depth/moving-frame code.
-  Candidate .9 adds cloud/terrain depth reconstruction coverage; live rendering
-  acceptance is pending.
+  The owner confirmed .9's no-shader cloud correction. Candidate .10 addresses
+  stationary portal LOD flicker; its live rendering acceptance is pending.
   See `docs/ZUBLASTIC_DH.md` for evidence, limits and the Portal Lab trial.
 
 ### Zublastic dual moving portal endpoints
