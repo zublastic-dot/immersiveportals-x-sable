@@ -1,8 +1,10 @@
 # Distant Horizons 3.3.2 portal views
 
-Status on 2026-09-27: **IMPLEMENTED_NOT_LIVE_ACCEPTED**. Candidate .8 is a
-client integration inside IP/Sable. DH's JAR is neither edited nor bundled.
-It builds on .7; this does not newly accept or merge the earlier PR stack.
+Status on 2026-09-27: **PARTIAL_LIVE_ACCEPTANCE**. .9 cloud fade and .10 stationary
+LOD stability are owner accepted for the tested no-shader view. Candidate .11's
+outer-image isolation passes code/GPU tests but awaits installation and in-game
+acceptance. This integration is inside IP/Sable; DH's JAR is neither edited nor
+bundled. It builds on .7 without newly accepting or merging the earlier PR stack.
 
 ## Reproduction and implementation evidence
 
@@ -145,4 +147,56 @@ Evidence and candidate: `M:/PortalDH-20260927/flicker-repair/`.
 
 All **81 tests** and the Java 21 native-preserving build pass. Candidate .10
 SHA-256: `49ab34175d55a73020861ddb794b6f6fc70b4a684171b2d59f215174ca967421`.
-The candidate is not installed or visually accepted at this capture.
+At that build capture the candidate was not installed. The owner subsequently
+accepted .10 in Portal Lab with anti-aliasing restored to true: "No flicker;
+LODs are stable". Other 58 active JARs were unchanged.
+
+## .11 candidate: destination clouds/terrain outside the aperture
+
+Two owner screenshots establish a useful boundary control in .10: while in the
+Nether with zero rendered portals, no Overworld leakage is visible. Moving right
+to expose a sliver of the portal changes the counter to one and makes Overworld
+clouds and green terrain visible outside the portal aperture. Shaders are off.
+DH's configured vanilla fade is DOUBLE_PASS and its cloud list is Overworld-only.
+
+The defect is not simply an absent stencil test in DH's final copy. The inspected
+NeoForge wrapper uses its framebuffer copy path, which retains stencil testing.
+Instead DH's singleton color/depth textures are overwritten by the nested view.
+After IP returns to the Nether, `ClientApi.renderFadeTransparent` runs outside
+the portal scope and `GlVanillaFadeRenderer_neoforge` samples those same textures.
+Restoring `RENDER_STATE`, GL bindings and the portal mask does not restore pixels.
+This explains how a later outer-view pass can blend remote clouds and terrain
+across the screen. A diagnostic Vanilla Fade Mode=NONE comparison was requested;
+no owner result is assumed at this capture.
+
+.11 snapshots both DH images before the entire nested world render, then restores
+their contents on return, including exception unwinding. Snapshots are pooled by
+nesting depth, reallocated on size/format changes and released on client cleanup.
+Copies preserve read/draw framebuffer bindings, texture/PBO bindings, scissor,
+sRGB and stencil state. They do not touch Minecraft's live color/depth images.
+Unexpected mid-pass target replacement skips a stale restore and logs a warning.
+This scope is restricted to shaders disabled; Iris's shader/deferred targets keep
+their existing path. No DH setting is globally disabled as a workaround.
+
+Validation: **88 tests pass, 0 skipped**, with seven real GPU pixel regressions
+using a hidden OpenGL 3.3 context on the laptop's AMD integrated GPU. One executes
+DH 3.3.2's actual `vanilla_fade.frag`: overwritten shared input reproduces remote
+pixels in the outer output; restoring the production snapshot yields the parent
+pixels. The others cover nested/sibling views, exceptions, resize/recreation,
+uninitialized targets, both color/depth contents and hostile GL binding/mask
+state. This does not execute Minecraft's transformed mixins or establish visual
+acceptance on its NVIDIA rendering context.
+
+Run these optional GPU tests with `-PdhGlTests=true`; Windows native dependencies
+are the default, with `-PdhGlNatives=natives-linux` available for a Linux GL host.
+The ordinary test run skips the GPU class. The full native-preserving Java 21
+build passed. Candidate SHA-256:
+`83b6dba15e27f94c0a35c3cbb5fc1acf360599cd5d8096a0ca409bb429129a54`.
+Native SHA-256 is unchanged from above. Evidence, screenshots and candidate:
+`M:/PortalDH-20260927/mask-repair/`.
+
+Live acceptance requires the same zero/one-portal edge comparison with shaders
+off, AA on, and Vanilla Fade Mode restored to DOUBLE_PASS. Check both directions,
+normal outside terrain, crossing, and stationary LOD stability. There are two
+image copies each way per nested view (about 16 MiB of snapshot storage per active
+nesting level at 1080p); performance in the full game must also be checked.

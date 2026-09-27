@@ -6,6 +6,7 @@ import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.util.math.DhMat4f;
 import org.spongepowered.asm.mixin.Mixin;
 import qouteall.imm_ptl.core.render.MyGameRenderer;
+import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalRendering;
 import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
 import java.util.function.Consumer;
 
@@ -20,7 +21,9 @@ public class MixinDhWorldRender {
         var level = state.clientLevelWrapper;
         float partial = state.partialTickTime;
         boolean fog = state.vanillaFogEnabled;
-        try { original.call(info, wrapper); }
+        // The outer world's late fade samples DH's shared images after this entire
+        // nested world render. Restoring matrices or GL bindings alone is insufficient.
+        try (var images = DhPortalRendering.preserveOuterImages()) { original.call(info, wrapper); }
         finally {
             state.mcModelViewMatrix = modelView;
             state.mcProjectionMatrix = projection;

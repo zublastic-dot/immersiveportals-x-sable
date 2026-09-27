@@ -238,6 +238,12 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // Opt-in pixel regressions run in a hidden GLFW context, never the game window.
+    if (providers.gradleProperty('dhGlTests').getOrElse('false').toBoolean()) {
+        ['lwjgl', 'lwjgl-glfw', 'lwjgl-opengl'].each { module ->
+            testRuntimeOnly "org.lwjgl:${module}:3.3.3:${providers.gradleProperty('dhGlNatives').getOrElse('natives-windows')}"
+        }
+    }
     implementation "net.neoforged:neoforge:${neo_version}"
 
     // Sodium 0.8+ publishes native NeoForge artifacts. The release jar players
@@ -308,6 +314,7 @@ tasks.named('build').configure { dependsOn('jarJar') }
 
 tasks.named('test', Test).configure {
     useJUnitPlatform()
+    systemProperty 'ipsable.glTests', providers.gradleProperty('dhGlTests').getOrElse('false')
     maxHeapSize = '512m'
     maxParallelForks = 1
     testLogging { events 'passed', 'skipped', 'failed' }

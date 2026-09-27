@@ -14,9 +14,12 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
   correcting the stale distance reconstruction found in the .8 cloud comparison.
 - Disable DH terrain sample jitter inside portals where shared temporal history
   is skipped; preserve the normal view's anti-aliasing phase and settings.
+- Preserve DH's outer color/depth images across nested no-shader world renders,
+  preventing its late vanilla fade from reading the portal destination's images.
 - Preserve the actual-player view and previous camera/depth/moving-frame code.
-  The owner confirmed .9's no-shader cloud correction. Candidate .10 addresses
-  stationary portal LOD flicker; its live rendering acceptance is pending.
+  The owner confirmed .9's cloud correction and .10's stationary LOD stability.
+  Candidate .11 addresses clouds/terrain leaking outside the portal; in-game
+  acceptance is pending after 88 passing tests including seven GPU pixel cases.
   See `docs/ZUBLASTIC_DH.md` for evidence, limits and the Portal Lab trial.
 
 ### Zublastic dual moving portal endpoints

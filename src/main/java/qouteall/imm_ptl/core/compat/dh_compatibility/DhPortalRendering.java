@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.seibel.distanthorizons.api.enums.config.EDhApiDepthDirection;
 import com.seibel.distanthorizons.api.objects.math.DhApiMat4f;
 import com.seibel.distanthorizons.common.render.openGl.glObject.GLState;
+import com.seibel.distanthorizons.common.render.openGl.GlDhMetaRenderer_neoforge;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.RenderParams;
 import com.seibel.distanthorizons.core.util.math.DhMat4f;
@@ -13,6 +14,7 @@ import org.joml.Vector4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
+import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 
 /** DH references are isolated from the optional-dependency/version check. */
 public final class DhPortalRendering {
@@ -27,6 +29,13 @@ public final class DhPortalRendering {
     }
 
     public static Pass begin() { return new Pass(); }
+
+    public static DhPortalTextureSnapshots.Scope preserveOuterImages() {
+        // Iris owns its shader/deferred targets. This fixes DH's no-shader fade path.
+        if (IrisInterface.invoker.isShaders()) return null;
+        var renderer = GlDhMetaRenderer_neoforge.INSTANCE;
+        return DhPortalTextureSnapshots.capture(renderer.getActiveColorTextureId(), renderer.getActiveDepthTextureId());
+    }
 
     public static void prepare(RenderParams params) {
         if (!PortalRendering.isRendering() || PASS.current() == null) return;
