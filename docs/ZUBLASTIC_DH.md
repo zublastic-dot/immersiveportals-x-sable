@@ -200,3 +200,12 @@ off, AA on, and Vanilla Fade Mode restored to DOUBLE_PASS. Check both directions
 normal outside terrain, crossing, and stationary LOD stability. There are two
 image copies each way per nested view (about 16 MiB of snapshot storage per active
 nesting level at 1080p); performance in the full game must also be checked.
+
+## Owner acceptance and shader follow-up
+
+After .11 installation, the owner confirmed that clouds now render as intended
+in the tested no-shader portal-boundary view. This accepts that reported case,
+not every DH configuration or the shader path. The next owner comparison uses
+Complementary Unbound r5.9.3: a far Overworld hill has less fog through the Nether
+portal than after crossing. See `ZUBLASTIC_IRIS_DH.md` for the separate Iris
+eye-light sampling diagnosis and .12 candidate.

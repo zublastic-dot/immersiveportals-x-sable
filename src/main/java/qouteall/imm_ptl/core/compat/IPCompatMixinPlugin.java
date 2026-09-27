@@ -5,6 +5,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import qouteall.imm_ptl.core.compat.iris_compatibility.EuphoriaCompatibility;
+import qouteall.imm_ptl.core.compat.iris_compatibility.IrisPortalUniformCompatibility;
 import qouteall.imm_ptl.core.compat.real_camera.RealCameraCompatibility;
 import qouteall.imm_ptl.core.compat.dh_compatibility.DhCompatibility;
 
@@ -37,6 +38,9 @@ public class IPCompatMixinPlugin implements IMixinConfigPlugin {
             return EuphoriaCompatibility.supports(
                 version(modList, "euphoria_patcher"), version(modList, "iris")
             );
+        }
+        if (mixinClassName.endsWith(".MixinIrisPortalEyeBrightness")) {
+            return IrisPortalUniformCompatibility.supports(version(modList, "iris"));
         }
         if (mixinClassName.contains("IrisSodium")) {
             boolean sodiumLoaded = modList.getModFileById("embeddium") != null || modList.getModFileById("sodium") != null;
