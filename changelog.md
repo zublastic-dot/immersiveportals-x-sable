@@ -6,6 +6,14 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic Distant Horizons destination views
+
+- Add optional DH 3.3.2 integration inside IP/Sable: destination LOD ticks,
+  dimension-correct wrappers/lightmaps, scoped rendering and portal-plane clipping.
+- Preserve the actual-player view and previous camera/depth/moving-frame code.
+  Candidate .8 passes 67 code tests; live rendering acceptance is pending.
+  See `docs/ZUBLASTIC_DH.md` for evidence, limits and the Portal Lab trial.
+
 ### Zublastic dual moving portal endpoints
 
 - Give each physical portal frame its own Sable attachment and derive one coherent
