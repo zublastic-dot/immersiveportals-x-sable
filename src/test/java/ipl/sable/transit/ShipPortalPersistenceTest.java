@@ -51,4 +51,20 @@ class ShipPortalPersistenceTest {
         var restored = IplShipPortalAnchor.decodeAnchors(data.save(new CompoundTag(), null).getList("anchors", 10));
         assertEquals(Map.of(b, second.withDestLock(lastLock)), restored);
     }
+
+    @Test void dimensionHandoffPersistsNewHomeWithoutRebasingEitherAttachment() {
+        var carriedId = UUID.randomUUID(); var farId = UUID.randomUUID();
+        var carried = anchor(false); var far = anchor(true);
+        var afterTransit = carried.inDimension(Level.NETHER);
+        assertEquals(carried.shipId(), afterTransit.shipId());
+        assertEquals(carried.plotPos(), afterTransit.plotPos());
+        assertEquals(carried.localOrient(), afterTransit.localOrient());
+        assertEquals(carried.destLock(), afterTransit.destLock());
+        var data = new IplShipPortalAnchor.AnchorSavedData();
+        data.capture(Map.of(carriedId, afterTransit, farId, far));
+        IplShipPortalAnchor.clearAll();
+        var restored = IplShipPortalAnchor.decodeAnchors(data.save(new CompoundTag(), null).getList("anchors", 10));
+        assertEquals(Map.of(carriedId, afterTransit, farId, far), restored);
+        assertEquals(carried, restored.get(carriedId).inDimension(Level.OVERWORLD), "Returning restores the original home");
+    }
 }

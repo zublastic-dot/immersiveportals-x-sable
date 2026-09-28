@@ -453,51 +453,58 @@ public final class SableRehomeOps {
         Vec3 mappedLin = portal.transformLocalVec(new Vec3(linear.x, linear.y, linear.z));
         Vec3 mappedAng = portal.transformLocalVec(new Vec3(angular.x, angular.y, angular.z));
 
-        // Teleport riders BEFORE moving the pose, while the deck is still under them.
-        int riders = teleportRiders(hosted, oldParent, newParent, portal);
+        // Stage every attached portal face before riders or the frame change parent.
+        // A cancelled entity join leaves the original frame/portal connection intact.
+        try (var carriedPortals = IplShipPortalAnchor.prepareCarrierTransit(hosted, oldParent, newParent, mappedPose)) {
+            if (carriedPortals == null) return false;
 
-        // Move only this body's native frame. Connected bodies are deliberately NOT
-        // teleported: Atlas treats a portal as a window, so an active cross-aperture joint
-        // remains represented by source geometry plus image colliders until its own body
-        // legitimately completes transit.
-        pipeline.teleport(hosted, mappedPose.position(), mappedPose.orientation());
-        hosted.logicalPose().set(mappedPose);
-        // A subsequent hosting tick must begin entirely in the destination frame. Merely
-        // forgetting PortalCrossingDetector's cached trail is insufficient: captureTrail
-        // seeds a missing trail from lastPose, which would otherwise still be source-space
-        // and could create a fictitious segment through a chained or self-recursive portal.
-        hosted.updateLastPose();
-        pipeline.resetVelocity(hosted);
-        pipeline.addLinearAndAngularVelocity(hosted,
-            new Vector3d(mappedLin.x, mappedLin.y, mappedLin.z),
-            new Vector3d(mappedAng.x, mappedAng.y, mappedAng.z));
+            // Teleport riders BEFORE moving the pose, while the deck is still under them.
+            int riders = teleportRiders(hosted, oldParent, newParent, portal);
 
-        // Retire every old-parent portal image before publishing the new parent image.
-        // Otherwise the completed session's P(body) and the destination's identity(body)
-        // coexist in one chart for a broad-phase step. That produces two contact histories
-        // for one rigid body: the invisible original and the visible, slightly divergent
-        // twin reported on oblique/high-speed crossings.
-        for (StraddleKey key : IplAtlasStraddleSession.sessionKeysFor(uuid)) {
-            IplAtlasStraddleSession.clear(key, "parent-flip");
-            IplStraddleSessionSync.onSessionEnd(server, key, "parent-flip");
+            // Move only this body's native frame. Connected bodies are deliberately NOT
+            // teleported: Atlas treats a portal as a window, so an active cross-aperture joint
+            // remains represented by source geometry plus image colliders until its own body
+            // legitimately completes transit.
+            pipeline.teleport(hosted, mappedPose.position(), mappedPose.orientation());
+            hosted.logicalPose().set(mappedPose);
+            // A subsequent hosting tick must begin entirely in the destination frame. Merely
+            // forgetting PortalCrossingDetector's cached trail is insufficient: captureTrail
+            // seeds a missing trail from lastPose, which would otherwise still be source-space
+            // and could create a fictitious segment through a chained or self-recursive portal.
+            hosted.updateLastPose();
+            pipeline.resetVelocity(hosted);
+            pipeline.addLinearAndAngularVelocity(hosted,
+                new Vector3d(mappedLin.x, mappedLin.y, mappedLin.z),
+                new Vector3d(mappedAng.x, mappedAng.y, mappedAng.z));
+
+            // Retire every old-parent portal image before publishing the new parent image.
+            // Otherwise the completed session's P(body) and the destination's identity(body)
+            // coexist in one chart for a broad-phase step. That produces two contact histories
+            // for one rigid body: the invisible original and the visible, slightly divergent
+            // twin reported on oblique/high-speed crossings.
+            for (StraddleKey key : IplAtlasStraddleSession.sessionKeysFor(uuid)) {
+                IplAtlasStraddleSession.clear(key, "parent-flip");
+                IplStraddleSessionSync.onSessionEnd(server, key, "parent-flip");
+            }
+
+            stampParent(hosted, newParent, hosting);
+            hosted.updateBoundingBox();
+            carriedPortals.commit();
+            ipl.sable.atlas.IplAtlasBodyImages.reconcile(hosted);
+
+            // Keep existing trackers through the flip. Removing them here creates a visible gap:
+            // the destination projection is gone as soon as the ship clears the portal, while a
+            // new full-sync is not sent until the tracking system's next tick. The handoff packet
+            // moves their existing client object into the destination frame immediately; normal
+            // tracking then retains in-range viewers and removes only viewers that truly left.
+            // The old tracked set only contains source-side viewers. A cross-dimension exit can
+            // reveal the fully crossed body to destination portal viewers before the tracking tick
+            // adds them, so hand off to both sets now instead of leaving a one-way invisible ship.
+            queueParentHandoff(hosted, newParent, portal);
+
+            LOG.info("[IPL-FLIP] complete uuid={} riders={}", uuid, riders);
+            return true;
         }
-
-        stampParent(hosted, newParent, hosting);
-        hosted.updateBoundingBox();
-        ipl.sable.atlas.IplAtlasBodyImages.reconcile(hosted);
-
-        // Keep existing trackers through the flip. Removing them here creates a visible gap:
-        // the destination projection is gone as soon as the ship clears the portal, while a
-        // new full-sync is not sent until the tracking system's next tick. The handoff packet
-        // moves their existing client object into the destination frame immediately; normal
-        // tracking then retains in-range viewers and removes only viewers that truly left.
-        // The old tracked set only contains source-side viewers. A cross-dimension exit can
-        // reveal the fully crossed body to destination portal viewers before the tracking tick
-        // adds them, so hand off to both sets now instead of leaving a one-way invisible ship.
-        queueParentHandoff(hosted, newParent, portal);
-
-        LOG.info("[IPL-FLIP] complete uuid={} riders={}", uuid, riders);
-        return true;
     }
 
     /**

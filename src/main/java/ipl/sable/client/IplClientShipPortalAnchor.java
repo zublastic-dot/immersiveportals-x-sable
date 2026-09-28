@@ -7,7 +7,9 @@ import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaterniond;
 import org.joml.Vector3d;
@@ -98,9 +100,16 @@ public final class IplClientShipPortalAnchor {
         }
         // Snapshot BOTH carrier render poses before changing any of the four faces.
         Map<UUID, ShipPortalMotion.Pose> poses = new HashMap<>();
+        Map<UUID, Portal> portals = new HashMap<>();
         ANCHORS.forEach((id, a) -> {
             ClientSubLevel ship = findShip(a.shipId());
             if (ship == null || ship.isRemoved()) return;
+            // Entity and carrier handoff packets may arrive in different frames.
+            // Never pose an old-level portal using the new-level carrier transform.
+            Level parent = ipl.sable.dim.IplDimAgnostic.getParentLevel(ship);
+            Portal portal = parent == null ? null : findPortal(id, parent.dimension());
+            if (portal == null) return;
+            portals.put(id, portal);
             Pose3dc pose = ship.renderPose();
             Vec3 position = pose.transformPosition(new Vec3(a.plotPos().x, a.plotPos().y, a.plotPos().z));
             DQuaternion rotation = DQuaternion.fromMcQuaternion(new Quaterniond(pose.orientation()));
@@ -111,7 +120,7 @@ public final class IplClientShipPortalAnchor {
             if (driven.contains(id)) continue;
             ClientAnchor a = ANCHORS.get(id);
             ShipPortalMotion.Pose origin = poses.get(id);
-            Portal portal = findPortal(id);
+            Portal portal = portals.get(id);
             if (origin == null || portal == null) continue;
             PortalExtension ext = PortalExtension.get(portal);
             UUID flipped = a.flippedId() != null ? a.flippedId() : ext.flippedPortalId;
@@ -120,20 +129,24 @@ public final class IplClientShipPortalAnchor {
             ShipPortalMotion.Partner other = ShipPortalMotion.otherEnd(reverse, parallel, ANCHORS::containsKey);
             ShipPortalMotion.Mapping mapping = ShipPortalMotion.resolve(id, other, poses, portal.getDestPos(), a.destLock());
             if (mapping == null) continue;
+            ResourceKey<Level> destination = other == null ? portal.getDestDim()
+                : portals.get(other.id()).getOriginDim();
 
             portal.setOriginPos(origin.position());
             portal.setOrientationRotation(origin.orientation());
             portal.setDestination(mapping.destination());
             portal.setRotation(mapping.rotation());
-            Portal twin = flipped == null ? null : findPortal(flipped);
+            portal.setDestDim(destination);
+            Portal twin = flipped == null ? null : findPortal(flipped, portal.getOriginDim());
             if (twin != null) {
                 twin.setOriginPos(origin.position());
                 twin.setOrientation(portal.getAxisW().scale(-1), portal.getAxisH());
                 twin.setDestination(mapping.destination());
                 twin.setRotation(mapping.rotation());
+                twin.setDestDim(destination);
             }
-            applyFarFace(reverse, mapping.returning(true));
-            applyFarFace(parallel, mapping.returning(false));
+            applyFarFace(reverse, mapping.returning(true), destination, portal.getOriginDim());
+            applyFarFace(parallel, mapping.returning(false), destination, portal.getOriginDim());
             driven.add(id);
             if (other != null) {
                 driven.add(other.id());
@@ -147,23 +160,26 @@ public final class IplClientShipPortalAnchor {
         }
     }
 
-    private static void applyFarFace(UUID id, ShipPortalMotion.Mapping mapping) {
-        Portal far = id == null ? null : findPortal(id);
+    private static void applyFarFace(UUID id, ShipPortalMotion.Mapping mapping,
+                                     ResourceKey<Level> originDim, ResourceKey<Level> destinationDim) {
+        Portal far = id == null ? null : findPortal(id, originDim);
         if (far == null) return;
         far.setOriginPos(mapping.origin().position());
         far.setDestination(mapping.destination());
         far.setOrientationRotation(mapping.origin().orientation());
         far.setRotation(mapping.rotation());
+        far.setDestDim(destinationDim);
     }
 
     /** Resolved portal entities (client Level.getEntities() is protected — scan once, cache). */
     private static final Map<UUID, Portal> PORTAL_CACHE = new HashMap<>();
 
-    private static Portal findPortal(UUID id) {
+    private static Portal findPortal(UUID id, ResourceKey<Level> dimension) {
         Portal cached = PORTAL_CACHE.get(id);
-        if (cached != null && !cached.isRemoved()) return cached;
+        if (cached != null && !cached.isRemoved() && cached.getOriginDim() == dimension) return cached;
         PORTAL_CACHE.remove(id);
         for (ClientLevel level : ClientWorldLoader.getClientWorlds()) {
+            if (level.dimension() != dimension) continue;
             for (Entity entity : level.entitiesForRendering()) {
                 if (entity instanceof Portal portal && !portal.isRemoved()
                     && portal.getUUID().equals(id)) {
@@ -200,6 +216,10 @@ public final class IplClientShipPortalAnchor {
                 double[] p = parse(localPos, 3);
                 double[] o = parse(localOrient, 4);
                 double[] d = parse(destLock, 4);
+                PORTAL_CACHE.remove(UUID.fromString(portalUuid));
+                if (parseUuid(flippedUuid) != null) PORTAL_CACHE.remove(parseUuid(flippedUuid));
+                if (parseUuid(reverseUuid) != null) PORTAL_CACHE.remove(parseUuid(reverseUuid));
+                if (parseUuid(parallelUuid) != null) PORTAL_CACHE.remove(parseUuid(parallelUuid));
                 ANCHORS.put(UUID.fromString(portalUuid), new ClientAnchor(
                     parseUuid(flippedUuid),
                     parseUuid(reverseUuid),

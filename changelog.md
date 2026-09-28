@@ -6,6 +6,22 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic carried portal dimension handoff
+
+- Transfer a Sable frame's attached portal faces with it when the frame crosses
+  another portal into a different dimension. Preserve portal identities and
+  the original far-end connection, and save the attachment's new dimension.
+- Stage all carried faces before retiring originals; reject incomplete handoffs
+  before moving the frame. Keep the portal being crossed outside this transfer.
+- Cancel stale client animations before applying their final state after a
+  portal's origin or destination dimension changes (.14 crashed on this path).
+- Exclude invisible portal-surface blocks from the occupied crossing volume:
+  lighting a hollow frame must not make its opening count as a solid sheet.
+- Candidate .15 passes 111 tests and addresses the observed crash and a false
+  crossing-volume defect; live small-through-large passage and the reported pushing still need
+  verification. See
+  `docs/ZUBLASTIC_CARRIED_PORTAL_TRANSIT.md` for behavior and validation limits.
+
 ### Zublastic portal surface outline preference
 
 - Add the client setting "Show Portal Surface Outline", enabled by default.

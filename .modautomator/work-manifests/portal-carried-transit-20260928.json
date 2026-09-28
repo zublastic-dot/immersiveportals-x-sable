@@ -1,0 +1,41 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-carried-transit-20260928",
+  "lease_id": "portal-carried-transit-20260928",
+  "worker_id": "codex-portal-carried-transit-20260928",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-carried-transit-20260928/portal-carried-transit-20260928",
+  "base_commit": "a42d3a352e23aed007fa99e4b01555234bd3f871",
+  "resources": [
+    "artifact:owner-pc:portal-carried-repair-20260928",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:compatibility/ip-sable-rendering"
+  ],
+  "paths": [
+    "src/main/java/ipl/sable/transit/IplShipPortalAnchor.java",
+    "src/main/java/ipl/sable/transit/SableRehomeOps.java",
+    "src/main/java/ipl/sable/transit/PortalTransferBatch.java",
+    "src/main/java/ipl/sable/client/IplClientShipPortalAnchor.java",
+    "src/test/java/ipl/sable/transit/PortalTransferBatchTest.java",
+    "src/test/java/ipl/sable/transit/ShipPortalPersistenceTest.java",
+    "docs/ZUBLASTIC_CARRIED_PORTAL_TRANSIT.md",
+    "gradle.properties",
+    "changelog.md",
+    "src/main/java/qouteall/imm_ptl/core/portal/animation",
+    "src/main/java/qouteall/imm_ptl/core/portal/PortalPlaceholderBlock.java",
+    "src/main/java/ipl/sable/transit/SableTransitController.java",
+    "src/main/java/ipl/sable/transit/IplPortalVolumeCache.java",
+    "src/test/java/qouteall/imm_ptl/core/portal/animation",
+    "src/test/java/ipl/sable/transit/PortalVolumeCollisionTest.java"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Preserve active portals carried across dimensions, repair the observed client animation crash, and investigate frame pushing without contact.",
+    "acceptance": [
+      "Regression coverage for stale portal animation after dimension changes.",
+      "Keep source fixes confined to IP/Sable and preserve the installed rendering and physics stack.",
+      "Record exact build/runtime results without claiming live acceptance before the owner repeats the crossing."
+    ]
+  }
+}

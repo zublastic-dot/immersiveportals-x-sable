@@ -61,6 +61,10 @@ public final class IplShipPortalAnchor {
         Anchor withDestLock(DQuaternion lock) {
             return new Anchor(shipId, portalDim, plotPos, localOrient, lock);
         }
+
+        Anchor inDimension(ResourceKey<Level> dimension) {
+            return new Anchor(shipId, dimension, plotPos, localOrient, destLock);
+        }
     }
 
     /** Portal UUID → anchor. Server-thread only. */
@@ -433,6 +437,160 @@ public final class IplShipPortalAnchor {
      * end of the fused step (IplFusedStep), when this tick's poses are final.
      */
     private static int syncCounter = 0;
+
+    private record TransitFace(Portal portal, UUID flipped, UUID reverse, UUID parallel,
+                               ResourceKey<Level> destination, ShipPortalMotion.Mapping mapping) {}
+
+    /**
+     * A portal entity belongs to the carrier's parent level, while its frame blocks
+     * remain in the hosting plot. Only the attachment's two faces change levels.
+     * Collect by persisted UUID, never by proximity to the portal being crossed.
+     */
+    public static CarrierTransit prepareCarrierTransit(ServerSubLevel ship, ServerLevel oldParent,
+                                                       ServerLevel newParent, Pose3dc mappedPose) {
+        MinecraftServer server = oldParent.getServer();
+        Map<UUID, Anchor> carried = new java.util.LinkedHashMap<>();
+        ANCHORS.forEach((id, anchor) -> {
+            if (anchor.shipId().equals(ship.getUniqueId())) carried.put(id, anchor);
+        });
+        Map<UUID, ShipPortalMotion.Pose> poses = samplePoses(server);
+        carried.forEach((id, anchor) -> poses.put(id, new ShipPortalMotion.Pose(
+            mappedPose.transformPosition(new Vec3(anchor.plotPos().x, anchor.plotPos().y, anchor.plotPos().z)),
+            DQuaternion.fromMcQuaternion(new Quaterniond(mappedPose.orientation())).hamiltonProduct(anchor.localOrient()))));
+        Map<UUID, TransitFace> faces = new java.util.LinkedHashMap<>();
+        Map<UUID, Portal> moving = new java.util.LinkedHashMap<>();
+        try {
+            for (var entry : carried.entrySet()) {
+                if (entry.getValue().portalDim() != oldParent.dimension()) {
+                    throw new IllegalStateException("Carrier and attached portal have different parent dimensions: " + entry.getKey());
+                }
+                Portal primary = requiredPortal(oldParent, entry.getKey());
+                resolveCluster(primary);
+                PortalExtension ext = PortalExtension.get(primary);
+                Portal flipped = requiredPortal(oldParent, memberId(ext.flippedPortalId, ext.flippedPortal));
+                ServerLevel far = server.getLevel(primary.getDestDim());
+                Portal reverse = requiredPortal(far, memberId(ext.reversePortalId, ext.reversePortal));
+                Portal parallel = requiredPortal(far, memberId(ext.parallelPortalId, ext.parallelPortal));
+                ShipPortalMotion.Partner other = partner(primary);
+                ShipPortalMotion.Mapping mapping = ShipPortalMotion.resolve(entry.getKey(), other, poses,
+                    primary.getDestPos(), entry.getValue().destLock());
+                if (mapping == null) throw new IllegalStateException("Other portal carrier has not loaded: " + entry.getKey());
+                ResourceKey<Level> destination = other != null && carried.containsKey(other.id())
+                    ? newParent.dimension() : primary.getDestDim();
+                rememberTransitFace(faces, primary, destination, mapping);
+                rememberTransitFace(faces, flipped, destination, mapping.flipped());
+                rememberTransitFace(faces, reverse, newParent.dimension(), mapping.returning(true));
+                rememberTransitFace(faces, parallel, newParent.dimension(), mapping.returning(false));
+                moving.put(primary.getUUID(), primary);
+                if (flipped != null) moving.put(flipped.getUUID(), flipped);
+            }
+            // Same-dimension traversal changes the pose but needs no entity recreation.
+            var batch = PortalTransferBatch.prepare(oldParent == newParent ? java.util.List.<Portal>of()
+                    : java.util.List.copyOf(moving.values()), original -> {
+                if (newParent.getEntity(original.getUUID()) != null) {
+                    throw new IllegalStateException("Destination already contains portal " + original.getUUID());
+                }
+                Entity copy = original.getType().create(newParent);
+                if (!(copy instanceof Portal replacement)) throw new IllegalStateException("Cannot recreate " + original);
+                replacement.restoreFrom(original);
+                replacement.setId(original.getId());
+                if (!replacement.getUUID().equals(original.getUUID())) throw new IllegalStateException("Portal identity changed");
+                applyTransitFace(replacement, faces.get(original.getUUID()));
+                return replacement;
+            }, newParent::addFreshEntity, portal -> {
+                if (newParent.getEntity(portal.getUUID()) == portal) portal.remove(Entity.RemovalReason.CHANGED_DIMENSION);
+            });
+            if (batch == null) {
+                TRANSIT_FAILURES.invoke(() -> LOG.warn(
+                    "[IPL-SHIP-PORTAL] destination rejected a portal face; carrier {} has not changed parent", ship.getUniqueId()));
+                return null;
+            }
+            return new CarrierTransit(ship, newParent, carried, faces, batch);
+        } catch (RuntimeException ex) {
+            TRANSIT_FAILURES.invoke(() -> LOG.warn("[IPL-SHIP-PORTAL] cannot prepare attached portals for carrier {}", ship.getUniqueId(), ex));
+            return null;
+        }
+    }
+
+    private static final qouteall.q_misc_util.my_util.LimitedLogger TRANSIT_FAILURES =
+        new qouteall.q_misc_util.my_util.LimitedLogger(20);
+
+    private static Portal requiredPortal(ServerLevel level, UUID id) {
+        if (id == null || id.equals(net.minecraft.Util.NIL_UUID)) return null;
+        if (level != null && level.getEntity(id) instanceof Portal portal && !portal.isRemoved()) return portal;
+        throw new IllegalStateException("Attached portal face is not loaded: " + id);
+    }
+
+    private static void rememberTransitFace(Map<UUID, TransitFace> faces, Portal portal,
+                                           ResourceKey<Level> destination, ShipPortalMotion.Mapping mapping) {
+        if (portal == null) return;
+        PortalExtension ext = PortalExtension.get(portal);
+        faces.put(portal.getUUID(), new TransitFace(portal, memberId(ext.flippedPortalId, ext.flippedPortal),
+            memberId(ext.reversePortalId, ext.reversePortal), memberId(ext.parallelPortalId, ext.parallelPortal),
+            destination, mapping));
+    }
+
+    private static void applyTransitFace(Portal portal, TransitFace face) {
+        portal.setOriginPos(face.mapping().origin().position());
+        portal.setOrientationRotation(face.mapping().origin().orientation());
+        portal.setDestination(face.mapping().destination());
+        portal.setRotation(face.mapping().rotation());
+        portal.setDestDim(face.destination());
+    }
+
+    /** Prepared replacements are removed if the frame handoff aborts. */
+    public static final class CarrierTransit implements AutoCloseable {
+        private final ServerSubLevel ship;
+        private final ServerLevel destination;
+        private final Map<UUID, Anchor> carried;
+        private final Map<UUID, TransitFace> faces;
+        private final PortalTransferBatch<Portal> batch;
+
+        private CarrierTransit(ServerSubLevel ship, ServerLevel destination, Map<UUID, Anchor> carried,
+                               Map<UUID, TransitFace> faces, PortalTransferBatch<Portal> batch) {
+            this.ship = ship;
+            this.destination = destination;
+            this.carried = carried;
+            this.faces = faces;
+            this.batch = batch;
+        }
+
+        public void commit() {
+            Map<UUID, Portal> current = new HashMap<>();
+            faces.forEach((id, face) -> current.put(id, face.portal()));
+            batch.replacements().forEach(pair -> current.put(pair.destination().getUUID(), pair.destination()));
+            batch.commit(portal -> portal.remove(Entity.RemovalReason.CHANGED_DIMENSION));
+            faces.forEach((id, face) -> applyTransitFace(current.get(id), face));
+            // All four references must be rebound together. A lazy reference to a
+            // removed source entity can otherwise break pairing on the next tick.
+            faces.forEach((id, face) -> {
+                Portal portal = current.get(id);
+                PortalExtension ext = PortalExtension.get(portal);
+                ext.flippedPortalId = face.flipped();
+                ext.reversePortalId = face.reverse();
+                ext.parallelPortalId = face.parallel();
+                ext.flippedPortal = current.get(face.flipped());
+                ext.reversePortal = current.get(face.reverse());
+                ext.parallelPortal = current.get(face.parallel());
+                portal.reloadAndSyncToClientNextTick();
+            });
+            carried.forEach((id, anchor) -> ANCHORS.put(id, anchor.inDimension(destination.dimension())));
+            Map<UUID, ShipPortalMotion.Pose> poses = samplePoses(destination.getServer());
+            carried.forEach((id, anchor) -> {
+                Portal portal = current.get(id);
+                applyCarrierSideEffects(portal, ship, true);
+                drivePortal(portal, poses, true);
+            });
+            if (!carried.isEmpty()) {
+                markDirty(destination.getServer());
+                for (UUID id : ANCHORS.keySet()) syncToClients(destination.getServer(), id);
+                LOG.info("[IPL-SHIP-PORTAL] carried {} portal attachment(s) with ship {} into {}",
+                    carried.size(), ship.getUniqueId(), destination.dimension().location());
+            }
+        }
+
+        @Override public void close() { batch.close(); }
+    }
 
     public static void tickAll(MinecraftServer server) {
         if (PERSISTENCE_ENABLED && restoredFor != server) {

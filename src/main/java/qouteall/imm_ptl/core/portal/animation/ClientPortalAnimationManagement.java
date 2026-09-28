@@ -3,6 +3,9 @@ package qouteall.imm_ptl.core.portal.animation;
 import de.nick1st.imm_ptl.events.ClientCleanupEvent;
 import net.neoforged.bus.api.Event;
 import net.neoforged.neoforge.common.NeoForge;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 import qouteall.imm_ptl.core.ClientWorldLoader;
 import qouteall.imm_ptl.core.IPCGlobal;
 import qouteall.imm_ptl.core.portal.Portal;
@@ -100,26 +103,19 @@ public class ClientPortalAnimationManagement {
                 return true;
             }
             
+            PortalState currentState = animation.getCurrentState(
+                currTime, portal.getOriginDim(), portal.getDestDim()
+            );
+            if (currentState == null) {
+                return true;
+            }
+            portal.setPortalState(currentState);
+
             if (currTime > animation.toTimeNano) {
-                portal.setPortalState(animation.toState);
                 // animation finished
                 NeoForge.EVENT_BUS.post(new ClientPortalDefaultAnimationFinishEvent(portal));
                 return true;
             }
-            
-            PortalState currentState = animation.getCurrentState(currTime);
-            
-            if (currentState.fromWorld != portal.getOriginDim()) {
-                // stop animation
-                return true;
-            }
-            
-            if (currentState.toWorld != portal.getDestDim()) {
-                // stop animation
-                return true;
-            }
-            
-            portal.setPortalState(currentState);
             
             return false;
         });
@@ -211,6 +207,22 @@ public class ClientPortalAnimationManagement {
             );
             
             return currState;
+        }
+
+        @Nullable
+        public PortalState getCurrentState(
+            long currTime, ResourceKey<Level> origin, ResourceKey<Level> destination
+        ) {
+            // A carried portal or its return face can change dimensions between
+            // frames. Even a finished animation belongs to its original dimension
+            // pair: applying its last state would overwrite the handoff or violate
+            // Portal.setPortalState's dimension invariant. Cancel before either path.
+            if (fromState.fromWorld != origin || fromState.toWorld != destination
+                || toState.fromWorld != origin || toState.toWorld != destination) {
+                return null;
+            }
+            if (currTime > toTimeNano) return toState;
+            return getCurrentState(currTime);
         }
     }
 }
