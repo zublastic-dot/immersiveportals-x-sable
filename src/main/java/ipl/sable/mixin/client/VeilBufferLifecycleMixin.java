@@ -1,10 +1,10 @@
 package ipl.sable.mixin.client;
 
-import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.blaze3d.platform.GlStateManager;
 import ipl.sable.render.GlObjectLifecycle;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.At;
 
 /**
  * glGen* reserves names only. Veil's debug labels and VertexArray DSA uploads
@@ -13,13 +13,15 @@ import org.spongepowered.asm.mixin.injection.At;
  */
 @Mixin(GlStateManager.class)
 public abstract class VeilBufferLifecycleMixin {
-    @ModifyReturnValue(method = "_glGenBuffers", at = @At("RETURN"), require = 1)
-    private static int ipl$initializeBuffer(int name) {
-        return GlObjectLifecycle.initializeGeneratedBuffer(name);
+    // IP's own cache returns through a cancellable HEAD injection. RETURN
+    // injectors miss that generated early return, so wrap the entire operation.
+    @WrapMethod(method = "_glGenBuffers", require = 1)
+    private static int ipl$initializeBuffer(Operation<Integer> original) {
+        return GlObjectLifecycle.initializeGeneratedBuffer(original.call());
     }
 
-    @ModifyReturnValue(method = "_glGenVertexArrays", at = @At("RETURN"), require = 1)
-    private static int ipl$initializeVertexArray(int name) {
-        return GlObjectLifecycle.initializeGeneratedVertexArray(name);
+    @WrapMethod(method = "_glGenVertexArrays", require = 1)
+    private static int ipl$initializeVertexArray(Operation<Integer> original) {
+        return GlObjectLifecycle.initializeGeneratedVertexArray(original.call());
     }
 }

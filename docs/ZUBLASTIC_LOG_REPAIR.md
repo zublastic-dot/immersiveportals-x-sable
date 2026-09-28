@@ -1,4 +1,4 @@
-# Portal Lab log repairs (.16)
+# Portal Lab log repairs (.16 / .17)
 
 Scope: IP/Sable only, following the owner-requested .15 log audit. The accepted
 carried-portal fix, native DLL and installed mod lineup are retained.
@@ -26,6 +26,11 @@ carried-portal fix, native DLL and installed mod lineup are retained.
   label time, consume errors, or turn off debug reporting. Real-GPU regressions
   reproduce both original driver errors and verify the corrected operations,
   binding preservation and preservation of unrelated errors.
+  The .16 live startup exposed a missed path: IP's own `cacheGlBuffer` HEAD
+  injections return batch-reserved names before the original return instruction.
+  A return-value injector therefore never initialized these names. In .17,
+  wrap the complete allocator so cached early returns receive the same lifecycle
+  handling. The cache stays enabled; unused reserved names are not instantiated.
 - **Assembly movement race:** .15 records three missing-sublevel movement
   errors at initial assembly, before hosted full sync. Sable 2.0.5 treats an
   integrated-server local connection as UDP-connected and delivers its fast
@@ -45,8 +50,14 @@ and the actual shader asset were inspected rather than assuming identical versio
 
 ## Validation and limits
 
-The full test/build run passes all 124 tests (zero failed/skipped), including 11
-hidden-GPU tests. The exact candidate hash is recorded with canonical history.
+The .16 test/build run passed all 124 tests (zero failed/skipped), including 11
+hidden-GPU tests. Its live startup succeeded in 79.886 seconds and the diagram
+compile failure did not recur, but all 22 startup GL errors remained (15 buffer
+labels, 5 VAO labels and 2 uploads). That is a failed GL repair checkpoint, not
+live acceptance. The .17 regression additionally exercises the actual allocator
+wrapper with batch-reserved names and checks successful labeling and DSA upload.
+All 125 tests/build pass for .17, including 12 hidden-GPU tests, with no skips.
+The exact candidate hashes and current validation are recorded with canonical history.
 The sound tests exercise worker-to-client dispatch and world teardown; GPU tests
 compile both the fullscreen effect and clipped world geometry through the real
 Veil preprocessor. No test silently skips a required graphics context when GPU

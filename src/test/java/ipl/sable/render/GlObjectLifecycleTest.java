@@ -1,5 +1,7 @@
 package ipl.sable.render;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import ipl.sable.mixin.client.VeilBufferLifecycleMixin;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.lwjgl.opengl.GL;
@@ -83,5 +85,41 @@ class GlObjectLifecycleTest {
             assertEquals(GL_INVALID_ENUM, glGetError());
             assertEquals(GL_NO_ERROR, glGetError());
         } finally { glDeleteBuffers(buffer); }
+    }
+
+    @Test void allocationWrapperMaterializesNamesReturnedFromTheBatchCache() throws Exception {
+        // IP's cancellable HEAD hook returns names from glGen* batches without
+        // reaching vanilla's RETURN. Exercise the actual outer wrapper with
+        // those reserved names, before any caller has bound either object.
+        int[] buffers = new int[2], vaos = new int[2];
+        glGenBuffers(buffers);
+        glGenVertexArrays(vaos);
+        int[] calls = {0};
+        try {
+            var bufferWrapper = VeilBufferLifecycleMixin.class.getDeclaredMethod(
+                "ipl$initializeBuffer", Operation.class);
+            var vaoWrapper = VeilBufferLifecycleMixin.class.getDeclaredMethod(
+                "ipl$initializeVertexArray", Operation.class);
+            bufferWrapper.setAccessible(true);
+            vaoWrapper.setAccessible(true);
+            Operation<Integer> cachedBuffer = args -> { calls[0]++; return buffers[1]; };
+            Operation<Integer> cachedVao = args -> { calls[0]++; return vaos[1]; };
+            assertFalse(glIsBuffer(buffers[1]));
+            assertFalse(glIsVertexArray(vaos[1]));
+            assertEquals(buffers[1], bufferWrapper.invoke(null, cachedBuffer));
+            assertEquals(vaos[1], vaoWrapper.invoke(null, cachedVao));
+            assertEquals(2, calls[0], "each underlying allocation runs once");
+            assertTrue(glIsBuffer(buffers[1]));
+            assertTrue(glIsVertexArray(vaos[1]));
+            assertFalse(glIsBuffer(buffers[0]), "unused cached names remain reserved");
+            assertFalse(glIsVertexArray(vaos[0]));
+            glObjectLabel(GL_BUFFER, buffers[1], "cached buffer");
+            glObjectLabel(GL_VERTEX_ARRAY, vaos[1], "cached VAO");
+            glNamedBufferData(buffers[1], 16, GL_STATIC_DRAW);
+            assertEquals(GL_NO_ERROR, glGetError());
+        } finally {
+            glDeleteBuffers(buffers);
+            glDeleteVertexArrays(vaos);
+        }
     }
 }

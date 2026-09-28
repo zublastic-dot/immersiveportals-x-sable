@@ -6,6 +6,16 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic cached GL allocation follow-up (.17)
+
+- Cover IP's own cached early returns when initializing GL buffers and VAOs.
+  The .16 live test still logged 22 GL errors because its return-value injector
+  missed that path. Wrap the complete allocator without disabling the cache.
+- Add a GPU regression that invokes the production wrappers with batch-reserved
+  names and verifies debug labels and direct-state-access uploads.
+- All 125 tests/build pass, including 12 hidden-GPU tests. Live verification of
+  the cached path and fresh in-world sound/assembly checks remains pending.
+
 ### Zublastic Portal Lab log repairs (.16)
 
 - Dispatch off-thread portal sound calls to the client thread, dropping queued
