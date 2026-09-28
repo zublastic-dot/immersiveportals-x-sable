@@ -1,0 +1,47 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-log-repair-20260928",
+  "lease_id": "portal-log-repair-20260928",
+  "worker_id": "codex-portal-log-repair-20260928",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-log-repair-20260928/portal-log-repair-20260928",
+  "base_commit": "7751533752b661d7a8ab66b6174652c56655474a",
+  "resources": [
+    "artifact:owner-pc:portal-log-repair-20260928",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:compatibility/ip-sable-rendering"
+  ],
+  "paths": [
+    "gradle.properties",
+    "changelog.md",
+    "docs/ZUBLASTIC_LOG_REPAIR.md",
+    "src/main/java/qouteall/imm_ptl/core/mixin/client/sound/MixinClientLevel_Sound.java",
+    "src/main/java/qouteall/imm_ptl/core/teleportation/ClientSoundDispatch.java",
+    "src/main/java/qouteall/imm_ptl/core/render/ShaderCodeTransformation.java",
+    "src/main/java/ipl/sable/render/IplVeilShaderPreProcessor.java",
+    "src/main/java/ipl/sable/render/GlObjectLifecycle.java",
+    "src/main/java/ipl/sable/mixin/client/IplShaderInstanceClipMixin.java",
+    "src/main/java/ipl/sable/mixin/client/VeilBufferLifecycleMixin.java",
+    "src/main/java/ipl/sable/mixin/client/VeilDebugLifecycleMixin.java",
+    "src/main/java/ipl/sable/mixin/SableCrossDimTrackingMixin.java",
+    "src/main/java/ipl/sable/transit/SableRehomeOps.java",
+    "src/main/java/ipl/sable/network/HostedMovementRouting.java",
+    "src/main/java/ipl/sable/mixin/SableHostedMovementMixin.java",
+    "src/main/resources/ipl_sable.mixins.json",
+    "src/main/resources/assets/immersive_portals/shaders/shader_transformation.yaml",
+    "src/test/java/qouteall/imm_ptl/core/teleportation/ClientSoundDispatchTest.java",
+    "src/test/java/ipl/sable/render/VeilShaderCompatibilityTest.java",
+    "src/test/java/ipl/sable/render/GlObjectLifecycleTest.java",
+    "src/test/java/ipl/sable/network/HostedMovementRoutingTest.java"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Repair confirmed sound-thread, shader and graphics-resource compatibility failures seen in Portal Lab .15; diagnose assembly packet ordering without suppressing real errors.",
+    "acceptance": [
+      "Changes remain in IP/Sable and preserve the installed mod lineup and native binary.",
+      "Production-path regressions cover repaired errors; log unproven issues separately.",
+      "Exact build and runtime evidence is recorded without claiming visual acceptance."
+    ]
+  }
+}

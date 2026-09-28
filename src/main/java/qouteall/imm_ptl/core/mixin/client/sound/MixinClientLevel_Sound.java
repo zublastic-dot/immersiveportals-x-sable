@@ -14,8 +14,10 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import qouteall.imm_ptl.core.IPGlobal;
+import qouteall.imm_ptl.core.ClientWorldLoader;
 import qouteall.imm_ptl.core.miscellaneous.IPVanillaCopy;
 import qouteall.imm_ptl.core.teleportation.CrossPortalSound;
+import qouteall.imm_ptl.core.teleportation.ClientSoundDispatch;
 
 @Mixin(ClientLevel.class)
 public class MixinClientLevel_Sound {
@@ -23,6 +25,13 @@ public class MixinClientLevel_Sound {
     @Shadow
     @Final
     private Minecraft minecraft;
+
+    @Shadow
+    private void playSound(double x, double y, double z, SoundEvent soundEvent,
+                           SoundSource soundSource, float volume, float pitch,
+                           boolean distanceDelay, long seed) {
+        throw new AssertionError();
+    }
     
     @IPVanillaCopy
     @Inject(
@@ -47,6 +56,17 @@ public class MixinClientLevel_Sound {
         }
         
         ClientLevel this_ = (ClientLevel) (Object) this;
+        // AsyncParticles can call playSound from an animation worker. Do not read
+        // the player, camera or entity sections there; replay the original call on
+        // the client thread, preserving its seed and distance-delay semantics.
+        if (ClientSoundDispatch.defer(minecraft.isSameThread(), minecraft,
+            () -> minecraft.level != null && (minecraft.level == this_
+                || (ClientWorldLoader.getIsInitialized()
+                    && ClientWorldLoader.getClientWorlds().contains(this_))),
+            () -> playSound(x, y, z, soundEvent, soundSource, volume, pitch, distanceDelay, seed))) {
+            ci.cancel();
+            return;
+        }
         Vec3 soundPos = new Vec3(x, y, z);
         
         if (!portal_isPosNearPlayer(soundPos)) {
