@@ -7,23 +7,10 @@
   "work_branch": "work/codex-portal-carried-transit-20260928/portal-carried-transit-20260928",
   "base_commit": "a42d3a352e23aed007fa99e4b01555234bd3f871",
   "resources": [
-    "artifact:owner-pc:portal-carried-transit-20260928",
+    "artifact:owner-pc:portal-carried-repair-20260928",
     "desktop:owner-pc:gregtest-portal-lab",
     "desktop:owner-pc:prism-launcher",
-    "domain:modautomator:compatibility/ip-sable-rendering",
-    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
-    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_CARRIED_PORTAL_TRANSIT.md",
-    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
-    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/ipl/sable/client/IplClientShipPortalAnchor.java",
-    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/ipl/sable/transit/IplShipPortalAnchor.java",
-    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/ipl/sable/transit/PortalTransferBatch.java",
-    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/ipl/sable/transit/SableRehomeOps.java",
-    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/ipl/sable/transit/PortalTransferBatchTest.java",
-    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/ipl/sable/transit/ShipPortalPersistenceTest.java",
-    "repo:zublastic-dot/zublastic-context:history/2026-09-28-carried-portal-transit.md",
-    "repo:zublastic-dot/zublastic-context:projects/modautomator.md",
-    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
-    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md"
+    "domain:modautomator:compatibility/ip-sable-rendering"
   ],
   "paths": [
     "src/main/java/ipl/sable/transit/IplShipPortalAnchor.java",
@@ -34,15 +21,21 @@
     "src/test/java/ipl/sable/transit/ShipPortalPersistenceTest.java",
     "docs/ZUBLASTIC_CARRIED_PORTAL_TRANSIT.md",
     "gradle.properties",
-    "changelog.md"
+    "changelog.md",
+    "src/main/java/qouteall/imm_ptl/core/portal/animation",
+    "src/main/java/qouteall/imm_ptl/core/portal/PortalPlaceholderBlock.java",
+    "src/main/java/ipl/sable/transit/SableTransitController.java",
+    "src/main/java/ipl/sable/transit/IplPortalVolumeCache.java",
+    "src/test/java/qouteall/imm_ptl/core/portal/animation",
+    "src/test/java/ipl/sable/transit/PortalVolumeCollisionTest.java"
   ],
   "value_case": {
     "category": "demonstrated_blocker",
-    "statement": "Keep a portal attached and linked when its Sable carrier traverses another portal into a different dimension.",
+    "statement": "Preserve active portals carried across dimensions, repair the observed client animation crash, and investigate frame pushing without contact.",
     "acceptance": [
-      "Move only the carried portal faces, preserving their identities, remote connection, plot shape and attachments.",
-      "Preserve the crossing portal and reject incomplete portal transfers before changing the frame parent.",
-      "Validate transfer failures, paired-end geometry and persistence; keep live acceptance separate from automated results."
+      "Regression coverage for stale portal animation after dimension changes.",
+      "Keep source fixes confined to IP/Sable and preserve the installed rendering and physics stack.",
+      "Record exact build/runtime results without claiming live acceptance before the owner repeats the crossing."
     ]
   }
 }

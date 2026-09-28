@@ -3,14 +3,17 @@ package ipl.sable.transit;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.state.BlockState;
+import qouteall.imm_ptl.core.portal.PortalPlaceholderBlock;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 
-/** Edit-driven occupied full-block cache for portal narrow phase. */
+/** Edit-driven occupied full-block cache for portal narrow phase, excluding portal openings. */
 public final class IplPortalVolumeCache {
 
     private static final Map<UUID, List<BlockPos>> BLOCKS = new HashMap<>();
@@ -67,12 +70,27 @@ public final class IplPortalVolumeCache {
     private static List<BlockPos> build(ServerSubLevel ship) {
         ServerLevel level = (ServerLevel) ship.getLevel();
         var bounds = ship.getPlot().getBoundingBox();
+        return collectBlocks(
+            new BlockPos(bounds.minX(), bounds.minY(), bounds.minZ()),
+            new BlockPos(bounds.maxX(), bounds.maxY(), bounds.maxZ()), level::getBlockState
+        );
+    }
+
+    static List<BlockPos> collectBlocks(
+        BlockPos min, BlockPos max, Function<BlockPos, BlockState> readState
+    ) {
         List<BlockPos> blocks = new ArrayList<>();
-        for (int x = bounds.minX(); x <= bounds.maxX(); x++) {
-            for (int y = bounds.minY(); y <= bounds.maxY(); y++) {
-                for (int z = bounds.minZ(); z <= bounds.maxZ(); z++) {
+        for (int x = min.getX(); x <= max.getX(); x++) {
+            for (int y = min.getY(); y <= max.getY(); y++) {
+                for (int z = min.getZ(); z <= max.getZ(); z++) {
                     BlockPos pos = new BlockPos(x, y, z);
-                    if (!level.getBlockState(pos).isAir()) blocks.add(pos);
+                    BlockState state = readState.apply(pos);
+                    // These invisible, non-colliding blocks mark the aperture. Treating
+                    // them as occupied cubes turns a hollow carrier into a solid sheet:
+                    // a small portal inside its opening can then admit the large frame
+                    // to a spurious straddle session, creating destination-side contacts.
+                    // Keep other blocks' existing whole-cube transit semantics.
+                    if (!state.isAir() && !state.is(PortalPlaceholderBlock.instance)) blocks.add(pos);
                 }
             }
         }
