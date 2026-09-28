@@ -146,6 +146,10 @@ public class ShaderCodeTransformation {
         ).findFirst().orElse(null);
     }
     
+    public static boolean hasTransformation(Program.Type type, String shaderId) {
+        return configs != null && getConfig(type, shaderId) != null;
+    }
+
     public static boolean shouldAddUniform(String shaderName) {
         if (configs == null) {
             LOGGER.info("Shader Transform Skipping {} in shouldAddUniform", shaderName);

@@ -61,6 +61,11 @@ public class IplVeilShaderPreProcessor implements ShaderPreProcessor {
         else if (ctx.isFragment()) typeName = "FRAGMENT";
         else typeName = "OTHER";
 
+        Program.Type type = ctx.isVertex()
+            ? Program.Type.VERTEX
+            : ctx.isFragment() ? Program.Type.FRAGMENT : null;
+        if (type == null) return;
+
         // Lookup key in the YAML's affectedShaders list. We need to try
         // multiple candidate forms because the shader name reaches us with
         // different shapes depending on which Veil code path is calling us:
@@ -80,24 +85,16 @@ public class IplVeilShaderPreProcessor implements ShaderPreProcessor {
         // matching is best-effort across the candidates.
         String stripped = stripVanillaShaderName(path);
         String key;
-        if (ShaderCodeTransformation.shouldAddUniform(full)) {
+        if (ShaderCodeTransformation.hasTransformation(type, full)) {
             key = full;
-        } else if (ShaderCodeTransformation.shouldAddUniform(path)) {
+        } else if (ShaderCodeTransformation.hasTransformation(type, path)) {
             key = path;
-        } else if (stripped != null && ShaderCodeTransformation.shouldAddUniform(stripped)) {
+        } else if (stripped != null && ShaderCodeTransformation.hasTransformation(type, stripped)) {
             key = stripped;
         } else {
             if (SEEN.putIfAbsent(full + "/" + typeName + "/skip", Boolean.TRUE) == null) {
                 LOG.info("[IPL-VEIL-PREPROCESS] name='{}' type={} -- not in affectedShaders, skip", full, typeName);
             }
-            return;
-        }
-
-        Program.Type type = ctx.isVertex()
-            ? Program.Type.VERTEX
-            : ctx.isFragment() ? Program.Type.FRAGMENT : null;
-        if (type == null) {
-            // YAML only covers VERTEX/FRAGMENT; geom/tess shouldn't reach here.
             return;
         }
 

@@ -79,6 +79,7 @@
     "IplPortalVolumeCacheInvalidationMixin"
   ],
   "client": [
+    "client.VeilBufferLifecycleMixin",
     "client.VeilPacketContextLevelMixin",
     "client.SableAltContainerTickMixin",
     "client.IplHostedClientWorldFrameRouterMixin",

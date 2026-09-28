@@ -6,6 +6,19 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic Portal Lab log repairs (.16)
+
+- Dispatch off-thread portal sound calls to the client thread, dropping queued
+  sounds if their world unloads before playback.
+- Exclude Simulated's fullscreen diagram outline from world-geometry clipping;
+  match Veil transformations by shader stage to avoid false failure warnings.
+- Instantiate freshly generated GL buffers and vertex arrays before Veil labels
+  or uploads them, preserving bindings and unrelated GL errors.
+- Keep the first assembly tick on the ordered connection while sublevel hosting
+  is active, preventing local/UDP movement from racing allocation or rehome.
+- All 124 tests pass, including 11 hidden-GPU tests. Live verification of the
+  repaired session errors remains pending. See `docs/ZUBLASTIC_LOG_REPAIR.md`.
+
 ### Zublastic carried portal dimension handoff
 
 - Transfer a Sable frame's attached portal faces with it when the frame crosses

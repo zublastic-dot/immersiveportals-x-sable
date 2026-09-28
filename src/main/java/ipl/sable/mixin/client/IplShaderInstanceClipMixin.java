@@ -109,7 +109,6 @@ public abstract class IplShaderInstanceClipMixin implements IplSubLevelClipShade
         "simulated:redstone_accumulator/diode",
         "simulated:spring/spring",
         "simulated:laser_pointer/lens",
-        "simulated:contraption_diagram/outline_diagram",
         "simulated:laser/laser",
         "aeronautics:levitite/levitite",
         "aeronautics:burner_flame",

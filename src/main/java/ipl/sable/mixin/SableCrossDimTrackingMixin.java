@@ -96,7 +96,9 @@ import java.util.UUID;
  *       movement updates fall through to TCP. Sable's UDP path bypasses
  *       {@code Connection.send} and therefore IP's outgoing-packet wrap; sending UDP to a
  *       cross-dim recipient would result in the packet landing in the wrong client
- *       container. Same-dim recipients keep using UDP.</li>
+ *       container. When the hosting dimension exists, the first same-dimension
+ *       assembly tick also uses TCP: Sable's local/UDP shortcut can overtake the
+ *       initial TCP allocation or outlive removal during rehome.</li>
  * </ol>
  *
  * <p><b>What's different from the previous attempt:</b>
@@ -390,12 +392,14 @@ public abstract class SableCrossDimTrackingMixin {
     }
 
     // ------------------------------------------------------------------------
-    // 7. Force TCP for cross-dim recipients in sendMovementUpdates. Sable's UDP
+    // 7. Force TCP for hosted lifecycles and cross-dim recipients. Sable's UDP
     //    fast-path bypasses Connection.send and therefore IP's outgoing-packet
     //    wrap; the client would receive an unwrapped packet and route it to its
     //    currently-active container (wrong dim). TCP fallback goes through
     //    Connection.send and gets wrapped by IP under the active
-    //    withForceRedirect from @Redirect above.
+    //    withForceRedirect from @Redirect above. The initial parent-dim assembly
+    //    tick also needs ordered delivery while hosting is active: the local
+    //    shortcut runs through a separate event loop from StartTracking.
     // ------------------------------------------------------------------------
 
     @WrapOperation(
@@ -407,10 +411,10 @@ public abstract class SableCrossDimTrackingMixin {
         require = 1
     )
     private boolean ipl$forceCrossDimToTCP(SableUDPServer server, ServerPlayer player, Operation<Boolean> original) {
-        if (player.serverLevel() != level) {
-            return false;
-        }
-        return original.call(server, player);
+        return ipl.sable.network.HostedMovementRouting.useUnorderedTransport(
+            player.serverLevel() == level,
+            ipl.sable.dim.SableSubLevelDimension.getSableSubLevelsOrNull(level.getServer()) != null,
+            () -> original.call(server, player));
     }
 
     // ------------------------------------------------------------------------
