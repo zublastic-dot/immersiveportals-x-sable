@@ -29,6 +29,7 @@
     "dh.MixinDhPortalCancellation",
     "dh.MixinDhRenderParams",
     "dh.MixinDhClientApi",
+    "dh.MixinDhVanillaFog",
     "dh.MixinDhClientLevel",
     "dh.MixinDhIntegratedLevel",
     "dh.MixinDhClientWrapper",

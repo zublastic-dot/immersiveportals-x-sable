@@ -254,3 +254,44 @@ not every DH configuration or the shader path. The next owner comparison uses
 Complementary Unbound r5.9.3: a far Overworld hill has less fog through the Nether
 portal than after crossing. See `ZUBLASTIC_IRIS_DH.md` for the separate Iris
 eye-light sampling diagnosis and .12 candidate.
+
+## .19 candidate: sky-coloured near terrain at the DH transition
+
+On DH 3.3.3 the owner reproduced a sky-coloured water/shoreline band and entire
+tree silhouettes in a Nether-to-Overworld portal view with shaders off. The trees
+render normally immediately after crossing. A subtle direct-view water seam,
+and a dark water seam with Complementary/Euphoria, are separate observations;
+they are not all assumed to have the same cause.
+
+The installed `MixinVanillaFogCommon_neoforge.cancelFog` retains an unsupported-IP
+fallback that forces vanilla distance fog on in portal views, even when DH's
+Enable Vanilla Fog setting is off. `MixinDhVanillaFog` removes only that portal
+veto. Quick Enable Rendering, the user fog setting, underwater/lava/powder-snow
+fog, blindness and the wrapper's special-fog decision still run unchanged.
+
+DH also skips its vanilla/LOD fade in portals. The compatibility enables it only
+inside a scoped portal fade call, retaining DH's shader-pack veto. Both opaque
+and transparent fade methods rebuild RenderParams, so both need the same oblique
+projection adjustment as the terrain pass. The scope also disables geometry clip
+distance for fullscreen shaders and restores GL state. An invalid projection
+suppresses the fade draw, matching the terrain guard. Existing shared-image
+snapshots continue to protect the parent view from nested portal rendering.
+
+The fog regression executes the installed DH decision and the compiled production
+hook with live game/config boundaries substituted. Its unpatched control reproduces
+the portal-only forced fog; 128 combinations verify parity with the direct view
+while retaining user/fluid/status/sky/special-fog conditions. Fade wrapper tests
+cover nested scope restoration, direct views, invalid projections and exceptions;
+installed-artifact contracts verify both parameter updates and draw call sites.
+These are offline checks, not a transformed Minecraft launch or visual acceptance.
+
+Acceptance requires the owner's same shoreline/tree view before and after crossing,
+shaders off first, then checking that Complementary/Euphoria and normal terrain
+remain intact. Portal audio and cross-dimensional lighting are separate work.
+
+Both supported DH artifacts (3.3.2 and 3.3.3) pass all **135 tests**, including
+12 hidden-context GPU regressions, and produce the same native-preserving .19
+JAR SHA-256 `3670c747bca080968cc79d0d29d4ffa567c58dcee2f213f5785e51d4d0343927`.
+Compared with .18, one production class changes and one is added; 1,023 others
+are byte-identical. The native DLL retains its previous SHA-256. Evidence:
+`M:/PortalAudioCompat-20260929/transition-build/`.

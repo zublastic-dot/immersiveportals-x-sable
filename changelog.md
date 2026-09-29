@@ -6,6 +6,17 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic portal fog/LOD transition repair (.19)
+
+- Honor DH's vanilla-fog setting inside supported portal views, retaining fluid,
+  blindness and special fog. DH's old unsupported-portal fallback forced distance
+  fog onto near terrain and produced sky-coloured trees and shoreline.
+- Run the no-shader vanilla/LOD fade in a portal scope with matching depth
+  reconstruction and restored GL state; retain DH's shader-pack veto.
+- Add installed-DH fog-policy and scoped-fade regressions. Full-game image
+  acceptance remains required; audio and portal illumination are separate work.
+- All 135 tests/build pass on DH 3.3.2 and 3.3.3, including 12 GPU regressions.
+
 ### Zublastic DH 3.3.3 compatibility activation (.18)
 
 - Enable the existing portal-view compatibility hooks for the inspected DH 3.3.3

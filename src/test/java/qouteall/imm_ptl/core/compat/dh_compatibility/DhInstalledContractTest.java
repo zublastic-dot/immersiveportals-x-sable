@@ -50,10 +50,37 @@ class DhInstalledContractTest {
     }
     @Test void scopedRenderAndLightmapTargetsExist() throws IOException {
         hasMethod("core/api/internal/ClientApi", "renderLodLayer", "(Z)V");
+        for (String method : new String[]{"renderFadeOpaque", "renderFadeTransparent", "shouldRenderFade"}) {
+            hasMethod("core/api/internal/ClientApi", method, method.equals("shouldRenderFade") ? "()Z" : "()V");
+        }
         hasMethod("common/wrappers/minecraft/MinecraftRenderWrapper_neoforge", "getLightmapClientLevelWrapper",
             "()Lcom/seibel/distanthorizons/core/wrapperInterfaces/world/IClientLevelWrapper;");
         hasMethod("common/render/openGl/postProcessing/antialiasing/GlDhTaaRenderer_neoforge", "render",
             "(Lcom/seibel/distanthorizons/core/render/RenderParams;)V");
+    }
+
+    @Test void bothFadePassesRebuildParametersBeforeDrawing() throws IOException {
+        try (var stream = getClass().getResourceAsStream("/com/seibel/distanthorizons/core/api/internal/ClientApi.class")) {
+            assertNotNull(stream);
+            var node = new ClassNode();
+            new ClassReader(stream).accept(node, ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            for (String name : new String[]{"renderFadeOpaque", "renderFadeTransparent"}) {
+                var method = node.methods.stream().filter(m -> m.name.equals(name) && m.desc.equals("()V"))
+                    .findFirst().orElseThrow();
+                int updates = 0, draws = 0;
+                for (var instruction : method.instructions) {
+                    if (!(instruction instanceof MethodInsnNode call)) continue;
+                    if (call.owner.equals("com/seibel/distanthorizons/core/render/RenderParams") && call.name.equals("update")) updates++;
+                    if (call.owner.equals("com/seibel/distanthorizons/core/wrapperInterfaces/render/renderPass/IDhVanillaFadeRenderer")
+                        && call.name.equals("render")
+                        && call.desc.equals("(Lcom/seibel/distanthorizons/core/render/RenderParams;)V")) {
+                        assertEquals(1, updates, "Fade must prepare this view's depth reconstruction before drawing");
+                        draws++;
+                    }
+                }
+                assertEquals(1, draws, "Each fade pass must match the scoped draw hook");
+            }
+        }
     }
 
     @Test void destinationViewAndBothRenderPassTargetsExist() throws IOException {
