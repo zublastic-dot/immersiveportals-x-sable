@@ -6,6 +6,20 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic portal clouds, ambient occlusion and LOD textures (.20)
+
+- Supply DH cloud culling with the destination camera direction, including portal
+  rotation, reflection and scale. Preserve its distance and behind-camera culling.
+- Reconstruct depth in DH's ambient-occlusion blur from the portal projection.
+  Its ordinary near/far formula cannot describe the angled portal clipping plane.
+  Keep the direct view's shader behavior and the user's AO setting intact.
+- Calculate LOD texture mip gradients before block-coordinate wrapping to avoid
+  false bands at tile boundaries in no-shader portal views. Keep textures enabled.
+- Add exact installed-DH cloud-culling and GPU blur regressions for forward and
+  reverse depth, plus texture sampling checks for all six block faces. Visual
+  acceptance of the three candidate corrections remains pending.
+- All 141 local tests/build pass on DH 3.3.2 and 3.3.3, including 15 GPU regressions.
+
 ### Zublastic portal fog/LOD transition repair (.19)
 
 - Honor DH's vanilla-fog setting inside supported portal views, retaining fluid,

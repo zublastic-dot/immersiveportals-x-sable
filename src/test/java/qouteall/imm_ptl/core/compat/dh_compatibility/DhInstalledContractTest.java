@@ -91,6 +91,7 @@ class DhInstalledContractTest {
         String render = "common/wrappers/minecraft/MinecraftRenderWrapper_neoforge";
         hasMethod(render, "getCameraExactPosition", "()Lcom/seibel/distanthorizons/core/util/math/DhVec3d;");
         hasMethod(render, "getRenderDistance", "()I");
+        hasMethod(render, "getLookAtVector", "()Lcom/seibel/distanthorizons/core/util/math/DhVec3f;");
         hasMethod("core/render/RenderParams", "update", "(Lcom/seibel/distanthorizons/api/enums/rendering/EDhApiRenderPass;"
             + "Lcom/seibel/distanthorizons/core/api/internal/rendering/DhRenderState;)V");
         for (String pass : new String[]{"render", "renderDeferred"}) {
@@ -136,6 +137,33 @@ class DhInstalledContractTest {
             String shader = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
             assertTrue(shader.contains("if (uFrameMod8 > 0)"));
             assertTrue(shader.contains("gl_Position.xy = TAAJitter(gl_Position.xy, gl_Position.w)"));
+        }
+    }
+
+    @Test void ssaoAdaptationTargetsAndInstalledSourceMatch() throws IOException {
+        hasMethod("common/render/openGl/glObject/shader/GlShader", "loadFile", "(Ljava/lang/String;Z)Ljava/lang/String;");
+        String renderer = "common/render/openGl/postProcessing/ssao/GlDhSSAOApplyShader_neoforge";
+        hasMethod(renderer, "onInit", "()V");
+        hasMethod(renderer, "onApplyUniforms", "(Lcom/seibel/distanthorizons/core/render/RenderParams;)V");
+        try (var stream = getClass().getResourceAsStream("/" + DhPortalSsao.APPLY_SHADER)) {
+            assertNotNull(stream);
+            String original = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            String patched = DhPortalSsao.patchApplyShader(original);
+            assertNotEquals(original, patched);
+            assertEquals(1, patched.split("float ipViewDepth", -1).length - 1);
+            assertTrue(patched.contains("ipViewDepth(sampleTexCoord, sampleDepth)"));
+            assertTrue(patched.contains("ipViewDepth(texCoord, fragmentDepth)"));
+            assertEquals(patched, DhPortalSsao.patchApplyShader(patched), "Repeated loading must not patch twice");
+        }
+        String unknown = "#version 330 core\nvoid main() {}";
+        assertEquals(unknown, DhPortalSsao.patchApplyShader(unknown), "Unrecognized shader stays intact");
+        assertEquals(unknown, DhPortalTextures.patchTerrainShader(unknown));
+        try (var stream = getClass().getResourceAsStream("/" + DhPortalTextures.TERRAIN_SHADER)) {
+            assertNotNull(stream);
+            String original = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            String patched = DhPortalTextures.patchTerrainShader(original);
+            assertNotEquals(original, patched);
+            assertEquals(patched, DhPortalTextures.patchTerrainShader(patched));
         }
     }
 }

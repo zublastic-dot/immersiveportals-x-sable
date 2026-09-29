@@ -295,3 +295,54 @@ JAR SHA-256 `3670c747bca080968cc79d0d29d4ffa567c58dcee2f213f5785e51d4d0343927`.
 Compared with .18, one production class changes and one is added; 1,023 others
 are byte-identical. The native DLL retains its previous SHA-256. Evidence:
 `M:/PortalAudioCompat-20260929/transition-build/`.
+
+## .20 candidate: distant clouds, AO depth and texture bands in portal views
+
+The owner accepted the .19 shoreline/tree transition and shader aperture checks,
+then reported dark beach patches and missing distant clouds without shaders.
+Disabling DH's **Enable Ambient Occlusion** improved the beach shading. It did
+not fully eliminate a very faint pattern of bands on sand. A second owner test
+confirmed those bands disappear with **Enable LOD Textures** off. These are
+separate effects; the AO correction alone does not claim to fix the texture bands.
+
+DH's cloud-group culling reads Camera.getLookVector(), but IP moves the camera
+position and applies portal rotation/reflection in the model-view matrix. This
+mixes destination positions with source-world directions. Near cloud groups skip
+the culling branch, so only distant groups disappear. A scoped direction derived
+from the inverse DH model-view gives the culler the same view as the geometry.
+The ordinary camera query, distance limit and back-facing rejection are retained.
+
+DH's SSAO apply shader uses a scalar near/far depth formula for its bilateral blur.
+Portal oblique clipping makes depth depend on screen position as well as distance.
+A narrowly matched runtime adaptation of the installed shader adds inverse-matrix
+depth reconstruction for supported no-shader portal passes. Every draw sets the
+enable flag, so outer and sibling views cannot inherit it. The ordinary shader
+branch remains unchanged. Unrecognized shader sources stay intact with a warning;
+no DH shader copy or globally disabled setting is bundled in this fork.
+
+The cloud regression executes the installed DH culling method with controlled
+camera/config inputs. GPU tests execute the installed AO apply shader with a known
+depth discontinuity: the old formula smears occlusion over the edge, while the
+matrix branch matches direct projection in forward/reverse depth. A separate
+comparison verifies unchanged ordinary shader output. These tests do not prove
+that every cause of the owner's beach shading difference is repaired. Check the
+same beach with AO restored, distant clouds before/after crossing, and the shader
+regression again in Portal Lab before claiming live acceptance.
+
+DH repeats block tiles with fract(vBlockPos), then uses implicit texture
+derivatives to choose mip levels. Those derivatives jump across integer block
+boundaries, introducing false bands. The .20 adaptation uses textureGrad with
+derivatives of the continuous block coordinates, preserving each face's UV
+orientation and the same atlas texel. It is enabled only for no-shader portal
+passes and reset on every ordinary draw. An installed-shader GPU regression with
+a mip-coloured atlas reproduces the bands, verifies continuous sampling for all
+six face orientations, and checks unchanged direct-view output. It does not
+replace portal TAA history or disable LOD textures.
+
+Both DH 3.3.2 and 3.3.3 pass all **141 tests**, including **15 hidden-context GPU
+regressions**, and produce the same native-preserving .20 JAR SHA-256
+`ebc4e636ebeaa0df77fb94d21d75161cdf2c2fb2d79327e891628cd6ff67fb88`.
+Compared with .19, three production classes change, six are added, and 1,022 are
+byte-identical; the native DLL is unchanged. Evidence is retained under
+`M:/PortalAudioCompat-20260929/render-followup-build/`. Full-game acceptance is
+still pending at this build capture.

@@ -8,8 +8,10 @@ import com.seibel.distanthorizons.common.render.openGl.GlDhMetaRenderer_neoforge
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.RenderParams;
 import com.seibel.distanthorizons.core.util.math.DhMat4f;
+import com.seibel.distanthorizons.core.util.math.DhVec3f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.render.AbstractDhRenderApiDefinition;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
@@ -30,6 +32,14 @@ public final class DhPortalRendering {
 
     public static Pass begin() { return new Pass(); }
 
+    public static DhVec3f getPortalLookDirection() {
+        Pass pass = PASS.current();
+        if (pass == null || !pass.valid || pass.lookDirection == null) return null;
+        // DH normalizes the returned vector while culling cloud groups.
+        Vector3f direction = pass.lookDirection;
+        return new DhVec3f(direction.x, direction.y, direction.z);
+    }
+
     public static DhPortalTextureSnapshots.Scope preserveOuterImages() {
         // Iris owns its shader/deferred targets. This fixes DH's no-shader fade path.
         if (IrisInterface.invoker.isShaders()) return null;
@@ -39,6 +49,9 @@ public final class DhPortalRendering {
 
     public static void prepare(RenderParams params) {
         if (!PortalRendering.isRendering() || PASS.current() == null) return;
+        // IP moves the Camera position but applies portal rotation/reflection to
+        // the model-view matrix. Camera.getLookVector() stays in the outer world.
+        PASS.current().lookDirection = DhPortalCamera.lookDirection(toJoml(params.dhModelViewMatrix));
         if (params.dhClientLevel instanceof DhPortalLevel level && params.exactCameraPosition != null) {
             var camera = params.exactCameraPosition;
             if (level.ip_getDhView() == null) {
@@ -93,6 +106,7 @@ public final class DhPortalRendering {
         private final float[] clearColor = new float[4];
         private final DhScopedContext.Scope scope;
         private boolean valid = true;
+        private Vector3f lookDirection;
 
         private Pass() {
             GL11.glGetFloatv(GL11.GL_COLOR_CLEAR_VALUE, clearColor);
