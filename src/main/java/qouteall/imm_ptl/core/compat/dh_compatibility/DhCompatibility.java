@@ -5,6 +5,7 @@ public final class DhCompatibility {
     private DhCompatibility() {}
 
     public static boolean supports(String version) {
-        return "3.3.2".equals(version) || "3.3.2-1.21.1".equals(version);
+        return "3.3.2".equals(version) || "3.3.2-1.21.1".equals(version)
+            || "3.3.3".equals(version) || "3.3.3-1.21.1".equals(version);
     }
 }

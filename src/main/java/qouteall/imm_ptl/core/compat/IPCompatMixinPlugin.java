@@ -1,5 +1,6 @@
 package qouteall.imm_ptl.core.compat;
 
+import com.mojang.logging.LogUtils;
 import net.neoforged.fml.loading.LoadingModList;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
@@ -13,6 +14,8 @@ import java.util.List;
 import java.util.Set;
 
 public class IPCompatMixinPlugin implements IMixinConfigPlugin {
+    private boolean dhVersionReported;
+
     @Override
     public void onLoad(String mixinPackage) {
     
@@ -29,7 +32,18 @@ public class IPCompatMixinPlugin implements IMixinConfigPlugin {
 
         LoadingModList modList = LoadingModList.get();
         if (mixinClassName.contains(".dh.")) {
-            return DhCompatibility.supports(version(modList, "distanthorizons"));
+            String dhVersion = version(modList, "distanthorizons");
+            boolean supported = DhCompatibility.supports(dhVersion);
+            if (dhVersion != null && !dhVersionReported) {
+                dhVersionReported = true;
+                if (supported) {
+                    LogUtils.getLogger().info("IP/Sable DH: enabling portal compatibility for Distant Horizons {}", dhVersion);
+                } else {
+                    LogUtils.getLogger().warn("IP/Sable DH: portal compatibility disabled for unverified Distant Horizons {}"
+                        + " (supported: 3.3.2 and 3.3.3). Portal LODs may be missing or incorrect.", dhVersion);
+                }
+            }
+            return supported;
         }
         if (mixinClassName.contains("RealCamera")) {
             return RealCameraCompatibility.supports(version(modList, "realcamera"));

@@ -1,4 +1,48 @@
-# Distant Horizons 3.3.2 portal views
+# Distant Horizons 3.3.2 / 3.3.3 portal views
+
+## 2026-09-29: DH 3.3.3 activation repair (.18)
+
+The owner updated Portal Lab to DH 3.3.3 and observed source-dimension LODs
+inside the destination view in both directions with Complementary, and no
+portal LODs with shaders disabled. The installed 3.3.3 JAR's SHA-256 is
+`864e70def5b0d54d619b940b66bb2784e91d3f3fc253064fdc1b3fc5786cbfab`;
+its bytes also match Modrinth release `9w34y8ai` by SHA-512.
+
+The confirmed fork defect is `DhCompatibility.supports`: .17 admits only 3.3.2,
+so updating DH silently excludes every `.dh.` compatibility mixin. This disables
+the destination-view, lightmap, scoped-state and texture-isolation corrections
+together. It explains missing no-shader LODs and is consistent with the reported
+shader leakage; the repaired full-game image still needs owner validation.
+
+.18 admits the inspected 3.3.3 release alongside 3.3.2. Uninspected versions
+remain excluded, with a single explicit log warning; a supported version logs
+that the portal hooks are enabled. No DH classes are initialized by the gate.
+The inspected hook targets and call descriptors are unchanged. DH's changed
+OpenGL target classes mostly route the same calls through its new LWJGL service;
+the portal cancellation, level ticking, render parameters and LOD renderer
+retain the inspected behavior. This is a version-bound correction, not a promise
+that arbitrary future DH versions will work.
+
+The dependency matrix tests the exact 3.3.2 and 3.3.3 artifacts. New contracts
+verify that the tested JAR's declared NeoForge version activates our hooks,
+that destination-view and opaque/deferred render targets exist, and that the
+CameraZoom call still matches the isolation hook. The candidate compiles against
+the older ABI. Local inspection/build evidence: `M:/PortalDH333-20260929/`.
+
+Both local Java 21 test/build runs pass **128 tests, zero skipped**, including
+12 hidden-context GPU regressions. Candidate SHA-256:
+`b5d34afccbb5622e411ab40913a1e04a5a316b7ee5450c062b53234af431fa8c`.
+Only the version gate and mixin plugin classes differ from .17; the other
+1,022 classes and native payload are byte-identical. DH is not bundled. At this
+capture .18 has not been installed or visually accepted.
+
+Repeat both portal directions with shaders disabled, then Complementary. Verify
+destination LODs, normal terrain outside the aperture, fog after crossing and
+stationary stability. A passing contract or GPU test does not execute Minecraft's
+transformed mixins or establish live acceptance. Jukebox audio cutting out on
+crossing is a separate owner observation; this candidate does not repair sound.
+
+## Original 3.3.2 investigation
 
 Status on 2026-09-27: **PARTIAL_LIVE_ACCEPTANCE**. .9 cloud fade and .10 stationary
 LOD stability are owner accepted for the tested no-shader view. Candidate .11's
@@ -32,8 +76,9 @@ that they are the only remaining incompatibilities in this mod stack.
 
 ## Scoped changes
 
-Optional client mixins activate only for DH 3.3.2. Other versions and absent DH
-retain their existing behavior. The normal render hook supplies the destination
+The original optional client mixins activate only for DH 3.3.2 (extended to the
+inspected 3.3.3 release in .18 above). Other versions and absent DH retain their
+existing behavior. The normal render hook supplies the destination
 wrapper and transformed camera; an immutable view is published to that DH level.
 DH's existing timer can then tick recently visible destinations under a
 thread-local wrapper/position override. Actual player caches are not rewritten.

@@ -259,11 +259,11 @@ dependencies {
     implementation "org.sinytra.forgified-fabric-api:fabric-renderer-api-v1:3.4.1+9125b6dc19"
     implementation "maven.modrinth:iris:1.8.14-beta.1+1.21.1-neoforge"
 
-    // Optional runtime integration, pinned to the inspected DH 3.3.2 artifact.
-    // Never embed DH in this fork. A local identical JAR may be used offline.
+    // Compile against the oldest supported DH ABI; CI also tests the exact 3.3.3 release.
+    // Never embed DH in this fork. A local inspected JAR may be used offline.
     def dhCompileArtifact = providers.gradleProperty('dhCompileJar').isPresent()
         ? files(providers.gradleProperty('dhCompileJar').get())
-        : 'maven.modrinth:distanthorizons:Ez3cx7Yd'
+        : "maven.modrinth:distanthorizons:${providers.gradleProperty('dhCompileVersion').getOrElse('Ez3cx7Yd')}"
     compileOnly dhCompileArtifact
     testImplementation dhCompileArtifact
 

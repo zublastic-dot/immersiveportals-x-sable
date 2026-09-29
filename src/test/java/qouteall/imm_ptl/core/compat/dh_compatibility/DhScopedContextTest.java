@@ -40,7 +40,9 @@ class DhScopedContextTest {
     @Test void absentAndUninspectedDhVersionsKeepTheirOwnBehavior() {
         assertTrue(DhCompatibility.supports("3.3.2"));
         assertTrue(DhCompatibility.supports("3.3.2-1.21.1"));
-        for (String version : new String[]{null, "", "2.4.5-b", "3.3.1", "3.3.3", "3.3.2-custom"}) {
+        assertTrue(DhCompatibility.supports("3.3.3"));
+        assertTrue(DhCompatibility.supports("3.3.3-1.21.1"));
+        for (String version : new String[]{null, "", "2.4.5-b", "3.3.1", "3.3.4", "3.3.2-custom", "3.3.3-custom"}) {
             assertFalse(DhCompatibility.supports(version));
         }
     }

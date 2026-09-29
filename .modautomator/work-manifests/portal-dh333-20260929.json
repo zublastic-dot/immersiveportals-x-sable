@@ -1,0 +1,36 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-dh333-20260929",
+  "lease_id": "portal-dh333-20260929",
+  "worker_id": "codex-portal-dh333-20260929",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-dh333-20260929/portal-dh333-20260929",
+  "base_commit": "f190fbf5e9e295f765325af2cd4d79986a2579ce",
+  "resources": [
+    "artifact:owner-pc:portal-dh333-20260929",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:compatibility/ip-sable-rendering"
+  ],
+  "paths": [
+    "src/main/java/qouteall/imm_ptl/core/compat/dh_compatibility",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/dh",
+    "src/main/java/qouteall/imm_ptl/core/compat/IPCompatMixinPlugin.java",
+    "src/test/java/qouteall/imm_ptl/core/compat/dh_compatibility",
+    "build.gradle",
+    "gradle.properties",
+    "changelog.md",
+    "docs/ZUBLASTIC_DH.md",
+    ".github/workflows/zublastic-verify.yml"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Repair IP/Sable compatibility activation after the owner updated DH from 3.3.2 to 3.3.3 and observed incorrect/missing portal LODs.",
+    "acceptance": [
+      "Inspect exact installed DH 3.3.3 method and field contracts before admitting it.",
+      "Exercise prior portal regression tests against both supported DH artifacts.",
+      "Deliver a native-preserving IP/Sable candidate without modifying DH, Iris or the sound stack.",
+      "Record the separate reported jukebox crossing cutoff without conflating it with rendering acceptance."
+    ]
+  }
+}
