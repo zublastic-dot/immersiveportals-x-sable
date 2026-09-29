@@ -1,4 +1,4 @@
-name: Zublastic chunk-ticket regression tests
+name: Zublastic regression tests
 on:
   pull_request:
   push:
@@ -9,6 +9,15 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dh: '3.3.2'
+            artifact: Ez3cx7Yd
+          - dh: '3.3.3'
+            artifact: 9w34y8ai
+    name: Regression tests (DH ${{ matrix.dh }})
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -16,10 +25,10 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Test the production scheduler
-        run: bash gradlew --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2G test
+      - name: Test against the supported DH artifact
+        run: bash gradlew --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2G -PdhCompileVersion=${{ matrix.artifact }} test
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: chunk-ticket-test-results
+          name: regression-test-results-dh-${{ matrix.dh }}
           path: build/test-results/test/

@@ -6,6 +6,17 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic DH 3.3.3 compatibility activation (.18)
+
+- Enable the existing portal-view compatibility hooks for the inspected DH 3.3.3
+  release. The previous version gate silently disabled them after the update.
+- Log the DH compatibility decision once so future unsupported updates are
+  visible, retaining the explicit gate for uninspected versions.
+- Test both 3.3.2 and 3.3.3 artifacts in CI, including the actual mod version's
+  activation and destination-view/render-call contracts. Both local builds pass
+  128 tests, including 12 GPU regressions. All changes stay in IP/Sable; live
+  portal comparisons remain required.
+
 ### Zublastic cached GL allocation follow-up (.17)
 
 - Cover IP's own cached early returns when initializing GL buffers and VAOs.
