@@ -488,3 +488,17 @@ retained: its resize assertion incorrectly assumed deleted GL names could not be
 immediately reused by the driver. Lifecycle checks now account for name reuse.
 A one-time runtime log confirms when private portal history actually accumulates;
 startup alone and these GPU tests do not prove the snowy mountain is accepted.
+
+
+### .23 runtime rejection and .24 loader correction
+
+After successful startup, the first .23 portal render on September 30 failed with
+`Missing installed DH shader taa.frag`; DH disabled its renderer. The GPU test
+classpath allowed cross-JAR resource lookup that NeoForge's named mod modules
+did not. .23 is **not a usable/accepted runtime repair**. The failure log is saved
+under `taa-build/deployment/first-runtime-failure.log`.
+
+.24 uses `GlShader.class.getClassLoader().getResourceAsStream`, matching DH's
+actual owning-loader lookup. A new regression loads the production pipeline
+through a separate loader that cannot access DH resources and verifies both
+shaders still resolve through DH's loader. Runtime acceptance remains required.

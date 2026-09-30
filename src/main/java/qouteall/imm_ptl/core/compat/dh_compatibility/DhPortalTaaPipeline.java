@@ -104,11 +104,7 @@ public final class DhPortalTaaPipeline implements AutoCloseable {
     }
     private static int program(String fragment) {
         String vertex = "#version 330 core\nout vec2 texCoord; void main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);texCoord=p;gl_Position=vec4(p*2.0-1.0,0,1);}";
-        String source;
-        try (var in = DhPortalTaaPipeline.class.getResourceAsStream("/assets/distanthorizons/shaders/antialias/gl/" + fragment)) {
-            if (in == null) throw new IOException("Missing installed DH shader " + fragment);
-            source = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) { throw new IllegalStateException(e); }
+        String source = loadShader(fragment);
         int vs = 0, fs = 0, program = 0;
         try {
             vs = compile(GL_VERTEX_SHADER, vertex); fs = compile(GL_FRAGMENT_SHADER, source);
@@ -118,6 +114,16 @@ public final class DhPortalTaaPipeline implements AutoCloseable {
         } catch (RuntimeException | Error e) { glDeleteProgram(program); throw e; }
         finally { glDeleteShader(vs); glDeleteShader(fs); }
     }
+    static String loadShader(String fragment) {
+        // Match DH's owning-loader lookup. Class.getResourceAsStream on our mod
+        // cannot see assets in DH's separate named module under NeoForge.
+        var loader = com.seibel.distanthorizons.common.render.openGl.glObject.shader.GlShader.class.getClassLoader();
+        try (var in = loader.getResourceAsStream("assets/distanthorizons/shaders/antialias/gl/" + fragment)) {
+            if (in == null) throw new IOException("Missing installed DH shader " + fragment);
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) { throw new IllegalStateException(e); }
+    }
+
     private static int compile(int type, String source) {
         int shader = glCreateShader(type); glShaderSource(shader, source); glCompileShader(shader);
         if (glGetShaderi(shader, GL_COMPILE_STATUS) == GL_FALSE) {

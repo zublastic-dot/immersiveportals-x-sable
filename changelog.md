@@ -6,7 +6,14 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
-### Zublastic isolated portal temporal anti-aliasing (.23)
+### Zublastic DH shader resource loading correction (.24)
+
+- Load TAA shader resources through DH's owning class loader. .23 passed the
+  standalone GPU tests but its first NeoForge game run could not see DH assets
+  through the IP module, causing DH to disable rendering with an explicit error.
+- Add a separate-resource-loader regression and retain the isolated TAA design.
+
+### Zublastic isolated portal temporal anti-aliasing (.23; failed runtime trial)
 
 - Accumulate DH temporal AA in private histories keyed by source dimension,
   destination level and the complete ordered portal path, with matching per-view
