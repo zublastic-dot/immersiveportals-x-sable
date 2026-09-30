@@ -1,3 +1,7 @@
+## 0.5.1-zublastic.33 - retain enclosure lighting across chunk unloads
+
+Either portal endpoint now maintains both lighting directions. Verified enclosure geometry and measured light levels survive destination chunk/entity unloads for DH rendering, while current lightmaps keep time and weather responsive. Known geometry changes invalidate incomplete proofs; portal motion, retargeting and removal discard their mappings. This session-local cache requires an initial live measurement. Adds unload/reload, moved-aperture, local-lamp and partial-boundary regressions.
+
 ## 0.5.1-zublastic.32 — portal enclosure lighting trial
 
 Adds a bounded client-only portal light field for enclosed air volumes, shared by Sodium and DH ordinary terrain rendering. Removes the local dimension ambient floor inside recognized enclosures and imports attenuated light from the linked opening. No world light data changes. Shader packs and per-emitter RGB transport remain unsupported; see `docs/ZUBLASTIC_PORTAL_LIGHT.md` for exact limits and acceptance checks.

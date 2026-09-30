@@ -1,6 +1,8 @@
-# Portal enclosure lighting trial (.32)
+# Portal enclosure lighting trial (.33)
 
-Status: experimental first renderer adapter, not live accepted. Shader-pack light
+Status: experimental first renderer adapter. The .32 near-room night comparison
+was observed live; its distance/unload regression is addressed in .33, pending
+live verification. Shader-pack light
 transport remains unimplemented. This is not a claim of general ray-traced GI.
 
 ## Trigger and behavior
@@ -37,11 +39,19 @@ colored-light sampling. The installed shader is included in local GPU link tests
 ## Bounds and conservative fallbacks
 
 - At most 4,096 air cells per solve and fewer than 32 cells along each axis.
-- At most one candidate portal is examined per five client ticks; regions expire
-  after 80 ticks and removed portals/dimensions are discarded. At most four
-  regions are bound for a rendered dimension.
+- At most one of 16 active aperture mappings is examined per five client ticks.
+  Either loaded portal endpoint maintains both directions; counterpart entities
+  unloading does not discard the field. Moved, retargeted or removed apertures
+  and unloaded dimensions discard their snapshots. At most four regions are
+  bound for a rendered dimension.
+- Verified air/opaque geometry and measured light levels are cached in memory
+  for unloaded chunks, while current lightmaps still apply time/weather/gamma.
+  Loaded samples always replace cached ones. A known geometry change with a
+  partly unloaded boundary invalidates the proof. This cache is session-local:
+  a room not yet measured this session cannot receive a guessed correction.
 - Reaching unloaded space, the extent limit, or the cell budget does not prove
-  an enclosure. It disables the correction for that candidate.
+  an enclosure. Without a previous matching, verified snapshot it disables the
+  correction for that candidate. This does not request additional chunks.
 - Only air propagates in this first adapter. Glass, partial blocks and fluids
   are conservative boundaries. Scaled, nonrectangular and non-axis-aligned
   apertures retain existing rendering.
