@@ -535,3 +535,34 @@ camera/matrix adapter, both ping-pong targets, phase wrap and shader veto.
 Runtime logs distinguish `portal crossing TAA history transferred` from a reset.
 Evidence and dual-version build results: M:/PortalAudioCompat-20260929/taa-crossing/.
 These checks do not establish that the owner's brief visual disturbance is fixed.
+
+
+### .25 directional acceptance and .26 main-to-portal return candidate
+
+The owner confirms forward Nether-to-Overworld crossing is smooth in .25, but
+holding S with the portal behind the player still produces a brief white flash:
+the camera keeps facing Overworld terrain while the player backs into the Nether.
+The direct Overworld image becomes a portal image at that instant. The runtime
+log alternates .25 main-history transfers and resets. .25 had no reciprocal
+main-to-portal history handoff; no prior visibility of the return portal can be
+assumed in this reproduction.
+
+.26 records only metadata for DH's completed unsharpened main image, including
+the actual terrain sample phase and the post-flip ping-pong framebuffer. At a
+successful crossing it copies that image into the bounded private pool under
+the linked reverse portal UUID and the reversed dimension pair. Copying happens
+before DH renders/reuses its targets in the new dimension, not every frame.
+The first compatible portal frame promotes that completed image as its history,
+advances the matching phase and uses its original camera/matrix for reprojection.
+The old DH main image can then be overwritten without affecting the return view.
+
+Missing reverse links, stale main frames, shader/AA vetoes and wrong source
+dimensions cannot donate. Existing projection/view/camera/depth/resize checks
+still reject incompatible portal reuse. Only the exact top-level reverse path
+receives main history; sibling/nested views cannot borrow it, and a combo teleport
+cannot reuse the first dimension's main image for an unrelated intermediate one.
+Normal .25 portal-to-main transfer and texture/AO/cloud code remain unchanged.
+GPU tests cover overwritten main targets, continued sampling, repeated draws,
+subsequent forward transfer, GL-state restoration, invalid sources, resize/jumps
+and the unchanged memory bound. Runtime distinguishes capture from actual resume.
+Evidence: M:/PortalAudioCompat-20260929/taa-return/. Visual acceptance remains pending.

@@ -22,6 +22,7 @@ public class MixinDhTerrainAntiAliasing {
             int donatedPhase = DhPortalTaa.mainPhaseBeforeIncrement();
             if (donatedPhase >= 0) frameIndexMod8 = donatedPhase;
             original.call(params);
+            DhPortalTaa.recordMainSample(frameIndexMod8);
             return;
         }
 

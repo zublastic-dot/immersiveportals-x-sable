@@ -16,6 +16,11 @@ public class MixinDhAntiAliasing {
     @Shadow private int framebufferA, framebufferB, width, height;
     @Shadow private boolean textureAIsHistory;
 
+    @Inject(method = "render", at = @At("TAIL"))
+    private void ip_recordCompletedMain(RenderParams params, CallbackInfo ci) {
+        DhPortalTaa.recordMain(params, textureAIsHistory ? framebufferA : framebufferB, width, height);
+    }
+
     @Inject(method = "render", at = @At(value = "INVOKE",
         target = "Lcom/seibel/distanthorizons/common/render/openGl/postProcessing/antialiasing/GlDhTaaShader_neoforge;renderPrep(III)V"))
     private void ip_seedCrossingHistory(RenderParams params, CallbackInfo ci) {
