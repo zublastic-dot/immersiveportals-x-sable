@@ -502,3 +502,36 @@ under `taa-build/deployment/first-runtime-failure.log`.
 actual owning-loader lookup. A new regression loads the production pipeline
 through a separate loader that cannot access DH resources and verifies both
 shaders still resolve through DH's loader. Runtime acceptance remains required.
+
+
+### .24 steady-view acceptance and .25 crossing candidate
+
+The owner reports .24 portal and direct Overworld views look almost identical
+with shaders off. A subsecond disturbance remains at the actual dimension
+switch. Its resemblance to AA loss is a hypothesis, not a captured diagnosis.
+The .24 runtime log confirms accumulation without the .23 resource error.
+
+.25 transfers the completed private history of the successfully crossed portal
+into DH's next main-history target, after DH allocates/resizes it and before
+sampling. It copies unsharpened RGB10_A2 color and the matching previous camera
+and combined matrix. The first main terrain sample continues the donor's phase;
+repeated uploads use that same phase, then normal DH progression resumes.
+
+A success-only teleport hook issues a one-shot ticket for the exact source,
+destination and ordered UUID path. Same-frame combo teleports extend the path;
+siblings, other dimensions and different nested paths are never searched as
+alternatives. The donor must be completed within one frame and 0.5 seconds,
+match viewport/depth range/projection/view, and remain within eight camera
+blocks. An intervening overwrite, close, resize or invalidation rejects it.
+A rejected crossing donor black-clears main history rather than sampling the
+previous dimension. Ordinary frames leave DH's own main history untouched.
+Shader packs and AA-disabled rendering retain their prior behavior.
+
+Controlled GPU checks cover the color transfer and installed-shader continuation
+(.2 previous plus .8 current yields .26 rather than a raw .8 flash), GL-state
+restoration and stale/overwritten/closed donors. Contract tests inspect both DH
+artifacts and the successful teleport hook; production mixin tests exercise the
+camera/matrix adapter, both ping-pong targets, phase wrap and shader veto.
+Runtime logs distinguish `portal crossing TAA history transferred` from a reset.
+Evidence and dual-version build results: M:/PortalAudioCompat-20260929/taa-crossing/.
+These checks do not establish that the owner's brief visual disturbance is fixed.

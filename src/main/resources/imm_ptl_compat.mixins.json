@@ -37,6 +37,8 @@
     "dh.MixinDhWorldRender",
     "dh.MixinDhLodRenderer",
     "dh.MixinDhAntiAliasing",
+    "dh.MixinDhTaaPreviousFrame",
+    "dh.MixinDhPortalCrossing",
     "dh.MixinDhTerrainAntiAliasing",
     "dh.MixinDhTerrainTextures",
     "dh.MixinDhShaderSource",

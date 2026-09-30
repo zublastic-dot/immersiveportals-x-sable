@@ -6,6 +6,17 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic portal-crossing TAA continuity (.25 candidate)
+
+- Hand off the exact crossed portal's completed, unsharpened TAA history to DH's
+  main view, including its previous camera/matrix and matching sample phase.
+- Admit only recent compatible history from a successful teleport and the exact
+  ordered portal path; reject stale, resized, overwritten or incompatible donors.
+  Clear old main history when a crossing has no usable donor.
+- Preserve .24 steady-view rendering, shader vetoes, GPU cleanup and prior
+  texture/AO/cloud fixes. Log transfer versus reset for the fleeting crossing
+  disturbance; full-game acceptance of this candidate remains pending.
+
 ### Zublastic DH shader resource loading correction (.24)
 
 - Load TAA shader resources through DH's owning class loader. .23 passed the

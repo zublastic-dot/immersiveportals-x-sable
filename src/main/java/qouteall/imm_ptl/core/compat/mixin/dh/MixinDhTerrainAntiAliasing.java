@@ -19,6 +19,8 @@ public class MixinDhTerrainAntiAliasing {
     @WrapMethod(method = "fillUniformData")
     private void ip_stablePortalSamples(DhApiRenderParam params, Operation<Void> original) {
         if (!PortalRendering.isRendering()) {
+            int donatedPhase = DhPortalTaa.mainPhaseBeforeIncrement();
+            if (donatedPhase >= 0) frameIndexMod8 = donatedPhase;
             original.call(params);
             return;
         }

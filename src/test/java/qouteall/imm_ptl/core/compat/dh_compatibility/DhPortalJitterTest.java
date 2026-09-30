@@ -29,6 +29,8 @@ public class DhPortalJitterTest {
     public static class Hooks {
         public static boolean portal;
         public static int jitter;
+        public static int mainPhase = -1;
+        public static int mainPhaseBeforeIncrement() { return mainPhase; }
         public static int jitterPhase() { return jitter; }
         public static final List<Float> uniforms = new ArrayList<>();
         public static boolean isRendering() { return portal; }
@@ -62,7 +64,7 @@ public class DhPortalJitterTest {
                 }
             }
         }
-        assertEquals(3, replaced, "Only the live portal flag and GL uniform upload are substituted");
+        assertEquals(4, replaced, "Only the live portal flag and GL uniform upload are substituted");
         var writer = new ClassWriter(0);
         node.accept(writer);
         Class<?> type = new WrapperLoader().define(writer.toByteArray());
@@ -73,6 +75,7 @@ public class DhPortalJitterTest {
         upload = type.getDeclaredMethod("ip_stablePortalSamples", DhApiRenderParam.class, Operation.class);
         upload.setAccessible(true);
         Hooks.portal = true;
+        Hooks.mainPhase = -1;
         Hooks.uniforms.clear();
     }
 
@@ -122,6 +125,22 @@ public class DhPortalJitterTest {
         upload.invoke(mixin, params, animatedUpload());
         assertEquals(List.of(4.0f), Hooks.uniforms);
         assertEquals(4, phase.getInt(mixin));
+    }
+
+    @Test void crossingContinuesDonatedPhaseOncePerFrameAndStillHonorsDhVeto() throws Exception {
+        Hooks.portal = false; Hooks.mainPhase = 7; phase.setInt(mixin, 3);
+        upload.invoke(mixin, params, animatedUpload());
+        upload.invoke(mixin, params, animatedUpload());
+        assertEquals(List.of(0.0f,0.0f), Hooks.uniforms);
+        Hooks.mainPhase = -1;
+        upload.invoke(mixin, params, animatedUpload());
+        assertEquals(1, phase.getInt(mixin));
+        Hooks.mainPhase = 4;
+        upload.invoke(mixin, params, (Operation<Void>) arguments -> {
+            try { phase.setInt(mixin, -1); } catch (Exception e) { throw new AssertionError(e); }
+            return null;
+        });
+        assertEquals(-1, phase.getInt(mixin));
     }
 
     @Test void failingPortalUploadRestoresPhaseWithoutSwallowingFailure() throws Exception {
