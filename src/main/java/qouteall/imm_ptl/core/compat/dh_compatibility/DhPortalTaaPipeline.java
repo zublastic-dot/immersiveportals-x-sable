@@ -51,6 +51,31 @@ public final class DhPortalTaaPipeline implements AutoCloseable {
     public long allocatedBytes() { return views.values().stream().mapToLong(v -> (long)v.width * v.height * 8).sum(); }
     public int viewCount() { return views.size(); }
 
+    public record Transfer(View donor, DhTaaHistory.Snapshot snapshot) {}
+    public Transfer transfer(Object key, int frame, long now, int width, int height,
+                             Matrix4f projection, Matrix4f modelView, Vector3d camera, boolean zeroToOne) {
+        View donor = views.get(key);
+        if (donor == null || donor.width != width || donor.height != height || donor.zeroToOne != zeroToOne) return null;
+        var snapshot = donor.history.snapshot();
+        return snapshot != null && snapshot.matches(frame, now, projection, modelView, camera)
+            ? new Transfer(donor, snapshot) : null;
+    }
+
+    /** Copies unsharpened accumulated color, preserving all caller GL state. Null/reused donors clear stale main history. */
+    public static boolean seed(Transfer transfer, int destination, int width, int height) {
+        try (var state = new State()) {
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination);
+            if (transfer == null || transfer.donor.history.snapshot() != transfer.snapshot
+                || transfer.donor.width != width || transfer.donor.height != height) {
+                glClearBufferfv(GL_COLOR, 0, new float[4]); return false;
+            }
+            var donor = transfer.donor;
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, donor.fbos[donor.readIndex ^ 1]);
+            glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            return true;
+        }
+    }
+
     public void render(View view, int currentColor, int depth, int destination,
                        Matrix4f projection, Matrix4f modelView, Vector3d camera) {
         if (view == null) return;

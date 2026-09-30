@@ -16,5 +16,6 @@ public class MixinDhRenderParams {
     @Inject(method = "update(Lcom/seibel/distanthorizons/api/enums/rendering/EDhApiRenderPass;Lcom/seibel/distanthorizons/core/api/internal/rendering/DhRenderState;)V", at = @At("TAIL"))
     private void ip_prepareView(EDhApiRenderPass pass, DhRenderState state, CallbackInfo ci) {
         DhPortalRendering.prepare((RenderParams)(Object)this);
+        qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalTaa.prepareMain((RenderParams)(Object)this);
     }
 }

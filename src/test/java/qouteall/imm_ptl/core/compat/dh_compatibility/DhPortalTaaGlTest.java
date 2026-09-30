@@ -116,6 +116,42 @@ class DhPortalTaaGlTest {
         render("a",0,.2f,false);
         assertEquals(.8,render("a",3,.8f,false),.003);
     }
+
+    private DhPortalTaaPipeline.Transfer transfer(Object key, int frame) {
+        return pipeline.transfer(key,frame,frame*16_000_000L,SIZE,SIZE,new Matrix4f(),new Matrix4f(),new Vector3d(),false);
+    }
+    private float centrePixel(int texture) {
+        glBindTexture(GL_TEXTURE_2D,texture); float[] pixels=new float[SIZE*SIZE*4];
+        glGetTexImage(GL_TEXTURE_2D,0,GL_RGBA,GL_FLOAT,pixels); return pixels[(4*SIZE+4)*4];
+    }
+    @Test void crossingSeedsUnsharpenedHistoryAndAvoidsFirstFrameSamplePop() {
+        render("crossed-portal",0,.2f,false);
+        var donor=transfer("crossed-portal",1); assertNotNull(donor);
+        var main=prepare("main",1,false);
+        // Model DH's history target: same installed TAA shader and RGB10_A2 format.
+        glEnable(GL_SCISSOR_TEST); glScissor(0,0,1,1); glEnable(GL_FRAMEBUFFER_SRGB);
+        int read=glGetInteger(GL_READ_FRAMEBUFFER_BINDING), draw=glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
+        assertTrue(DhPortalTaaPipeline.seed(donor,main.fbos[0],SIZE,SIZE));
+        assertEquals(read,glGetInteger(GL_READ_FRAMEBUFFER_BINDING)); assertEquals(draw,glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING));
+        assertTrue(glIsEnabled(GL_SCISSOR_TEST)); assertTrue(glIsEnabled(GL_FRAMEBUFFER_SRGB));
+        assertEquals(.2,centrePixel(main.textures[0]),.003);
+        main.history.valid=true; main.history.previousCombined.set(donor.snapshot().combined());
+        main.history.previousCamera.set(donor.snapshot().camera());
+        input(.8f); pipeline.render(main,color,depth,fbo,new Matrix4f(),new Matrix4f(),new Vector3d());
+        assertEquals(.26,centrePixel(main.textures[1]),.004,"Donated history blends instead of flashing raw .8");
+        assertEquals(.8,render("reset-control",0,.8f,false),.003);
+    }
+    @Test void crossingRejectsOtherPathsResizeStalenessAndOverwrittenDonors() {
+        render("exact",0,.2f,false);
+        assertNull(transfer("sibling",1)); assertNull(transfer("nested",1)); assertNull(transfer("exact",3));
+        assertNull(pipeline.transfer("exact",1,16_000_000L,SIZE*2,SIZE,new Matrix4f(),new Matrix4f(),new Vector3d(),false));
+        assertNull(pipeline.transfer("exact",1,16_000_000L,SIZE,SIZE,new Matrix4f(),new Matrix4f(),new Vector3d(),true));
+        var donor=transfer("exact",1); assertNotNull(donor);
+        render("exact",1,.8f,false); input(.7f);
+        assertFalse(DhPortalTaaPipeline.seed(donor,fbo,SIZE,SIZE)); assertEquals(0,centrePixel(color),.0001);
+        donor=transfer("exact",2); pipeline.close(); input(.7f);
+        assertFalse(DhPortalTaaPipeline.seed(donor,fbo,SIZE,SIZE)); assertEquals(0,centrePixel(color),.0001);
+    }
     @Test void restoresHostileGlStateAndDoesNotModifyUnrelatedTargets() {
         input(.2f); var v=prepare("a",0,false);
         int unrelated=glGenTextures(); glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,unrelated);

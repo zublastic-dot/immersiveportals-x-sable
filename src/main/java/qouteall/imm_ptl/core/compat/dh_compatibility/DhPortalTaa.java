@@ -15,15 +15,18 @@ import org.joml.Vector3d;
 import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
 import qouteall.imm_ptl.core.render.context_management.RenderStates;
-import java.util.List;
-import java.util.UUID;
+import qouteall.imm_ptl.core.portal.Portal;
+import com.seibel.distanthorizons.common.render.openGl.postProcessing.antialiasing.GlDhTaaShader_neoforge;
 
 /** Optional-DH boundary; only the ordinary-depth, no-shader portal path uses private TAA. */
 public final class DhPortalTaa {
     private static final DhPortalTaaPipeline PIPELINE = new DhPortalTaaPipeline();
     private static boolean registered;
     private static boolean reportedAccumulation;
-    private record Key(Object origin, Object destination, List<UUID> path) {}
+    private static final DhTaaCrossing CROSSING = new DhTaaCrossing();
+    private static DhPortalTaaPipeline.Transfer transfer;
+    private static boolean seedMain;
+    private static int mainFrame = -1, mainPhase = -1;
     private DhPortalTaa() {}
 
     private static boolean enabled() {
@@ -37,15 +40,53 @@ public final class DhPortalTaa {
         if (!enabled()) clear();
         else PIPELINE.prune(RenderStates.frameIndex, System.nanoTime());
     }
-    public static void clear() { PIPELINE.close(); reportedAccumulation = false; }
+    public static void clear() {
+        PIPELINE.close(); reportedAccumulation = false; CROSSING.clear(); transfer = null;
+        seedMain = false; mainFrame = mainPhase = -1;
+    }
+
+    public static void crossed(Portal portal) {
+        if (!enabled()) return;
+        CROSSING.crossed(portal.getOriginDim(), portal.getDestDim(), portal.getUUID(), RenderStates.frameIndex, System.nanoTime());
+    }
+
+    /** Select before terrain uniforms so the first main sample follows the donated portal sample. */
+    public static void prepareMain(RenderParams params) {
+        if (PortalRendering.isRendering() || !enabled() || !CROSSING.pending()) return;
+        mainFrame = RenderStates.frameIndex; mainPhase = -1; transfer = null; seedMain = true;
+        var key = CROSSING.take(RenderStates.originalPlayerDimension, mainFrame, System.nanoTime());
+        if (key == null || params.exactCameraPosition == null) return;
+        var render = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
+        var api = SingletonInjector.INSTANCE.get(AbstractDhRenderApiDefinition.class);
+        transfer = PIPELINE.transfer(key, mainFrame, System.nanoTime(),
+            render.getTargetFramebufferViewportWidth(), render.getTargetFramebufferViewportHeight(),
+            matrix(params.dhProjectionMatrix), matrix(params.dhModelViewMatrix), camera(params),
+            api.getDepthRange() == EDhApiDepthRange.ZERO_TO_POS_ONE);
+        if (transfer != null) mainPhase = transfer.snapshot().phase();
+    }
+
+    public static int mainPhaseBeforeIncrement() {
+        return enabled() && mainFrame == RenderStates.frameIndex ? mainPhase : -1;
+    }
+
+    /** Called inside DH's render, after its allocation/resize and before it reads main history. */
+    public static void seedMainHistory(int framebuffer, int width, int height) {
+        if (!seedMain || PortalRendering.isRendering() || !enabled()) return;
+        seedMain = false;
+        boolean copied = DhPortalTaaPipeline.seed(mainFrame == RenderStates.frameIndex ? transfer : null, framebuffer, width, height);
+        if (copied) ((DhTaaPreviousFrame)(Object)GlDhTaaShader_neoforge.INSTANCE).ip_acceptPortalHistory(transfer.snapshot());
+        com.mojang.logging.LogUtils.getLogger().info("IP/Sable DH: portal crossing TAA history {}", copied ? "transferred" : "reset (no compatible recent portal view)");
+        transfer = null;
+    }
 
     private static DhPortalTaaPipeline.View view(RenderParams params) {
         if (params == null || !enabled() || !DhPortalRendering.isSupportedPass()
             || DhPortalRendering.getGeometryClipPlane() == null || params.exactCameraPosition == null) return null;
         var render = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
         var api = SingletonInjector.INSTANCE.get(AbstractDhRenderApiDefinition.class);
-        var key = new Key(RenderStates.originalPlayerDimension, params.clientLevelWrapper,
-            PortalRendering.getPortalPath().stream().map(p -> p.getUUID()).toList());
+        var path = PortalRendering.getPortalPath();
+        var key = new DhTaaCrossing.Key(RenderStates.originalPlayerDimension, path.getLast().getDestDim(),
+            path.stream().map(p -> p.getUUID()).toList());
         return PIPELINE.prepare(key, RenderStates.frameIndex, System.nanoTime(),
             render.getTargetFramebufferViewportWidth(), render.getTargetFramebufferViewportHeight(),
             matrix(params.dhProjectionMatrix), matrix(params.dhModelViewMatrix), camera(params),
