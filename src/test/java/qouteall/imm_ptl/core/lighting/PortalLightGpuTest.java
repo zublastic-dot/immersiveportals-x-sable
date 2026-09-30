@@ -78,11 +78,26 @@ class PortalLightGpuTest {
         String f=PortalLightShaders.dh(path,resource(path));assertTrue(f.contains("ipPortalLightGain(vertexWorldPos)"));
         int p=link(resource("assets/distanthorizons/shaders/terrain/gl/vert.vert"),f);glDeleteProgram(p);
     }
+    @Test @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="IP_PORTAL_TEST_COLORFUL_JAR",matches=".+")
+    void installedColorfulLightingVertexLinksWithOrdinarySodiumFragment() throws Exception {
+        String v=PortalLightShaders.sodium("colorful_lighting_sodium_compat:blocks/block_layer_opaque.vsh",resource("assets/colorful_lighting_sodium_compat/shaders/blocks/block_layer_opaque.vsh"));
+        assertTrue(v.contains("ipPortalLightPosition=position;"));
+        assertTrue(v.contains("colorful_sample_lightmap("),"retain Colorful Lighting's actual light calculation");
+        String f=PortalLightShaders.sodium("sodium:blocks/block_layer_opaque.fsh",resource("assets/sodium/shaders/blocks/block_layer_opaque.fsh"));
+        int p=link(constants(imports(v)),constants(imports(f)));glDeleteProgram(p);
+    }
     static String constants(String s) { int n=s.indexOf('\n');return s.substring(0,n+1)+"#define USE_VERTEX_COMPRESSION\n#define USE_FOG\n#define MAX_TEXTURE_LOD_BIAS 4\n"+s.substring(n+1); }
-    static String resource(String name) throws IOException { try(var in=PortalLightGpuTest.class.getClassLoader().getResourceAsStream(name)){ assertNotNull(in,name);return new String(in.readAllBytes(),StandardCharsets.UTF_8); } }
+    static String resource(String name) throws IOException {
+        if(name.startsWith("assets/colorful_lighting_sodium_compat/")) {
+            try(var zip=new java.util.zip.ZipFile(System.getenv("IP_PORTAL_TEST_COLORFUL_JAR"))) {
+                try(var in=zip.getInputStream(zip.getEntry(name))) {return new String(in.readAllBytes(),StandardCharsets.UTF_8);}
+            }
+        }
+        try(var in=PortalLightGpuTest.class.getClassLoader().getResourceAsStream(name)){ assertNotNull(in,name);return new String(in.readAllBytes(),StandardCharsets.UTF_8); }
+    }
     static String imports(String s) throws IOException {
-        var matcher=Pattern.compile("#import <sodium:([^>]+)>").matcher(s);var out=new StringBuilder();int last=0;
-        while(matcher.find()) {out.append(s,last,matcher.start()).append(imports(resource("assets/sodium/shaders/"+matcher.group(1))));last=matcher.end();}
+        var matcher=Pattern.compile("#import <([^:]+):([^>]+)>").matcher(s);var out=new StringBuilder();int last=0;
+        while(matcher.find()) {out.append(s,last,matcher.start()).append(imports(resource("assets/"+matcher.group(1)+"/shaders/"+matcher.group(2))));last=matcher.end();}
         return out.append(s.substring(last)).toString();
     }
 }

@@ -31,11 +31,16 @@ public final class PortalLightShaders {
         }
         """;
     private PortalLightShaders() {}
+    public static String sodiumGeometryName(String name) {
+        return name.equals("colorful_lighting_sodium_compat:blocks/block_layer_opaque.vsh")
+            ? "sodium:blocks/block_layer_opaque.vsh" : name;
+    }
     private static String declarations(String source,String declarations) {
         var main=MAIN.matcher(source);
         return main.find()?source.substring(0,main.start())+declarations+"\n"+source.substring(main.start()):source;
     }
     public static String sodium(String name,String source) {
+        name=sodiumGeometryName(name);
         if(source.contains("ipPortalLightGain") || source.contains("out vec3 ipPortalLightPosition;")) return source;
         if(name.equals("sodium:blocks/block_layer_opaque.vsh") && source.contains("vec3 position = _vert_position + translation;"))
             return declarations(source,"out vec3 ipPortalLightPosition;").replace("vec3 position = _vert_position + translation;",

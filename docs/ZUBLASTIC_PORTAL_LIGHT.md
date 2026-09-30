@@ -30,6 +30,9 @@ same client-only 3D field. Exact air-cell membership precedes interpolation, so
 the exterior roof cannot borrow an interior correction. Field origins are
 relative to the current view camera, including nested portal views. No DH data
 or shader-pack files are edited or deleted. Local texture/albedo detail remains.
+Colorful Lighting 2.5.1 substitutes a differently named Sodium vertex shader;
+that known namespace uses the same geometry adapter while retaining its own
+colored-light sampling. The installed shader is included in local GPU link tests.
 
 ## Bounds and conservative fallbacks
 
