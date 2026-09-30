@@ -16,9 +16,17 @@ import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalRendering;
 public abstract class MixinDhGeometryClipping {
     @Shadow public abstract int tryGetUniformLocation(CharSequence name);
     @Unique private int ip_clipPlaneLocation = -2;
+    @Unique private qouteall.imm_ptl.core.lighting.PortalLightGpu.Binding ip_lightBinding;
+
+    @Inject(method="unbind()V",at=@At("HEAD"))
+    private void ip_restoreLight(CallbackInfo ci) {
+        if(ip_lightBinding!=null) { ip_lightBinding.close(); ip_lightBinding=null; }
+    }
 
     @Inject(method = "bind()V", at = @At("RETURN"))
     private void ip_setThisViewPlane(CallbackInfo ci) {
+        if(ip_lightBinding!=null) ip_lightBinding.close();
+        ip_lightBinding=qouteall.imm_ptl.core.lighting.PortalLightGpu.bind();
         if (ip_clipPlaneLocation == -2) ip_clipPlaneLocation = tryGetUniformLocation(DhPortalClipping.UNIFORM);
         if (ip_clipPlaneLocation < 0) return;
         var plane = DhPortalRendering.getGeometryClipPlane();

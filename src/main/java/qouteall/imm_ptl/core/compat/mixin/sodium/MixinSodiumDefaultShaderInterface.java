@@ -23,9 +23,15 @@ import java.util.concurrent.ConcurrentMap;
 public class MixinSodiumDefaultShaderInterface {
     @Unique
     private GlUniformFloat4v uIPClippingEquation;
+    @Unique private qouteall.imm_ptl.core.lighting.PortalLightGpu.Binding ip_lightBinding;
+
+    @Inject(method="resetState",at=@At("HEAD"),remap=false)
+    private void ip_restoreLightBinding(CallbackInfo ci) {
+        if(ip_lightBinding!=null) { ip_lightBinding.close(); ip_lightBinding=null; }
+    }
 
     // Probe E: once-per-variant log so we can see, for each ChunkShaderOptions
-    // variant Sodium builds (pass × fog × vertex format etc.), whether
+    // variant Sodium builds (pass Ä‚â€” fog Ä‚â€” vertex format etc.), whether
     // bindUniformOptional actually returned a real binding. Null means the
     // linked program doesn't expose iportal_ClippingEquation -- which under
     // Sodium implies either the shader name in our YAML doesn't match what
@@ -62,6 +68,8 @@ public class MixinSodiumDefaultShaderInterface {
         remap = false
     )
     private void onSetup(CallbackInfo ci) {
+        if(ip_lightBinding!=null) ip_lightBinding.close();
+        ip_lightBinding=qouteall.imm_ptl.core.lighting.PortalLightGpu.bind();
         if (uIPClippingEquation != null) {
             if (FrontClipping.isClippingEnabled) {
                 double[] equation = FrontClipping.getActiveClipPlaneEquationAfterModelView();

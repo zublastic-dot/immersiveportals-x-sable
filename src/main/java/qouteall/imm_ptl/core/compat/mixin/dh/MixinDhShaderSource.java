@@ -27,6 +27,6 @@ public class MixinDhShaderSource {
         if (patched.equals(source)) {
             LogUtils.getLogger().warn("IP/Sable DH: unrecognized shader {}; portal adaptation unavailable", path);
         }
-        cir.setReturnValue(patched);
+        cir.setReturnValue(qouteall.imm_ptl.core.lighting.PortalLightShaders.dh(path, patched));
     }
 }

@@ -1,3 +1,7 @@
+## 0.5.1-zublastic.32 — portal enclosure lighting trial
+
+Adds a bounded client-only portal light field for enclosed air volumes, shared by Sodium and DH ordinary terrain rendering. Removes the local dimension ambient floor inside recognized enclosures and imports attenuated light from the linked opening. No world light data changes. Shader packs and per-emitter RGB transport remain unsupported; see `docs/ZUBLASTIC_PORTAL_LIGHT.md` for exact limits and acceptance checks.
+
 # Changelog
 
 All notable changes to this project will be documented in this file.  

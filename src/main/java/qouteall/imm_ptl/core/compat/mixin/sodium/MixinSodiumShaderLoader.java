@@ -57,6 +57,6 @@ public abstract class MixinSodiumShaderLoader {
             );
         }
 
-        return transformed;
+        return qouteall.imm_ptl.core.lighting.PortalLightShaders.sodium(nameStr, transformed);
     }
 }
