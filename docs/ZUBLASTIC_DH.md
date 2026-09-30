@@ -597,3 +597,12 @@ movement still remains fast. Tests cover both directions, rotation/scale,
 consecutive crossings, timestamp preservation, invalid transforms and the exact
 DH field/sampling/near-clip contracts in both supported artifacts. Live visual
 acceptance of .27 remains required. Evidence: M:/PortalAudioCompat-20260929/detail-transition/.
+
+
+## Portal vanilla coverage (.28 candidate)
+
+Owner accepted .27 building-detail continuity on crossing. The subsequent seam appears after standing farther from a portal for 2-3 seconds and resolves closer to it. IP reduces destination loading radius at five blocks; tracking generations last 13 ticks and default unload retention is four generations. The previous DH wrapper always returned WorldRenderInfo render distance, even after smaller destination coverage unloaded.
+
+Shaders-off DH portal passes now conservatively bound that radius by the nearest missing destination chunk footprint, measured from the transformed camera. The lookup uses FULL chunks with create=false and excludes EmptyLevelChunk; ClientLevel.hasChunk is not a reliable availability predicate. The value is cached only within a render pass, with no global cross-view cache or setting mutation. Main view and Iris shaders retain prior behavior. Partial coverage may move the transition nearer; this is intentional to avoid a hole, and visual acceptance remains required.
+
+Regression cases cover delayed shrink/reload, off-centre cameras, missing interior chunks, negative coordinates, full coverage and non-creating runtime integration. Existing GPU regressions remain required on DH 3.3.2 and 3.3.3. Evidence: M:/PortalAudioCompat-20260929/boundary-transition/.

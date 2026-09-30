@@ -30,7 +30,8 @@ public class MixinDhRenderWrapper {
 
     @Inject(method = "getRenderDistance", at = @At("HEAD"), cancellable = true)
     private void ip_viewRenderDistance(CallbackInfoReturnable<Integer> cir) {
-        if (WorldRenderInfo.isRendering()) cir.setReturnValue(WorldRenderInfo.getRenderDistance());
+        if (WorldRenderInfo.isRendering()) cir.setReturnValue(
+            DhPortalRendering.vanillaCoverageDistance(WorldRenderInfo.getRenderDistance()));
     }
 
     @Inject(method = "getLightmapClientLevelWrapper", at = @At("HEAD"), cancellable = true)

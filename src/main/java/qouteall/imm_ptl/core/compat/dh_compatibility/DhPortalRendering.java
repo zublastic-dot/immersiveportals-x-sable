@@ -37,6 +37,23 @@ public final class DhPortalRendering {
 
     public static Pass begin() { return new Pass(); }
 
+    public static int vanillaCoverageDistance(int requested) {
+        Pass pass = PASS.current();
+        if (pass == null || !PortalRendering.isRendering() || IrisInterface.invoker.isShaders()) return requested;
+        if (pass.coverageDistance == null) {
+            var mc = net.minecraft.client.Minecraft.getInstance();
+            var level = mc.level;
+            var camera = mc.gameRenderer.getMainCamera().getPosition();
+            pass.coverageDistance = level == null ? requested : DhVanillaCoverage.radius(
+                requested, camera.x, camera.z, (x, z) -> {
+                    var chunk = level.getChunkSource().getChunk(x, z,
+                        net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false);
+                    return chunk != null && !(chunk instanceof net.minecraft.world.level.chunk.EmptyLevelChunk);
+                });
+        }
+        return pass.coverageDistance;
+    }
+
     public static RenderParams currentParams() { return PASS.current() == null ? null : PASS.current().params; }
 
     public static Vector4f getGeometryClipPlane() {
@@ -155,6 +172,7 @@ public final class DhPortalRendering {
         private Vector4f geometryClipPlane;
         private boolean oblique;
         private RenderParams params;
+        private Integer coverageDistance;
 
         private Pass() {
             GL11.glGetFloatv(GL11.GL_COLOR_CLEAR_VALUE, clearColor);

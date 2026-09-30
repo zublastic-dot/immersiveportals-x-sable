@@ -6,6 +6,12 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic portal vanilla/LOD boundary (.28 candidate)
+
+- Bound shaders-off portal DH transition distance by destination chunks actually available around the transformed camera. Retained chunks may unload several seconds after stepping away from a portal; DH must not keep a near plane based on the larger main-view distance.
+- Preserve .27 crossing correction and all user settings. Shader and main-view paths retain their existing distance.
+
+
 ### Zublastic crossing-induced detail reduction (.27 candidate)
 
 - Rebase DH's previous speed-sampling position through a successfully crossed
