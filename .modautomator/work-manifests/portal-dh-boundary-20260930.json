@@ -1,0 +1,48 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-dh-boundary-20260930",
+  "lease_id": "portal-dh-boundary-20260930",
+  "worker_id": "codex-portal-dh-boundary-20260930",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-dh-boundary-20260930/portal-dh-boundary-20260930",
+  "base_commit": "21e2ac2ddc8377949ea922363e4398e43dd731d5",
+  "resources": [
+    "artifact:owner-pc:portal-audio-20260929",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:compatibility/ip-sable-rendering",
+    "repo:zublastic-dot/immersiveportals-x-sable:.modautomator/work-manifests/portal-dh-boundary-20260930.json",
+    "repo:zublastic-dot/immersiveportals-x-sable:build.gradle",
+    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_DH.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/dh_compatibility",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/mixin/dh",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/resources/imm_ptl_compat.mixins.json",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/compat/dh_compatibility",
+    "repo:zublastic-dot/zublastic-context:.modautomator/work-manifests/portal-dh-boundary-20260930.json",
+    "repo:zublastic-dot/zublastic-context:history/2026-09-29-portal-dh333-regression.md",
+    "repo:zublastic-dot/zublastic-ideas:.modautomator/work-manifests/portal-dh-boundary-20260930.json",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md"
+  ],
+  "paths": [
+    "build.gradle",
+    "changelog.md",
+    "docs/ZUBLASTIC_DH.md",
+    "gradle.properties",
+    "src/main/java/qouteall/imm_ptl/core/compat/dh_compatibility",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/dh",
+    "src/main/resources/imm_ptl_compat.mixins.json",
+    "src/test/java/qouteall/imm_ptl/core/compat/dh_compatibility"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Align portal DH transition with available destination vanilla chunks.",
+    "acceptance": [
+      "Preserve accepted .27 crossing behavior",
+      "Cover delayed destination chunk unloading",
+      "Build and test DH 3.3.2 and 3.3.3"
+    ]
+  }
+}
