@@ -4,8 +4,8 @@
   "lease_id": "portal-audio-20260929",
   "worker_id": "codex-portal-audio-20260929",
   "repository": "zublastic-dot/immersiveportals-x-sable",
-  "work_branch": "work/codex-portal-audio-20260929/portal-audio-20260929",
-  "base_commit": "b264d6779100e69a131b1da94e30884c611e7d34",
+  "work_branch": "work/codex-portal-audio-20260929/portal-audio-20260929-audio",
+  "base_commit": "1f5e9d07564b4642cafde0ac62d8dcaecfc64529",
   "resources": [
     "artifact:owner-pc:portal-audio-20260929",
     "domain:modautomator:compatibility/ip-sable-audio",
@@ -35,8 +35,9 @@
   ],
   "value_case": {
     "category": "demonstrated_blocker",
-    "statement": "Repair owner-reproduced sky-coloured DH transition in portal views first; preserve subsequent portal audio and Sound Physics Aeronautics scope.",
+    "statement": "Repair the remaining owner-reproduced DH texture brightness mismatch across portal crossings; preserve accepted .21 rendering and subsequent portal audio/Sound Physics Aeronautics scope.",
     "acceptance": [
+      "Keep block texture colour consistent across portal crossings without reintroducing sand mip bands.",
       "Keep DH terrain depth and fade reconstruction consistent inside portals, with shaders on/off runtime checks.",
       "Preserve original sound identity and playback position across crossings.",
       "Route remote audio with dimension and moving-sublevel context.",

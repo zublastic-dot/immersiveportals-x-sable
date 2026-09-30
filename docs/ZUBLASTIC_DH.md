@@ -393,3 +393,41 @@ and no failures or skips. The Java 21 builds produce the same .21 JAR SHA-256
 the native DLL. Build logs and test XML are in
 `M:/PortalAudioCompat-20260929/stable-depth-build/`. Installation, hosted CI and
 owner acceptance are recorded separately in canonical context.
+
+The owner subsequently confirmed that both beach AO/dark-patch differences and
+close-portal cloud flicker are gone on .21. They also accepted the shader-on
+destination terrain and aperture containment check. These are bounded acceptance
+results for the reported cases, not a claim that every rendering difference is
+resolved.
+
+## .22 candidate: keep texture mips inside their material tile
+
+The remaining no-shader report is darker terrain through the portal, especially
+snow and other pale blocks. Disabling DH anti-aliasing did not remove it;
+disabling LOD textures, with AO unchanged, made the before/after brightness match.
+The exact DH 3.3.3 atlas generates a complete mip chain for its 16x16 tiles.
+Beyond mip 4 a texel combines unrelated materials. The .20 continuous gradients
+can select those coarser mips at distance, while the direct view still uses the
+old wrapped derivatives. The two views therefore select different colours.
+
+The installed-shader GPU reproduction with .21's adaptation turns a neutral 0.5
+tile into 0.14901961 at a 64-texel footprint when neighbouring tiles are dark.
+.22 caps the continuous footprint at mip 4, samples the two bracketing levels
+explicitly, and confines each sample to its tile. It uses this policy in both
+direct and portal views without shader packs. Shader packs retain their existing
+sampling; absent uniforms are left alone, and toggling shaders resets the policy.
+
+The regression covers distant footprints, six face orientations, exact inverted
+UV boundaries and the previous sand-band failure. Compiled production upload
+tests check view parity and shader toggles. No DH shader copy or setting change
+is required. The .21 depth/AO/cloud implementation remains unchanged. Full-game
+acceptance must still compare the same pale terrain with LOD textures enabled,
+then confirm shader-on destination rendering and aperture containment.
+
+Both DH 3.3.2 and 3.3.3 pass all **154 local tests**, including **22 GPU checks**,
+with no failures or skips. Both builds produce .22 SHA-256
+`76df747594b13b1a351c668798cdc652d0e341d2ab9d0a8a8b1a8a4ba9d8c896`.
+Only the two texture-policy production classes differ from .21; the native DLL
+is unchanged. Evidence is in
+`M:/PortalAudioCompat-20260929/texture-brightness-build/`. Hosted CI, installation
+and owner acceptance are recorded separately in canonical context.

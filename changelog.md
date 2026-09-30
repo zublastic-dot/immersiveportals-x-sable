@@ -6,6 +6,17 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic destination texture brightness repair (.22)
+
+- Limit DH texture mip sampling to each block's own 16x16 tile. Coarser atlas
+  mips blend unrelated materials and can darken distant snow and pale terrain.
+- Clamp each sampled mip inside its tile and use continuous gradients in both
+  direct and portal views without shader packs. This retains the sand-band fix
+  while removing the change of sampling policy at a crossing.
+- Preserve shader-pack sampling and the owner's texture/AO/anti-aliasing options.
+  GPU checks reproduce the old darkening and cover distant tiles, all six face
+  orientations and exact tile boundaries. In-game .22 acceptance remains pending.
+
 ### Zublastic portal AO and close-threshold depth repair (.21)
 
 - Keep DH's ordinary depth projection in no-shader portal views and clip terrain
