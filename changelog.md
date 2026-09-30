@@ -6,6 +6,20 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic portal AO and close-threshold depth repair (.21)
+
+- Keep DH's ordinary depth projection in no-shader portal views and clip terrain
+  and both cloud rendering paths at the portal in their geometry shaders.
+- Avoid the oblique depth reconstruction errors that lose contact shading and
+  produce false AO on flat sand, and the depth precision collapse near a portal
+  that makes distant overlapping cloud faces depend on draw order.
+- Reset the clip plane for every shader bind and retain the existing oblique
+  path for shader packs, active custom shader overrides, or unknown DH sources.
+- Regressions render actual depth and execute DH's installed AO and cloud
+  shaders, including step-edge shading, rejected geometry and near-threshold
+  cloud depth order. Owner acceptance remains required.
+- All 150 local tests/build pass on DH 3.3.2 and 3.3.3, including 20 GPU regressions.
+
 ### Zublastic portal clouds, ambient occlusion and LOD textures (.20)
 
 - Supply DH cloud culling with the destination camera direction, including portal
@@ -17,7 +31,8 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
   false bands at tile boundaries in no-shader portal views. Keep textures enabled.
 - Add exact installed-DH cloud-culling and GPU blur regressions for forward and
   reverse depth, plus texture sampling checks for all six block faces. Visual
-  acceptance of the three candidate corrections remains pending.
+  acceptance is recorded separately: .20's distant-cloud visibility and texture
+  bands pass; beach AO remains unresolved and motivates .21.
 - All 141 local tests/build pass on DH 3.3.2 and 3.3.3, including 15 GPU regressions.
 
 ### Zublastic portal fog/LOD transition repair (.19)

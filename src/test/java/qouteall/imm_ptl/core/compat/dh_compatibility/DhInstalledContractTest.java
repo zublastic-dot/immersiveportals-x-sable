@@ -166,4 +166,34 @@ class DhInstalledContractTest {
             assertEquals(patched, DhPortalTextures.patchTerrainShader(patched));
         }
     }
+
+    @Test void allGeometryPathsSupportIndependentPortalClipping() throws IOException {
+        hasMethod("common/render/openGl/glObject/shader/GlShaderProgram", "bind", "()V");
+        hasMethod("common/render/openGl/glObject/shader/GlShaderProgram", "tryGetUniformLocation", "(Ljava/lang/CharSequence;)I");
+        for (String path : DhPortalClipping.PATHS) {
+            try (var stream = getClass().getResourceAsStream("/" + path)) {
+                assertNotNull(stream,path);
+                String original = new String(stream.readAllBytes(),StandardCharsets.UTF_8);
+                String patched = DhPortalClipping.patch(path,original);
+                assertTrue(DhPortalClipping.isPatched(patched),path);
+                assertEquals(patched,DhPortalClipping.patch(path,patched),path);
+                assertEquals("unknown",DhPortalClipping.patch(path,"unknown"),path);
+            }
+        }
+        // Instanced and fallback direct clouds both go through the common bind hook.
+        try (var stream = getClass().getResourceAsStream("/com/seibel/distanthorizons/common/render/openGl/generic/GlGenericObjectShaderProgram.class")) {
+            assertNotNull(stream);
+            var node = new ClassNode();
+            new ClassReader(stream).accept(node,ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            var bind = node.methods.stream().filter(m -> m.name.equals("bind")).findFirst().orElseThrow();
+            boolean callsCommonBind = false;
+            for (var instruction : bind.instructions) {
+                if (instruction instanceof MethodInsnNode call && call.name.equals("bind") && call.desc.equals("()V")
+                    && call.owner.equals("com/seibel/distanthorizons/common/render/openGl/glObject/shader/GlShaderProgram")) {
+                    callsCommonBind = true;
+                }
+            }
+            assertTrue(callsCommonBind,"Both cloud modes must receive the per-view clip plane");
+        }
+    }
 }

@@ -5,6 +5,10 @@ import com.seibel.distanthorizons.api.enums.config.EDhApiDepthDirection;
 import com.seibel.distanthorizons.api.objects.math.DhApiMat4f;
 import com.seibel.distanthorizons.common.render.openGl.glObject.GLState;
 import com.seibel.distanthorizons.common.render.openGl.GlDhMetaRenderer_neoforge;
+import com.seibel.distanthorizons.common.render.openGl.glObject.shader.GlShader;
+import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiShaderProgram;
+import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiGenericObjectShaderProgram;
+import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.RenderParams;
 import com.seibel.distanthorizons.core.util.math.DhMat4f;
@@ -22,6 +26,7 @@ import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 public final class DhPortalRendering {
     public static final DhScopedContext<DhPortalView> TICK_VIEW = new DhScopedContext<>();
     private static final DhScopedContext<Pass> PASS = new DhScopedContext<>();
+    private static Boolean geometryShadersAvailable;
 
     private DhPortalRendering() {}
 
@@ -31,6 +36,31 @@ public final class DhPortalRendering {
     }
 
     public static Pass begin() { return new Pass(); }
+
+    public static Vector4f getGeometryClipPlane() {
+        Pass pass = PASS.current();
+        return pass != null && pass.valid ? pass.geometryClipPlane : null;
+    }
+
+    public static boolean usesObliqueProjection() {
+        Pass pass = PASS.current();
+        return pass != null && pass.valid && pass.oblique;
+    }
+
+    private static boolean canUseGeometryClipping() {
+        if (IrisInterface.invoker.isShaders()) return false;
+        var terrainOverride = OverrideInjector.INSTANCE.get(IDhApiShaderProgram.class);
+        var genericOverride = OverrideInjector.INSTANCE.get(IDhApiGenericObjectShaderProgram.class);
+        if (terrainOverride != null && terrainOverride.overrideThisFrame()
+            || genericOverride != null && genericOverride.overrideThisFrame()) return false;
+        if (geometryShadersAvailable == null) {
+            geometryShadersAvailable = DhPortalClipping.PATHS.stream()
+                .allMatch(path -> DhPortalClipping.isPatched(GlShader.loadFile(path, false)));
+            if (!geometryShadersAvailable) LogUtils.getLogger().warn(
+                "IP/Sable DH: geometry clipping shaders unavailable; retaining oblique fallback");
+        }
+        return geometryShadersAvailable;
+    }
 
     public static DhVec3f getPortalLookDirection() {
         Pass pass = PASS.current();
@@ -49,6 +79,8 @@ public final class DhPortalRendering {
 
     public static void prepare(RenderParams params) {
         if (!PortalRendering.isRendering() || PASS.current() == null) return;
+        PASS.current().geometryClipPlane = null;
+        PASS.current().oblique = false;
         // IP moves the Camera position but applies portal rotation/reflection to
         // the model-view matrix. Camera.getLookVector() stays in the outer world.
         PASS.current().lookDirection = DhPortalCamera.lookDirection(toJoml(params.dhModelViewMatrix));
@@ -68,9 +100,18 @@ public final class DhPortalRendering {
         var camera = params.exactCameraPosition;
         double d = n.x * (camera.x - plane.pos().x)
             + n.y * (camera.y - plane.pos().y) + n.z * (camera.z - plane.pos().z);
+        Vector4f cameraPlane = new Vector4f((float)n.x, (float)n.y, (float)n.z, (float)d);
+        if (canUseGeometryClipping()) {
+            PASS.current().geometryClipPlane = DhPortalClipping.clipSpacePlane(
+                toJoml(params.dhProjectionMatrix), toJoml(params.dhModelViewMatrix), cameraPlane);
+            PASS.current().valid = PASS.current().geometryClipPlane != null;
+            // Keep DH's ordinary depth precision, AO reconstruction and far plane.
+            // The geometry shaders discard only the half-space behind the portal.
+            return;
+        }
         var renderApi = SingletonInjector.INSTANCE.get(AbstractDhRenderApiDefinition.class);
         Matrix4f clipped = DhPortalProjection.clip(toJoml(params.dhProjectionMatrix),
-            toJoml(params.dhModelViewMatrix), new Vector4f((float)n.x, (float)n.y, (float)n.z, (float)d),
+            toJoml(params.dhModelViewMatrix), cameraPlane,
             renderApi.getDepthDirection() == EDhApiDepthDirection.REVERSE_Z);
         if (clipped == null) {
             PASS.current().valid = false;
@@ -80,6 +121,7 @@ public final class DhPortalRendering {
         result.set(clipped);
         DhPortalMatrices.applyProjection(params, result);
         params.apiCopy.update(params);
+        PASS.current().oblique = true;
     }
 
     private static Matrix4f toJoml(DhApiMat4f matrix) {
@@ -107,12 +149,14 @@ public final class DhPortalRendering {
         private final DhScopedContext.Scope scope;
         private boolean valid = true;
         private Vector3f lookDirection;
+        private Vector4f geometryClipPlane;
+        private boolean oblique;
 
         private Pass() {
             GL11.glGetFloatv(GL11.GL_COLOR_CLEAR_VALUE, clearColor);
             scope = PASS.push(this);
             // DH and its fullscreen post shaders do not write gl_ClipDistance.
-            // Clip its terrain using the projection instead; preserve IP's stencil mask.
+            // Geometry uses its scoped fragment clip (or oblique fallback); preserve IP's stencil mask.
             GL11.glDisable(GL30.GL_CLIP_DISTANCE0);
         }
 

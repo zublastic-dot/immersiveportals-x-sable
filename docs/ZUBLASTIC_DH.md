@@ -346,3 +346,50 @@ Compared with .19, three production classes change, six are added, and 1,022 are
 byte-identical; the native DLL is unchanged. Evidence is retained under
 `M:/PortalAudioCompat-20260929/render-followup-build/`. Full-game acceptance is
 still pending at this build capture.
+
+## .21 candidate: preserve depth while clipping portal geometry
+
+The owner accepts .20's distant-cloud visibility and removal of faint sand bands
+with LOD textures enabled. With AO enabled, dark patches remain and screenshots
+516df1ef/6d8737b4 show missing contact shading under raised sand steps before
+crossing. They also report cloud flicker only close to the portal plane, stopping
+on crossing or backing away (dc47a49c/13208d21/14923417). Visibility and temporal
+stability are separate acceptance criteria.
+
+A new GPU reproduction renders a raised step into a real 32-bit float depth
+texture, then executes DH's installed AO generation shader. The old oblique
+projection adds false darkening and weakens the step shading. AO samples fetch
+nearest-neighbour depth at a texel but reconstruct at unsnapped sample UVs;
+oblique depth makes that mismatch strongly affect reconstructed distance.
+Additionally, depth precision collapses as the near plane approaches the camera.
+The .20 regression covered only the subsequent blur stage and did not catch this.
+
+.21 leaves DH's ordinary projection, inverse and far plane intact without shader
+packs. Small runtime adaptations of terrain and both direct/instanced generic
+geometry shaders carry a signed portal-plane distance and discard the rejected
+half-space. The plane is transformed into homogeneous clip coordinates, so this
+also covers generic cloud object transforms, rotations, reflections and scale.
+Each program bind uploads the current view plane or zero for ordinary views.
+Fullscreen shaders and IP's aperture stencil retain their existing behavior.
+
+The shader-pack path is unchanged. Active custom DH shader overrides or an
+unrecognized required source retain the old oblique path, including .20's blur
+correction. The normal-depth path uses the ordinary AO blur branch too, preserving
+parity with the direct view. User AO, cloud, texture and anti-aliasing settings are
+not disabled or changed. The .20 camera direction and texture-gradient fixes remain.
+
+GPU controls reproduce the old AO mismatch at portal distances from five blocks
+to 0.0001 blocks. The candidate's AO output matches the ordinary view, including
+raised step edges; an opposite-facing clip plane rejects the whole test surface.
+A second real-depth test puts two cloud faces two blocks apart at 1,000 blocks:
+old oblique depth makes the visible face depend on draw order close to the portal;
+normal depth consistently keeps the closer face. Both cloud modes and terrain
+shader pairs compile, and ordinary/reverse depth plus bind reset behavior are
+checked. These controlled tests are not owner-PC Minecraft visual acceptance.
+
+Both supported DH artifacts pass all **150 local tests**, with **20 GPU checks**
+and no failures or skips. The Java 21 builds produce the same .21 JAR SHA-256
+`95c5686c98ad1df4600e3b9dcfe48061db66c1c93355ea5077b7a67634758b61`, preserving
+the native DLL. Build logs and test XML are in
+`M:/PortalAudioCompat-20260929/stable-depth-build/`. Installation, hosted CI and
+owner acceptance are recorded separately in canonical context.

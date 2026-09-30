@@ -30,7 +30,7 @@ public abstract class MixinDhSsaoApply extends GlAbstractShaderRenderer {
     @Inject(method = "onApplyUniforms", at = @At("RETURN"))
     private void ip_useThisViewDepth(RenderParams params, CallbackInfo ci) {
         if (ip_portalProjection < 0 || ip_depthZeroToOne < 0 || ip_inverseProjection < 0) return;
-        boolean portal = DhPortalRendering.isSupportedPass() && !IrisInterface.invoker.isShaders();
+        boolean portal = DhPortalRendering.usesObliqueProjection() && !IrisInterface.invoker.isShaders();
         // Set on every draw: an outer/sibling view must not inherit the portal flag.
         shader.setUniform(ip_portalProjection, portal);
         if (portal) {

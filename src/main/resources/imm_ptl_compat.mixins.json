@@ -40,6 +40,7 @@
     "dh.MixinDhTerrainAntiAliasing",
     "dh.MixinDhTerrainTextures",
     "dh.MixinDhShaderSource",
+    "dh.MixinDhGeometryClipping",
     "dh.MixinDhSsaoApply",
     "real_camera.MixinRealCameraCore",
     "iris.MixinIrisPortalEyeBrightness",
