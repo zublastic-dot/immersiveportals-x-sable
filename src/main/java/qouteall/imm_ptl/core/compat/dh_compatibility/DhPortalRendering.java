@@ -37,6 +37,8 @@ public final class DhPortalRendering {
 
     public static Pass begin() { return new Pass(); }
 
+    public static RenderParams currentParams() { return PASS.current() == null ? null : PASS.current().params; }
+
     public static Vector4f getGeometryClipPlane() {
         Pass pass = PASS.current();
         return pass != null && pass.valid ? pass.geometryClipPlane : null;
@@ -79,6 +81,7 @@ public final class DhPortalRendering {
 
     public static void prepare(RenderParams params) {
         if (!PortalRendering.isRendering() || PASS.current() == null) return;
+        PASS.current().params = params;
         PASS.current().geometryClipPlane = null;
         PASS.current().oblique = false;
         // IP moves the Camera position but applies portal rotation/reflection to
@@ -151,6 +154,7 @@ public final class DhPortalRendering {
         private Vector3f lookDirection;
         private Vector4f geometryClipPlane;
         private boolean oblique;
+        private RenderParams params;
 
         private Pass() {
             GL11.glGetFloatv(GL11.GL_COLOR_CLEAR_VALUE, clearColor);

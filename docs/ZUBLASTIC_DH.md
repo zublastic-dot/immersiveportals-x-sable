@@ -431,3 +431,74 @@ Only the two texture-policy production classes differ from .21; the native DLL
 is unchanged. Evidence is in
 `M:/PortalAudioCompat-20260929/texture-brightness-build/`. Hosted CI, installation
 and owner acceptance are recorded separately in canonical context.
+
+
+## .23 candidate: isolated temporal AA for portal views
+
+The owner accepts .22's texture brightness parity with LOD textures ON and
+shaders OFF. With DH AA ON, snowy mountain speckles still diminish after crossing.
+The prior compatibility path explicitly cancelled portal TAA and forced terrain
+jitter to -1. DH 3.3.2/3.3.3 retain history textures in their renderer singleton,
+but previous camera/matrix data in a separate shader singleton. Simply allowing
+that shared renderer would contaminate both main and portal histories.
+
+The portal path now uses the installed DH `taa.frag` and `sharpen.frag` resources
+in separate GL programs, with the same uniforms, RGB10_A2 history format and
+sharpen amount/composite policy. No DH singleton is changed or shader copied into
+this JAR. Histories are keyed by source dimension, destination level wrapper and
+the entire ordered portal UUID path. The complete path distinguishes siblings,
+recursive views and reverse crossings. Client cleanup also separates sessions.
+
+Terrain uses one phase of DH's existing eight-phase sequence per view/frame,
+restoring the main terrain shader's counter in finally. Repeated uniform uploads
+and repeated draws in the same outer frame do not advance history or phase again;
+output becomes history only at the next frame. Previous matrices and camera are
+captured with that output. Invalid history is explicitly black-cleared, matching
+DH's no-history branch, rather than reading undefined texture storage.
+
+A missed/incomplete frame, pause of at least 0.5 seconds, eight-block camera jump,
+large view rotation, projection change, resize or depth-range change resets
+history. Inactive views are freed after two seconds. The pool permits at most
+eight views and 256 MiB of history textures, never evicting a current-frame view.
+An over-budget view retains the prior unjittered fallback. AA/shader toggles, DH
+renderer free and client cleanup delete targets/programs. GL bindings, samplers,
+masks, enables, viewport and blend state are restored even on failure.
+
+The new path is restricted to prepared ordinary-depth, no-shader portal views.
+Shader packs and custom/unknown geometry overrides retain their .22 behavior.
+The accepted texture, AO, clipping and cloud algorithms remain unchanged.
+
+Regression tests run the actual installed DH TAA/sharpen shaders on a hidden GL
+context: an alternating .2/.8 input produces .26 on its second accumulated frame,
+and substantially smaller temporal variation after convergence. Separate portal,
+nested and dimension keys retain distinct histories. Further checks cover stale
+history, repeated frames, resize, eviction, cleanup, hostile GL state and unrelated
+texture preservation. Compiled production mixin tests verify portal routing,
+main-view passthrough, private phase upload, AA/shader veto and exception cleanup.
+These controlled GPU checks do not certify the owner's full Minecraft image.
+
+Both supported DH artifacts pass **164 tests, including 28 GPU checks**, with
+zero failures or skips, and complete the Java 21 native-preserving build.
+Both produce .23 SHA-256
+`dc75502f8c5ad94f71d3b61de4ec732f317f2b6c548904aff5e4a9b41a0aef80`.
+Compared with .22, five production classes change, six are added, 1,028 are
+byte-identical and none are removed. The native DLL is byte-identical.
+Evidence: `M:/PortalAudioCompat-20260929/taa-build/`. The first failed GPU run is
+retained: its resize assertion incorrectly assumed deleted GL names could not be
+immediately reused by the driver. Lifecycle checks now account for name reuse.
+A one-time runtime log confirms when private portal history actually accumulates;
+startup alone and these GPU tests do not prove the snowy mountain is accepted.
+
+
+### .23 runtime rejection and .24 loader correction
+
+After successful startup, the first .23 portal render on September 30 failed with
+`Missing installed DH shader taa.frag`; DH disabled its renderer. The GPU test
+classpath allowed cross-JAR resource lookup that NeoForge's named mod modules
+did not. .23 is **not a usable/accepted runtime repair**. The failure log is saved
+under `taa-build/deployment/first-runtime-failure.log`.
+
+.24 uses `GlShader.class.getClassLoader().getResourceAsStream`, matching DH's
+actual owning-loader lookup. A new regression loads the production pipeline
+through a separate loader that cannot access DH resources and verifies both
+shaders still resolve through DH's loader. Runtime acceptance remains required.

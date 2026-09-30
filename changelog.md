@@ -6,6 +6,25 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic DH shader resource loading correction (.24)
+
+- Load TAA shader resources through DH's owning class loader. .23 passed the
+  standalone GPU tests but its first NeoForge game run could not see DH assets
+  through the IP module, causing DH to disable rendering with an explicit error.
+- Add a separate-resource-loader regression and retain the isolated TAA design.
+
+### Zublastic isolated portal temporal anti-aliasing (.23; failed runtime trial)
+
+- Accumulate DH temporal AA in private histories keyed by source dimension,
+  destination level and the complete ordered portal path, with matching per-view
+  terrain sample phases. Main-view textures, camera history and phase stay intact.
+- Run the installed DH TAA and sharpening shaders with bounded private GPU
+  targets. Reset stale/discontinuous/resized history; release resources after
+  inactivity, AA/shader changes, DH renderer shutdown and client cleanup.
+- Cover accumulation, sibling/nested/dimension isolation, duplicate-frame draws,
+  GL-state restoration and GPU lifecycle alongside the accepted .22 regressions.
+  Preserve the shader-pack path. Full-game snow-speckle acceptance is pending.
+
 ### Zublastic destination texture brightness repair (.22)
 
 - Limit DH texture mip sampling to each block's own 16x16 tile. Coarser atlas
@@ -15,7 +34,7 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
   while removing the change of sampling policy at a crossing.
 - Preserve shader-pack sampling and the owner's texture/AO/anti-aliasing options.
   GPU checks reproduce the old darkening and cover distant tiles, all six face
-  orientations and exact tile boundaries. In-game .22 acceptance remains pending.
+  orientations and exact tile boundaries. The owner accepts .22 brightness parity with LOD textures enabled and shaders OFF.
 
 ### Zublastic portal AO and close-threshold depth repair (.21)
 

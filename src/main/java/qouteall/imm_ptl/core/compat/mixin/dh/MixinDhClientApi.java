@@ -13,6 +13,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
 import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalRendering;
+import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalTaa;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
 
 @Pseudo
@@ -20,6 +21,7 @@ import qouteall.imm_ptl.core.render.context_management.PortalRendering;
 public class MixinDhClientApi {
     @WrapMethod(method = "renderLodLayer")
     private void ip_renderScope(boolean deferred, Operation<Void> original) {
+        DhPortalTaa.maintain();
         if (!PortalRendering.isRendering()) { original.call(deferred); return; }
         try (var scope = DhPortalRendering.begin()) {
             original.call(deferred);
