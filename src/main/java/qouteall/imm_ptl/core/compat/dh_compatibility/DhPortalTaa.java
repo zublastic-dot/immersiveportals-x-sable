@@ -16,6 +16,7 @@ import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
 import qouteall.imm_ptl.core.render.context_management.RenderStates;
 import qouteall.imm_ptl.core.portal.Portal;
+import qouteall.imm_ptl.core.portal.PortalExtension;
 import com.seibel.distanthorizons.common.render.openGl.postProcessing.antialiasing.GlDhTaaShader_neoforge;
 
 /** Optional-DH boundary; only the ordinary-depth, no-shader portal path uses private TAA. */
@@ -27,6 +28,9 @@ public final class DhPortalTaa {
     private static DhPortalTaaPipeline.Transfer transfer;
     private static boolean seedMain;
     private static int mainFrame = -1, mainPhase = -1;
+    private static DhTaaMainHistory lastMain;
+    private static int sampleFrame = -1, samplePhase = -1;
+    private static DhTaaCrossing.Key returnKey;
     private DhPortalTaa() {}
 
     private static boolean enabled() {
@@ -43,11 +47,39 @@ public final class DhPortalTaa {
     public static void clear() {
         PIPELINE.close(); reportedAccumulation = false; CROSSING.clear(); transfer = null;
         seedMain = false; mainFrame = mainPhase = -1;
+        lastMain = null; returnKey = null; sampleFrame = samplePhase = -1;
     }
 
     public static void crossed(Portal portal) {
         if (!enabled()) return;
+        // The other side's linked UUID is authoritative. Never choose a nearby/same-dimension portal.
+        var main = lastMain; lastMain = null; returnKey = null;
+        if (main != null) {
+            var key = main.returnKey(portal.getOriginDim(), portal.getDestDim(), PortalExtension.get(portal).reversePortalId,
+                RenderStates.frameIndex, System.nanoTime());
+            if (key != null && PIPELINE.capture(key, main.snapshot(), main.framebuffer(), main.width(), main.height(), main.zeroToOne())) {
+                returnKey = key;
+            }
+        }
+        com.mojang.logging.LogUtils.getLogger().info("IP/Sable DH: main-to-portal return TAA history {}",
+            returnKey != null ? "captured" : "unavailable (no recent main view or linked reverse portal)");
         CROSSING.crossed(portal.getOriginDim(), portal.getDestDim(), portal.getUUID(), RenderStates.frameIndex, System.nanoTime());
+    }
+
+    public static void recordMainSample(int phase) {
+        sampleFrame = RenderStates.frameIndex; samplePhase = phase;
+    }
+
+    /** DH has completed accumulation and flipped its ping-pong selector at this point. */
+    public static void recordMain(RenderParams params, int framebuffer, int width, int height) {
+        if (PortalRendering.isRendering()) return;
+        lastMain = null;
+        if (!enabled() || sampleFrame != RenderStates.frameIndex || samplePhase < 0 || params.exactCameraPosition == null) return;
+        var api = SingletonInjector.INSTANCE.get(AbstractDhRenderApiDefinition.class);
+        lastMain = new DhTaaMainHistory(RenderStates.originalPlayerDimension, framebuffer, width, height,
+            api.getDepthRange() == EDhApiDepthRange.ZERO_TO_POS_ONE,
+            new DhTaaHistory.Snapshot(RenderStates.frameIndex, System.nanoTime(), samplePhase,
+                matrix(params.dhProjectionMatrix), matrix(params.dhModelViewMatrix), camera(params)));
     }
 
     /** Select before terrain uniforms so the first main sample follows the donated portal sample. */
@@ -87,10 +119,16 @@ public final class DhPortalTaa {
         var path = PortalRendering.getPortalPath();
         var key = new DhTaaCrossing.Key(RenderStates.originalPlayerDimension, path.getLast().getDestDim(),
             path.stream().map(p -> p.getUUID()).toList());
-        return PIPELINE.prepare(key, RenderStates.frameIndex, System.nanoTime(),
+        var result = PIPELINE.prepare(key, RenderStates.frameIndex, System.nanoTime(),
             render.getTargetFramebufferViewportWidth(), render.getTargetFramebufferViewportHeight(),
             matrix(params.dhProjectionMatrix), matrix(params.dhModelViewMatrix), camera(params),
             api.getDepthRange() == EDhApiDepthRange.ZERO_TO_POS_ONE);
+        if (key.equals(returnKey)) {
+            com.mojang.logging.LogUtils.getLogger().info("IP/Sable DH: main-to-portal return TAA history {}",
+                result != null && result.history.valid ? "resumed" : "reset (incompatible or stale return view)");
+            returnKey = null;
+        }
+        return result;
     }
     public static int jitterPhase() {
         var view = view(DhPortalRendering.currentParams());

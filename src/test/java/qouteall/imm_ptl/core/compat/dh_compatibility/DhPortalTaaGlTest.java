@@ -152,6 +152,43 @@ class DhPortalTaaGlTest {
         donor=transfer("exact",2); pipeline.close(); input(.7f);
         assertFalse(DhPortalTaaPipeline.seed(donor,fbo,SIZE,SIZE)); assertEquals(0,centrePixel(color),.0001);
     }
+
+    @Test void backingIntoPortalPreservesMainImageEvenAfterDhOverwritesItsTargets() {
+        render("old-main",0,.2f,false); var old=prepare("old-main",0,false);
+        var snapshot=new DhTaaHistory.Snapshot(0,0,7,new Matrix4f(),new Matrix4f(),new Vector3d());
+        glEnable(GL_SCISSOR_TEST); glScissor(0,0,1,1); glEnable(GL_FRAMEBUFFER_SRGB);
+        int read=glGetInteger(GL_READ_FRAMEBUFFER_BINDING),draw=glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
+        assertTrue(pipeline.capture("linked-return",snapshot,old.fbos[1],SIZE,SIZE,false));
+        assertEquals(read,glGetInteger(GL_READ_FRAMEBUFFER_BINDING));assertEquals(draw,glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING));
+        assertTrue(glIsEnabled(GL_SCISSOR_TEST));assertTrue(glIsEnabled(GL_FRAMEBUFFER_SRGB));
+        glDisable(GL_SCISSOR_TEST); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,old.fbos[1]);
+        glClearBufferfv(GL_COLOR,0,new float[]{1,1,1,1});
+        assertEquals(.8,render("unrelated-portal",0,.8f,false),.003);
+        var returned=prepare("linked-return",1,false);
+        assertTrue(returned.history.valid);assertEquals(0,returned.history.phase());
+        assertEquals(.26,render("linked-return",1,.8f,false),.004);
+        assertEquals(.26,render("linked-return",1,.8f,false),.004,"Repeated uploads keep the donated prior frame");
+        // The independently accumulated portal can subsequently hand history back to main again.
+        var donor=transfer("linked-return",2); assertNotNull(donor);
+        assertTrue(DhPortalTaaPipeline.seed(donor,fbo,SIZE,SIZE));assertEquals(.26,centrePixel(color),.004);
+    }
+
+    @Test void returnCaptureKeepsPoolBoundsAndRejectsInvalidSourcesOrIncompatibleNextViews() {
+        input(.2f);var snapshot=new DhTaaHistory.Snapshot(0,0,3,new Matrix4f(),new Matrix4f(),new Vector3d());
+        assertFalse(pipeline.capture("invalid",snapshot,0,SIZE,SIZE,false));assertEquals(0,pipeline.viewCount());
+        assertTrue(pipeline.capture("return",snapshot,fbo,SIZE,SIZE,false));
+        var resized=pipeline.prepare("return",1,16_000_000L,16,16,new Matrix4f(),new Matrix4f(),new Vector3d(),false);
+        assertFalse(resized.history.valid);assertEquals(0,resized.history.phase());
+        assertTrue(pipeline.capture("return",snapshot,fbo,SIZE,SIZE,false));
+        var jumped=pipeline.prepare("return",1,16_000_000L,SIZE,SIZE,new Matrix4f(),new Matrix4f(),new Vector3d(20,0,0),false);
+        assertFalse(jumped.history.valid);
+        for(int i=1;i<20;i++) {
+            var next=new DhTaaHistory.Snapshot(i,i*16_000_000L,3,new Matrix4f(),new Matrix4f(),new Vector3d());
+            assertTrue(pipeline.capture("return-"+i,next,fbo,SIZE,SIZE,false));
+        }
+        assertTrue(pipeline.viewCount()<=8);assertTrue(pipeline.allocatedBytes()<=256L*1024*1024);
+        pipeline.close();assertEquals(0,pipeline.viewCount());
+    }
     @Test void restoresHostileGlStateAndDoesNotModifyUnrelatedTargets() {
         input(.2f); var v=prepare("a",0,false);
         int unrelated=glGenTextures(); glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,unrelated);

@@ -6,6 +6,16 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic backward-crossing TAA continuity (.26 candidate)
+
+- Preserve the completed main-view image for the exact linked reverse portal
+  when backing through a portal while still facing the departing landscape.
+  Copy only on crossing, before DH can overwrite its main targets; resume the
+  matching camera/matrix and terrain sample phase in the new portal view.
+- Reject missing reverse links, wrong dimensions, stale/disabled histories and
+  incompatible viewport/camera/projection. Use the existing bounded history pool
+  and cleanup. Retain .25's owner-accepted forward-crossing continuity.
+
 ### Zublastic portal-crossing TAA continuity (.25 candidate)
 
 - Hand off the exact crossed portal's completed, unsharpened TAA history to DH's

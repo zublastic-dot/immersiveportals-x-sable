@@ -53,6 +53,14 @@ public final class DhTaaHistory {
     }
     public int phase() { return phase; }
     public Snapshot snapshot() { return snapshot; }
+    /** Install a completed external image before beginning the next portal frame. */
+    public void restoreCompleted(Snapshot source) {
+        frame = source.frame(); time = source.time(); phase = source.phase();
+        projection = new Matrix4f(source.projection()); view = new Matrix4f(source.view()); camera = new Vector3d(source.camera());
+        begun = completed = valid = true;
+        previousCombined.set(source.combined()); previousCamera.set(camera);
+        snapshot = new Snapshot(frame, time, phase, new Matrix4f(projection), new Matrix4f(view), new Vector3d(camera));
+    }
     public void complete() {
         completed = true;
         snapshot = new Snapshot(frame, time, phase, new Matrix4f(projection), new Matrix4f(view), new Vector3d(camera));

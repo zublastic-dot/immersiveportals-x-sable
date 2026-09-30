@@ -51,6 +51,24 @@ public final class DhPortalTaaPipeline implements AutoCloseable {
     public long allocatedBytes() { return views.values().stream().mapToLong(v -> (long)v.width * v.height * 8).sum(); }
     public int viewCount() { return views.size(); }
 
+    /** Copy only on crossing, before DH can overwrite its departing main-view ping-pong targets. */
+    public boolean capture(Object key, DhTaaHistory.Snapshot snapshot, int sourceFramebuffer,
+                           int width, int height, boolean zeroToOne) {
+        try (var state = new State()) {
+            if (snapshot == null || snapshot.phase() < 0 || !glIsFramebuffer(sourceFramebuffer)) return false;
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, sourceFramebuffer);
+            if (glCheckFramebufferStatus(GL_READ_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) return false;
+            var view = prepare(key, snapshot.frame(), snapshot.time(), width, height,
+                snapshot.projection(), snapshot.view(), snapshot.camera(), zeroToOne);
+            if (view == null) return false;
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, sourceFramebuffer);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, view.fbos[view.readIndex ^ 1]);
+            glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            view.history.restoreCompleted(snapshot);
+            return true;
+        }
+    }
+
     public record Transfer(View donor, DhTaaHistory.Snapshot snapshot) {}
     public Transfer transfer(Object key, int frame, long now, int width, int height,
                              Matrix4f projection, Matrix4f modelView, Vector3d camera, boolean zeroToOne) {

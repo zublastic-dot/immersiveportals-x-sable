@@ -10,6 +10,7 @@ class DhPortalTaaRoutingTest {
         static boolean portal; static int draws, frees, seeded;
         public static boolean isRendering() { return portal; }
         public static void render(RenderParams p) { draws++; }
+        public static void recordMain(RenderParams p,int f,int w,int h) { seeded=f; assertEquals(800,w); assertEquals(600,h); }
         public static void seedMainHistory(int f, int w, int h) { seeded=f; assertEquals(800,w); assertEquals(600,h); }
         public static void clear() { frees++; }
     }
@@ -27,7 +28,7 @@ class DhPortalTaaRoutingTest {
                 call.owner=Hooks.class.getName().replace('.','/');replaced++;
             }
         }
-        assertEquals(4,replaced);var writer=new ClassWriter(0);n.accept(writer);
+        assertEquals(5,replaced);var writer=new ClassWriter(0);n.accept(writer);
         var type=new Loader().define(writer.toByteArray());var instance=type.getConstructor().newInstance();
         var render=type.getDeclaredMethod("ip_noCrossDimensionHistory",RenderParams.class,CallbackInfo.class);render.setAccessible(true);
         Hooks.draws=Hooks.frees=0;
@@ -44,5 +45,8 @@ class DhPortalTaaRoutingTest {
         var seed=type.getDeclaredMethod("ip_seedCrossingHistory",RenderParams.class,CallbackInfo.class);seed.setAccessible(true);
         side.setBoolean(instance,true);seed.invoke(instance,null,new CallbackInfo("render",false));assertEquals(41,Hooks.seeded);
         side.setBoolean(instance,false);seed.invoke(instance,null,new CallbackInfo("render",false));assertEquals(42,Hooks.seeded);
+        var record=type.getDeclaredMethod("ip_recordCompletedMain",RenderParams.class,CallbackInfo.class);record.setAccessible(true);
+        side.setBoolean(instance,true);record.invoke(instance,null,new CallbackInfo("render",false));assertEquals(41,Hooks.seeded);
+        side.setBoolean(instance,false);record.invoke(instance,null,new CallbackInfo("render",false));assertEquals(42,Hooks.seeded);
     }
 }
