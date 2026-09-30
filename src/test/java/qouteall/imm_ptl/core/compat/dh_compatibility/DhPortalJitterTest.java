@@ -28,6 +28,8 @@ public class DhPortalJitterTest {
 
     public static class Hooks {
         public static boolean portal;
+        public static int jitter;
+        public static int jitterPhase() { return jitter; }
         public static final List<Float> uniforms = new ArrayList<>();
         public static boolean isRendering() { return portal; }
         public static void glUniform1f(int location, float value) {
@@ -53,13 +55,14 @@ public class DhPortalJitterTest {
             for (var instruction : method.instructions) {
                 if (instruction instanceof MethodInsnNode call
                     && (call.owner.equals("qouteall/imm_ptl/core/render/context_management/PortalRendering")
-                        || call.owner.equals("org/lwjgl/opengl/GL33"))) {
+                        || call.owner.equals("org/lwjgl/opengl/GL33")
+                        || call.owner.equals("qouteall/imm_ptl/core/compat/dh_compatibility/DhPortalTaa"))) {
                     call.owner = Hooks.class.getName().replace('.', '/');
                     replaced++;
                 }
             }
         }
-        assertEquals(2, replaced, "Only the live portal flag and GL uniform upload are substituted");
+        assertEquals(3, replaced, "Only the live portal flag and GL uniform upload are substituted");
         var writer = new ClassWriter(0);
         node.accept(writer);
         Class<?> type = new WrapperLoader().define(writer.toByteArray());
@@ -86,11 +89,12 @@ public class DhPortalJitterTest {
     }
 
     @ParameterizedTest @ValueSource(ints = {-1, 0, 1, 2, 3, 4, 5, 6, 7})
-    void repeatedPortalViewsAreUnjitteredAndDoNotConsumeOuterPhase(int initial) throws Exception {
+    void repeatedPortalViewsUsePrivatePhaseAndDoNotConsumeOuterPhase(int initial) throws Exception {
         phase.setInt(mixin, initial);
         for (int i = 0; i < 16; i++) {
+            Hooks.jitter = i & 7;
             upload.invoke(mixin, params, animatedUpload());
-            assertEquals(-1.0f, Hooks.uniforms.getLast());
+            assertEquals((float)(i & 7), Hooks.uniforms.getLast());
             assertEquals(initial, phase.getInt(mixin));
         }
         // Entering the actual dimension keeps DH's original sample sequence.
@@ -98,6 +102,18 @@ public class DhPortalJitterTest {
         upload.invoke(mixin, params, animatedUpload());
         assertEquals((initial + 1) % 8, phase.getInt(mixin));
         assertEquals((float)((initial + 1) % 8), Hooks.uniforms.getLast());
+    }
+
+    @Test void dhDisabledAaAndShaderVetoIsPreserved() throws Exception {
+        Hooks.jitter = 4;
+        phase.setInt(mixin, 6);
+        Operation<Void> disabled = arguments -> {
+            try { phase.setInt(mixin, -1); } catch (Exception e) { throw new AssertionError(e); }
+            return null;
+        };
+        upload.invoke(mixin, params, disabled);
+        assertEquals(-1f, Hooks.uniforms.getLast());
+        assertEquals(6, phase.getInt(mixin));
     }
 
     @Test void normalViewUniformUploadsAreUntouched() throws Exception {
