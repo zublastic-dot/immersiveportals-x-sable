@@ -1,0 +1,47 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-audio-20260929",
+  "lease_id": "portal-audio-20260929",
+  "worker_id": "codex-portal-audio-20260929",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-audio-20260929/portal-audio-20260929",
+  "base_commit": "b264d6779100e69a131b1da94e30884c611e7d34",
+  "resources": [
+    "artifact:owner-pc:portal-audio-20260929",
+    "domain:modautomator:compatibility/ip-sable-audio",
+    "domain:modautomator:compatibility/ip-sable-rendering"
+  ],
+  "paths": [
+    "src/main/java/qouteall/imm_ptl/core/sound",
+    "src/main/java/qouteall/imm_ptl/core/mixin/client/sound",
+    "src/main/java/qouteall/imm_ptl/core/teleportation/CrossPortalSound.java",
+    "src/main/java/qouteall/imm_ptl/core/IPModMainClient.java",
+    "src/main/java/qouteall/imm_ptl/core/compat/IPCompatMixinPlugin.java",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/sound_physics",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/dynamic_surroundings",
+    "src/main/java/ipl/sable/client/IplStraddleStaffPick.java",
+    "src/main/resources/imm_ptl.mixins.json",
+    "src/main/resources/imm_ptl_compat.mixins.json",
+    "src/test/java/qouteall/imm_ptl/core/sound",
+    "build.gradle",
+    "gradle.properties",
+    "changelog.md",
+    "docs/ZUBLASTIC_AUDIO.md",
+    ".github/workflows/zublastic-verify.yml",
+    "src/main/java/qouteall/imm_ptl/core/compat/dh_compatibility",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/dh",
+    "src/test/java/qouteall/imm_ptl/core/compat/dh_compatibility",
+    "docs/ZUBLASTIC_DH.md"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Repair owner-reproduced sky-coloured DH transition in portal views first; preserve subsequent portal audio and Sound Physics Aeronautics scope.",
+    "acceptance": [
+      "Keep DH terrain depth and fade reconstruction consistent inside portals, with shaders on/off runtime checks.",
+      "Preserve original sound identity and playback position across crossings.",
+      "Route remote audio with dimension and moving-sublevel context.",
+      "Exercise sound physics rather than bypassing required audio processing.",
+      "Keep changes inside IP/Sable and record bounded runtime acceptance separately."
+    ]
+  }
+}

@@ -2,6 +2,7 @@ package qouteall.imm_ptl.core.compat.mixin.dh;
 
 import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper_neoforge;
 import com.seibel.distanthorizons.core.util.math.DhVec3d;
+import com.seibel.distanthorizons.core.util.math.DhVec3f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,6 +16,12 @@ import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
 @Pseudo
 @Mixin(targets = "com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftRenderWrapper_neoforge", remap = false)
 public class MixinDhRenderWrapper {
+    @Inject(method = "getLookAtVector", at = @At("HEAD"), cancellable = true)
+    private void ip_destinationLookDirection(CallbackInfoReturnable<DhVec3f> cir) {
+        var direction = DhPortalRendering.getPortalLookDirection();
+        if (direction != null) cir.setReturnValue(direction);
+    }
+
     @Inject(method = "getCameraExactPosition", at = @At("HEAD"), cancellable = true)
     private void ip_tickCamera(CallbackInfoReturnable<DhVec3d> cir) {
         var view = DhPortalRendering.TICK_VIEW.current();

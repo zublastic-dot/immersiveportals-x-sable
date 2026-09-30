@@ -254,3 +254,142 @@ not every DH configuration or the shader path. The next owner comparison uses
 Complementary Unbound r5.9.3: a far Overworld hill has less fog through the Nether
 portal than after crossing. See `ZUBLASTIC_IRIS_DH.md` for the separate Iris
 eye-light sampling diagnosis and .12 candidate.
+
+## .19 candidate: sky-coloured near terrain at the DH transition
+
+On DH 3.3.3 the owner reproduced a sky-coloured water/shoreline band and entire
+tree silhouettes in a Nether-to-Overworld portal view with shaders off. The trees
+render normally immediately after crossing. A subtle direct-view water seam,
+and a dark water seam with Complementary/Euphoria, are separate observations;
+they are not all assumed to have the same cause.
+
+The installed `MixinVanillaFogCommon_neoforge.cancelFog` retains an unsupported-IP
+fallback that forces vanilla distance fog on in portal views, even when DH's
+Enable Vanilla Fog setting is off. `MixinDhVanillaFog` removes only that portal
+veto. Quick Enable Rendering, the user fog setting, underwater/lava/powder-snow
+fog, blindness and the wrapper's special-fog decision still run unchanged.
+
+DH also skips its vanilla/LOD fade in portals. The compatibility enables it only
+inside a scoped portal fade call, retaining DH's shader-pack veto. Both opaque
+and transparent fade methods rebuild RenderParams, so both need the same oblique
+projection adjustment as the terrain pass. The scope also disables geometry clip
+distance for fullscreen shaders and restores GL state. An invalid projection
+suppresses the fade draw, matching the terrain guard. Existing shared-image
+snapshots continue to protect the parent view from nested portal rendering.
+
+The fog regression executes the installed DH decision and the compiled production
+hook with live game/config boundaries substituted. Its unpatched control reproduces
+the portal-only forced fog; 128 combinations verify parity with the direct view
+while retaining user/fluid/status/sky/special-fog conditions. Fade wrapper tests
+cover nested scope restoration, direct views, invalid projections and exceptions;
+installed-artifact contracts verify both parameter updates and draw call sites.
+These are offline checks, not a transformed Minecraft launch or visual acceptance.
+
+Acceptance requires the owner's same shoreline/tree view before and after crossing,
+shaders off first, then checking that Complementary/Euphoria and normal terrain
+remain intact. Portal audio and cross-dimensional lighting are separate work.
+
+Both supported DH artifacts (3.3.2 and 3.3.3) pass all **135 tests**, including
+12 hidden-context GPU regressions, and produce the same native-preserving .19
+JAR SHA-256 `3670c747bca080968cc79d0d29d4ffa567c58dcee2f213f5785e51d4d0343927`.
+Compared with .18, one production class changes and one is added; 1,023 others
+are byte-identical. The native DLL retains its previous SHA-256. Evidence:
+`M:/PortalAudioCompat-20260929/transition-build/`.
+
+## .20 candidate: distant clouds, AO depth and texture bands in portal views
+
+The owner accepted the .19 shoreline/tree transition and shader aperture checks,
+then reported dark beach patches and missing distant clouds without shaders.
+Disabling DH's **Enable Ambient Occlusion** improved the beach shading. It did
+not fully eliminate a very faint pattern of bands on sand. A second owner test
+confirmed those bands disappear with **Enable LOD Textures** off. These are
+separate effects; the AO correction alone does not claim to fix the texture bands.
+
+DH's cloud-group culling reads Camera.getLookVector(), but IP moves the camera
+position and applies portal rotation/reflection in the model-view matrix. This
+mixes destination positions with source-world directions. Near cloud groups skip
+the culling branch, so only distant groups disappear. A scoped direction derived
+from the inverse DH model-view gives the culler the same view as the geometry.
+The ordinary camera query, distance limit and back-facing rejection are retained.
+
+DH's SSAO apply shader uses a scalar near/far depth formula for its bilateral blur.
+Portal oblique clipping makes depth depend on screen position as well as distance.
+A narrowly matched runtime adaptation of the installed shader adds inverse-matrix
+depth reconstruction for supported no-shader portal passes. Every draw sets the
+enable flag, so outer and sibling views cannot inherit it. The ordinary shader
+branch remains unchanged. Unrecognized shader sources stay intact with a warning;
+no DH shader copy or globally disabled setting is bundled in this fork.
+
+The cloud regression executes the installed DH culling method with controlled
+camera/config inputs. GPU tests execute the installed AO apply shader with a known
+depth discontinuity: the old formula smears occlusion over the edge, while the
+matrix branch matches direct projection in forward/reverse depth. A separate
+comparison verifies unchanged ordinary shader output. These tests do not prove
+that every cause of the owner's beach shading difference is repaired. Check the
+same beach with AO restored, distant clouds before/after crossing, and the shader
+regression again in Portal Lab before claiming live acceptance.
+
+DH repeats block tiles with fract(vBlockPos), then uses implicit texture
+derivatives to choose mip levels. Those derivatives jump across integer block
+boundaries, introducing false bands. The .20 adaptation uses textureGrad with
+derivatives of the continuous block coordinates, preserving each face's UV
+orientation and the same atlas texel. It is enabled only for no-shader portal
+passes and reset on every ordinary draw. An installed-shader GPU regression with
+a mip-coloured atlas reproduces the bands, verifies continuous sampling for all
+six face orientations, and checks unchanged direct-view output. It does not
+replace portal TAA history or disable LOD textures.
+
+Both DH 3.3.2 and 3.3.3 pass all **141 tests**, including **15 hidden-context GPU
+regressions**, and produce the same native-preserving .20 JAR SHA-256
+`ebc4e636ebeaa0df77fb94d21d75161cdf2c2fb2d79327e891628cd6ff67fb88`.
+Compared with .19, three production classes change, six are added, and 1,022 are
+byte-identical; the native DLL is unchanged. Evidence is retained under
+`M:/PortalAudioCompat-20260929/render-followup-build/`. Full-game acceptance is
+still pending at this build capture.
+
+## .21 candidate: preserve depth while clipping portal geometry
+
+The owner accepts .20's distant-cloud visibility and removal of faint sand bands
+with LOD textures enabled. With AO enabled, dark patches remain and screenshots
+516df1ef/6d8737b4 show missing contact shading under raised sand steps before
+crossing. They also report cloud flicker only close to the portal plane, stopping
+on crossing or backing away (dc47a49c/13208d21/14923417). Visibility and temporal
+stability are separate acceptance criteria.
+
+A new GPU reproduction renders a raised step into a real 32-bit float depth
+texture, then executes DH's installed AO generation shader. The old oblique
+projection adds false darkening and weakens the step shading. AO samples fetch
+nearest-neighbour depth at a texel but reconstruct at unsnapped sample UVs;
+oblique depth makes that mismatch strongly affect reconstructed distance.
+Additionally, depth precision collapses as the near plane approaches the camera.
+The .20 regression covered only the subsequent blur stage and did not catch this.
+
+.21 leaves DH's ordinary projection, inverse and far plane intact without shader
+packs. Small runtime adaptations of terrain and both direct/instanced generic
+geometry shaders carry a signed portal-plane distance and discard the rejected
+half-space. The plane is transformed into homogeneous clip coordinates, so this
+also covers generic cloud object transforms, rotations, reflections and scale.
+Each program bind uploads the current view plane or zero for ordinary views.
+Fullscreen shaders and IP's aperture stencil retain their existing behavior.
+
+The shader-pack path is unchanged. Active custom DH shader overrides or an
+unrecognized required source retain the old oblique path, including .20's blur
+correction. The normal-depth path uses the ordinary AO blur branch too, preserving
+parity with the direct view. User AO, cloud, texture and anti-aliasing settings are
+not disabled or changed. The .20 camera direction and texture-gradient fixes remain.
+
+GPU controls reproduce the old AO mismatch at portal distances from five blocks
+to 0.0001 blocks. The candidate's AO output matches the ordinary view, including
+raised step edges; an opposite-facing clip plane rejects the whole test surface.
+A second real-depth test puts two cloud faces two blocks apart at 1,000 blocks:
+old oblique depth makes the visible face depend on draw order close to the portal;
+normal depth consistently keeps the closer face. Both cloud modes and terrain
+shader pairs compile, and ordinary/reverse depth plus bind reset behavior are
+checked. These controlled tests are not owner-PC Minecraft visual acceptance.
+
+Both supported DH artifacts pass all **150 local tests**, with **20 GPU checks**
+and no failures or skips. The Java 21 builds produce the same .21 JAR SHA-256
+`95c5686c98ad1df4600e3b9dcfe48061db66c1c93355ea5077b7a67634758b61`, preserving
+the native DLL. Build logs and test XML are in
+`M:/PortalAudioCompat-20260929/stable-depth-build/`. Installation, hosted CI and
+owner acceptance are recorded separately in canonical context.
