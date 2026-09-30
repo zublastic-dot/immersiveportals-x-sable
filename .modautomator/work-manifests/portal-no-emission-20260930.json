@@ -1,0 +1,46 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-no-emission-20260930",
+  "lease_id": "portal-no-emission-20260930",
+  "worker_id": "codex-portal-no-emission-20260930",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-no-emission-20260930/portal-no-emission-20260930",
+  "base_commit": "d3dbb5d17767513ebb8104369f136854beb8d9f7",
+  "resources": [
+    "artifact:owner-pc:portal-audio-20260929",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:compatibility/ip-sable-rendering",
+    "repo:zublastic-dot/zublastic-context:.modautomator/work-manifests/portal-no-emission-20260930.json",
+    "repo:zublastic-dot/zublastic-context:history/2026-09-29-portal-dh333-regression.md",
+    "repo:zublastic-dot/zublastic-ideas:.modautomator/work-manifests/portal-no-emission-20260930.json",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/portal/PortalPlaceholderBlock.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/portal/nether_portal/BreakablePortalEntity.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/portal/PendingLightChecks.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/portal",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_DH.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:.modautomator/work-manifests/portal-no-emission-20260930.json"
+  ],
+  "paths": [
+    "src/main/java/qouteall/imm_ptl/core/portal/PortalPlaceholderBlock.java",
+    "src/main/java/qouteall/imm_ptl/core/portal/nether_portal/BreakablePortalEntity.java",
+    "src/main/java/qouteall/imm_ptl/core/portal/PendingLightChecks.java",
+    "src/test/java/qouteall/imm_ptl/core/portal",
+    "gradle.properties",
+    "changelog.md",
+    "docs/ZUBLASTIC_DH.md"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Remove unconditional portal light emission and refresh existing source lighting.",
+    "acceptance": [
+      "No artificial level-15 portal lamp",
+      "Bound existing-portal light checks without block replacement or forced chunk loading",
+      "Preserve .29 and Colorful Lighting"
+    ]
+  }
+}

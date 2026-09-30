@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import qouteall.imm_ptl.core.McHelper;
 import qouteall.imm_ptl.core.mc_utils.ServerTaskList;
 import qouteall.imm_ptl.core.portal.Portal;
+import qouteall.imm_ptl.core.portal.PendingLightChecks;
 import qouteall.imm_ptl.core.portal.PortalPlaceholderBlock;
 import qouteall.q_misc_util.Helper;
 import qouteall.q_misc_util.my_util.DQuaternion;
@@ -44,6 +45,25 @@ public abstract class BreakablePortalEntity extends Portal {
     public boolean unbreakable = false;
     private boolean isNotified = true;
     private boolean shouldBreakPortal = false;
+    private BlockPortalShape lightCheckShape;
+    private PendingLightChecks<BlockPos> pendingLightChecks;
+
+    private void refreshPlaceholderLighting() {
+        if (isRemoved() || blockPortalShape == null) return;
+        if (lightCheckShape != blockPortalShape) {
+            lightCheckShape = blockPortalShape;
+            pendingLightChecks = new PendingLightChecks<>(blockPortalShape.area);
+        }
+        Level target = frameLevel();
+        // Recheck saved level-15 emission from older builds without loading chunks.
+        pendingLightChecks.drain(64, pos -> {
+            if (!target.hasChunkAt(pos)) return false;
+            if (target.getBlockState(pos).is(PortalPlaceholderBlock.instance)) {
+                target.getChunkSource().getLightEngine().checkBlock(pos);
+            }
+            return true;
+        });
+    }
     
     @Nullable
     protected OverlayInfo overlayInfo;
@@ -172,6 +192,7 @@ public abstract class BreakablePortalEntity extends Portal {
             addSoundAndParticle();
         }
         else {
+            refreshPlaceholderLighting();
             if (!unbreakable) {
                 if (isNotified || level().getGameTime() % 233 == getId() % 233) {
                     isNotified = false;
