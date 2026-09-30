@@ -1,9 +1,7 @@
 package ipl.sable.transit;
 
-import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import org.junit.jupiter.api.BeforeAll;
@@ -16,21 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PortalVolumeCollisionTest {
     @BeforeAll static void bootstrapBlocks() {
-        net.neoforged.fml.loading.LoadingModList.of(
-            java.util.List.of(), java.util.List.of(), java.util.List.of(),
-            java.util.List.of(), java.util.Map.of());
-        SharedConstants.tryDetectVersion();
-        Bootstrap.bootStrap();
-        // Unit tests have no mod-registration event. Register the real placeholder
-        // after vanilla bootstrap, following NeoForge's unfreeze/register/freeze cycle.
-        var registry = (net.minecraft.core.MappedRegistry<net.minecraft.world.level.block.Block>)
-            net.minecraft.core.registries.BuiltInRegistries.BLOCK;
-        registry.unfreeze();
-        net.minecraft.core.Registry.register(registry,
-            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("immersive_portals", "nether_portal_block"),
-            PortalPlaceholderBlock.instance);
-        PortalPlaceholderBlock.instance.getStateDefinition().getPossibleStates().forEach(BlockState::initCache);
-        registry.freeze();
+        qouteall.imm_ptl.core.portal.PortalBlockTestBootstrap.initialize();
     }
 
     @Test void lightingALargeFrameMustNotFillItsOpeningWithTransitVolume() {

@@ -55,7 +55,9 @@ public abstract class BreakablePortalEntity extends Portal {
             pendingLightChecks = new PendingLightChecks<>(blockPortalShape.area);
         }
         Level target = frameLevel();
-        // Recheck saved level-15 emission from older builds without loading chunks.
+        // Recheck saved emission/transparent-boundary light from older builds.
+        // Existing portals need a light-engine update even when their block IDs
+        // have not changed. Keep the work bounded and never force chunk loads.
         pendingLightChecks.drain(64, pos -> {
             if (!target.hasChunkAt(pos)) return false;
             if (target.getBlockState(pos).is(PortalPlaceholderBlock.instance)) {

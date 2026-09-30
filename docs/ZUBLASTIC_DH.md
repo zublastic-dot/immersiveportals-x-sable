@@ -618,3 +618,33 @@ Resources are reused, reallocated on resize, freed when portals are absent or th
 ### .30 — remove invisible portal light emission
 
 Portal placeholder blocks now emit zero block light. Existing breakable portal entities recheck their placeholder lighting once per entity load, at most 64 positions per tick, deferring unloaded chunks without force loading. Sable frame coordinates use the plot-hosting level. This removes the old fixed level-15 lamp; it does not implement destination-colored lighting or alter shader frame blending. Existing orphan placeholders without a portal entity are not proactively scanned.
+
+
+### .31 - block light from the hidden local continuation
+
+A live paired client/server survey of 3,360 positions in Portal Lab found identical
+block states and light levels, with no pending light work. The roof concrete and
+wool had opacity 15 and light 0. Glowstone at Nether (15,59,31) had light 15; the
+measured path ran around the roof edge at x=13, then through the portal placeholder
+at (14,56,31), light 9, to room air at (15,56,31), light 8. The .30 placeholder
+emitted zero but also blocked zero light. Thus ordinary local light could enter
+the room through a continuation that the portal rendering hides. Evidence:
+`M:/PortalAudioCompat-20260929/client-debug-control/roof-lit.json` and
+`glowstone-air-path.json`.
+
+.31 gives the placeholder full light opacity and disables direct sky propagation.
+Its render shape remains invisible, its collision shape empty, its emission zero,
+and its face-occlusion/AO behavior unchanged. Existing portal entities already
+check their aperture positions once per load, in bounded batches; this also
+removes previously propagated light without replacing blocks or forcing chunks.
+All DH, TAA, shader composition and frame-blend code is unchanged.
+
+Tests use Minecraft's actual BlockLightEngine with the production placeholder.
+The transparent negative control reproduces the measured 15-to-8 route; the fixed
+aperture stops it while preserving exterior lighting. Further cases cover lava,
+sea lanterns, redstone torches, stored-light cleanup, room lamps, portal removal,
+all portal axes and the direct sky source column. This targets ordinary block and
+sky light, including modded sources using that engine. It does not implement
+cross-dimensional light transport, alter Nether ambient brightness, or establish
+occlusion for an independent shader or colored-light renderer. Portal Lab visual
+and measured post-install acceptance remains required.
