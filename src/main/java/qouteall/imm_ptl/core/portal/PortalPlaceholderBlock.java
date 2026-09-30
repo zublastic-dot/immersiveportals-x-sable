@@ -54,7 +54,7 @@ public class PortalPlaceholderBlock extends Block {
             .strength(1.0f, 0)
             .noOcclusion()
             .noLootTable()
-            .lightLevel((s) -> 15)
+            .lightLevel((s) -> 0)
     );
     
     public PortalPlaceholderBlock(Properties properties) {

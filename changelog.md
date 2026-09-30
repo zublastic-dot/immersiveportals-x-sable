@@ -328,3 +328,8 @@ Atlas hardening since the 0.5.0 merge (PR #15):
 [6.0.6]: https://github.com/iPortalTeam/ImmersivePortalsModForNeo/releases/tag/v6.0.6
 [6.0.3]: https://github.com/iPortalTeam/ImmersivePortalsModForNeo/releases/tag/v6.0.3
 
+
+
+### .30 — remove invisible portal light emission
+
+Portal placeholder blocks now emit zero block light. Existing breakable portal entities recheck their placeholder lighting once per entity load, at most 64 positions per tick, deferring unloaded chunks without force loading. Sable frame coordinates use the plot-hosting level. This removes the old fixed level-15 lamp; it does not implement destination-colored lighting or alter shader frame blending. Existing orphan placeholders without a portal entity are not proactively scanned.
