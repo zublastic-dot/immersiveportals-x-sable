@@ -566,3 +566,34 @@ GPU tests cover overwritten main targets, continued sampling, repeated draws,
 subsequent forward transfer, GL-state restoration, invalid sources, resize/jumps
 and the unchanged memory bound. Runtime distinguishes capture from actual resume.
 Evidence: M:/PortalAudioCompat-20260929/taa-return/. Visual acceptance remains pending.
+
+
+### .26 flash acceptance and .27 speed-sampling correction
+
+The owner confirms .26 removes the brief white flash in both crossing directions.
+A separate two-second detail drop remains: the red-and-gold Nether tower becomes
+coarse immediately on crossing, then recovers without movement, in both directions.
+
+DH ClientApi compares raw main-camera positions and averages 40 speed samples,
+spaced more than 50 ms apart. Its previous position is not dimension-aware. With
+the installed reduceOverdrawWithFastMovement=true and DOUBLE_PASS fade, a speed
+average above 10 blocks/s pulls the vanilla-to-LOD transition closer. The owner's
+screenshots differ by approximately 100 vertical and 178 horizontal coordinate
+blocks: such a jump can saturate the reduction until the bad sample rolls out
+roughly two seconds later. This provides a testable explanation distinct from TAA.
+
+.27 transforms only the previous sampling point through the successful portal's
+full point transform (translation, rotation and scale), preserving its timestamp
+and the rolling average. The next sample measures actual movement in the same
+coordinate frame. No configuration change or blanket fast-movement disable is
+used. Rejected teleports do not reach the hook. Uninitialized/nonfinite samples
+are not installed; consecutive crossings compose transformations. Existing AA,
+texture, AO and cloud algorithms are unchanged.
+
+Tests execute the compiled production rebase method and the installed DH rolling
+average. The uncorrected cross-world jump remains above 100 blocks/s for 40
+samples; correction retains a 4-block/s walking average. Genuine 60-block/s
+movement still remains fast. Tests cover both directions, rotation/scale,
+consecutive crossings, timestamp preservation, invalid transforms and the exact
+DH field/sampling/near-clip contracts in both supported artifacts. Live visual
+acceptance of .27 remains required. Evidence: M:/PortalAudioCompat-20260929/detail-transition/.

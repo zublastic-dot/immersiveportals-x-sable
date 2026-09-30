@@ -6,6 +6,14 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic crossing-induced detail reduction (.27 candidate)
+
+- Rebase DH's previous speed-sampling position through a successfully crossed
+  portal. Positions in different coordinate systems no longer look like a large
+  movement spike that temporarily moves the vanilla/LOD fade closer.
+- Keep DH's sample timestamp, rolling speed history, genuine fast-flight response
+  and all user settings. Preserve the owner-accepted .26 bidirectional AA fix.
+
 ### Zublastic backward-crossing TAA continuity (.26 candidate)
 
 - Preserve the completed main-view image for the exact linked reverse portal

@@ -16,5 +16,6 @@ public class MixinDhPortalCrossing {
         target = "Lqouteall/imm_ptl/core/teleportation/ClientTeleportationManager;isTeleportingFrame:Z"))
     private static void ip_crossed(TeleportationUtil.Teleportation teleportation, float partialTicks, CallbackInfo ci) {
         DhPortalTaa.crossed(teleportation.portal());
+        qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalMotion.crossed(teleportation.portal());
     }
 }

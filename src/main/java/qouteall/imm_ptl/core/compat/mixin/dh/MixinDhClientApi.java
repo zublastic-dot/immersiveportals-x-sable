@@ -11,6 +11,10 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IImmersiveP
 import com.seibel.distanthorizons.core.wrapperInterfaces.render.renderPass.IDhVanillaFadeRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
+import org.spongepowered.asm.mixin.Shadow;
+import com.seibel.distanthorizons.core.util.math.DhVec3d;
+import qouteall.imm_ptl.core.compat.dh_compatibility.DhCameraSpeedHistory;
+import java.util.function.UnaryOperator;
 import org.spongepowered.asm.mixin.injection.At;
 import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalRendering;
 import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalTaa;
@@ -18,7 +22,19 @@ import qouteall.imm_ptl.core.render.context_management.PortalRendering;
 
 @Pseudo
 @Mixin(value = ClientApi.class, remap = false)
-public class MixinDhClientApi {
+public class MixinDhClientApi implements DhCameraSpeedHistory {
+    @Shadow private DhVec3d lastCameraPosForSpeedCheck;
+    @Shadow private long msSinceLastSpeedCheck;
+
+    @Override public boolean ip_rebaseCameraSpeed(UnaryOperator<DhVec3d> transform) {
+        if (msSinceLastSpeedCheck == 0 || lastCameraPosForSpeedCheck == null) return false;
+        // Copy: a mutable callback must not damage the old sample on failure.
+        DhVec3d rebased = transform.apply(new DhVec3d(lastCameraPosForSpeedCheck));
+        if (rebased == null || !Double.isFinite(rebased.x) || !Double.isFinite(rebased.y) || !Double.isFinite(rebased.z)) return false;
+        lastCameraPosForSpeedCheck = rebased;
+        // Keep the sample time and rolling average: real walking/flying still counts.
+        return true;
+    }
     @WrapMethod(method = "renderLodLayer")
     private void ip_renderScope(boolean deferred, Operation<Void> original) {
         DhPortalTaa.maintain();
