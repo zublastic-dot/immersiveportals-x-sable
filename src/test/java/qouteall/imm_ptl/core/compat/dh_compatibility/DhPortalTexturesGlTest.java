@@ -40,7 +40,16 @@ class DhPortalTexturesGlTest {
         assertEquals(GL_TRUE, glGetShaderi(shader, GL_COMPILE_STATUS), glGetShaderInfoLog(shader));
         return shader;
     }
-    private static float[] draw(int face, boolean patched, boolean portal) {
+    private static float[] draw(int face, boolean patched, boolean stableSampling) {
+        return draw(face, patched, stableSampling, false, 4.0f);
+    }
+
+    private static float[] draw(int face, boolean patched, boolean stableSampling, boolean contrastAtlas, float blockSpan) {
+        return draw(face, patched, stableSampling, contrastAtlas, blockSpan, .91f);
+    }
+
+    private static float[] draw(int face, boolean patched, boolean stableSampling, boolean contrastAtlas,
+                                float blockSpan, float blockPhase) {
         int vertex = compile(GL_VERTEX_SHADER, """
             #version 330 core
             out vec4 vPos;
@@ -50,9 +59,11 @@ class DhPortalTexturesGlTest {
             flat out uint vNormalIndex;
             flat out uint vTextureTileId;
             uniform int face;
+            uniform float blockSpan;
+            uniform float blockPhase;
             void main() {
                 vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
-                vec2 block = p * 4.0 + 0.91;
+                vec2 block = p * blockSpan + blockPhase;
                 vBlockPos = vec3(block.x, block.y, block.y);
                 vPos = vec4(vBlockPos, 1.0);
                 vertexWorldPos = vec3(0, 0, -100);
@@ -68,7 +79,21 @@ class DhPortalTexturesGlTest {
         assertEquals(GL_TRUE, glGetProgrami(program, GL_LINK_STATUS), glGetProgramInfoLog(program));
         int vao = glGenVertexArrays(), atlas = glGenTextures();
         glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, atlas);
-        for (int level = 0; level <= 4; level++) {
+        if (contrastAtlas) {
+            // Match DH's real atlas size, filtering and unrestricted generated
+            // mip chain. Tile 1 is neutral; unrelated neighbouring tiles are dark.
+            int width = 4096, height = 256;
+            float[] pixels = new float[width * height * 4];
+            for (int y = 0; y < height; y++) for (int x = 0; x < width; x++) {
+                int offset = (y * width + x) * 4;
+                float ratio = x >= 16 && x < 32 && y < 16 ? .5f : .125f;
+                pixels[offset] = pixels[offset + 1] = pixels[offset + 2] = ratio;
+                pixels[offset + 3] = 1;
+            }
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_FLOAT, pixels);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+        } else for (int level = 0; level <= 4; level++) {
             int width = 4096 >> level, height = 16 >> level;
             float[] pixels = new float[width * height * 4];
             for (int i = 0; i < pixels.length; i += 4) {
@@ -77,8 +102,10 @@ class DhPortalTexturesGlTest {
             }
             glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, pixels);
         }
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 4);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        if (!contrastAtlas) {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 4);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        }
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         try {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -86,8 +113,10 @@ class DhPortalTexturesGlTest {
             glDisable(GL_DEPTH_TEST); glDisable(GL_BLEND); glDisable(GL_SCISSOR_TEST); glDisable(GL_STENCIL_TEST);
             glUseProgram(program); glBindVertexArray(vao);
             glUniform1i(glGetUniformLocation(program, "face"), face);
+            glUniform1f(glGetUniformLocation(program, "blockSpan"), blockSpan);
+            glUniform1f(glGetUniformLocation(program, "blockPhase"), blockPhase);
             glUniform1i(glGetUniformLocation(program, "uBlockAtlas"), 0);
-            if (patched) glUniform1i(glGetUniformLocation(program, "uIpContinuousTextureGradients"), portal ? 1 : 0);
+            if (patched) glUniform1i(glGetUniformLocation(program, "uIpContinuousTextureGradients"), stableSampling ? 1 : 0);
             glDrawArrays(GL_TRIANGLES, 0, 3);
             float[] pixels = new float[SIZE * SIZE * 4];
             glReadPixels(0, 0, SIZE, SIZE, GL_RGBA, GL_FLOAT, pixels);
@@ -110,7 +139,28 @@ class DhPortalTexturesGlTest {
             float[] repair = draw(face, true, true);
             assertTrue(variation(control) > .1f, "Installed shader must reproduce false mip bands on face " + face);
             assertTrue(variation(repair) < .01f, "Continuous texture footprint on face " + face);
-            assertArrayEquals(control, draw(face, true, false), .001f, "Ordinary view retains installed sampling");
+            assertArrayEquals(control, draw(face, true, false), .001f, "Shader-pack opt-out retains installed sampling");
+        }
+    }
+
+    @Test void distantPaleTileCannotSampleDarkerNeighbouringMaterials() {
+        for (int face = 0; face < 6; face++) {
+            for (float span : new float[]{16, 128, 512}) {
+                float[] pixels = draw(face, true, true, true, span);
+                for (int i = 0; i < pixels.length; i += 4) {
+                    assertEquals(.5f, pixels[i], .008f,
+                        "Neutral tile must preserve terrain colour: face=" + face + ", span=" + span);
+                }
+            }
+        }
+    }
+
+    @Test void invertedFacesAtExactBlockBoundariesStayInsideTheirTile() {
+        for (int face = 0; face < 6; face++) {
+            float[] pixels = draw(face, true, true, true, 32, .5f);
+            for (int i = 0; i < pixels.length; i += 4) {
+                assertEquals(.5f, pixels[i], .008f, "Tile edge on face " + face);
+            }
         }
     }
 }

@@ -8,7 +8,6 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalRendering;
 import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 
 @Pseudo
@@ -23,8 +22,9 @@ public class MixinDhTerrainTextures {
             ip_continuousGradients = program.tryGetUniformLocation("uIpContinuousTextureGradients");
         }
         if (ip_continuousGradients >= 0) {
-            program.setUniform(ip_continuousGradients,
-                DhPortalRendering.isSupportedPass() && !IrisInterface.invoker.isShaders());
+            // Crossing must not switch between two different mip policies.
+            // Shader packs continue to own their texture sampling.
+            program.setUniform(ip_continuousGradients, !IrisInterface.invoker.isShaders());
         }
     }
 }

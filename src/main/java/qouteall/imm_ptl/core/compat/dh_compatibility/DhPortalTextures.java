@@ -1,6 +1,6 @@
 package qouteall.imm_ptl.core.compat.dh_compatibility;
 
-/** Keep mip selection continuous when DH repeats a block tile with fract(). */
+/** Continuous mip selection confined to one 16x16 block tile in DH's atlas. */
 public final class DhPortalTextures {
     public static final String TERRAIN_SHADER = "assets/distanthorizons/shaders/terrain/gl/frag.frag";
     private DhPortalTextures() {}
@@ -23,13 +23,24 @@ public final class DhPortalTextures {
                     return -delta.zy;
                 }
 
+                vec4 ipSampleTileMip(vec2 uv, vec2 atlasSize, float mip) {
+                    vec2 origin = vec2(float(vTextureTileId % 256u), float(vTextureTileId / 256u)) * 16.0;
+                    // Keep each mip's filter footprint inside this tile, including
+                    // inverted faces whose UV can land exactly on the far edge.
+                    float inset = 0.5 * exp2(mip);
+                    vec2 pixel = clamp(uv * atlasSize, origin + inset, origin + 16.0 - inset);
+                    return textureLod(uBlockAtlas, pixel / atlasSize, mip);
+                }
+
                 vec4 ipSampleBlockTile(vec2 uv, vec2 atlasSize) {
                     if (!uIpContinuousTextureGradients) return texture(uBlockAtlas, uv);
-                    // Derivatives of wrapped UVs jump at integer block boundaries.
-                    // Derive the footprint before wrapping, retaining the same tile/UV.
-                    vec2 dx = ipFaceGradient(dFdx(vBlockPos)) * 16.0 / atlasSize;
-                    vec2 dy = ipFaceGradient(dFdy(vBlockPos)) * 16.0 / atlasSize;
-                    return textureGrad(uBlockAtlas, uv, dx, dy);
+                    vec2 dx = ipFaceGradient(dFdx(vBlockPos)) * 16.0;
+                    vec2 dy = ipFaceGradient(dFdy(vBlockPos)) * 16.0;
+                    // Derive the footprint before fract(). At mip 4 one 16x16
+                    // tile is one texel; coarser mips mix unrelated materials.
+                    float mip = clamp(log2(max(max(length(dx), length(dy)), 1.0)), 0.0, 4.0);
+                    return mix(ipSampleTileMip(uv, atlasSize, floor(mip)),
+                               ipSampleTileMip(uv, atlasSize, ceil(mip)), fract(mip));
                 }
 
                 """ + insertion);
