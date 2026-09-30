@@ -139,14 +139,21 @@ public class PortalPlaceholderBlock extends Block {
         return false;
     }
     
-    //---------These are copied from BlockBarrier
+    // The aperture replaces this dimension's continuation with another world.
+    // Do not let local block/sky light propagate through that hidden continuation.
+    // Light opacity is independent of render shape, face occlusion and collision.
+    @Override
+    public int getLightBlock(BlockState state, BlockGetter world, BlockPos pos) {
+        return 15;
+    }
+
     @Override
     public boolean propagatesSkylightDown(
         BlockState blockState_1,
         BlockGetter blockView_1,
         BlockPos blockPos_1
     ) {
-        return true;
+        return false;
     }
     
     @Override

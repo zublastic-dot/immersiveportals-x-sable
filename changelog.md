@@ -6,6 +6,12 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Zublastic portal light boundary (.31 candidate)
+
+- Stop ordinary block light and skylight from propagating through invisible portal placeholders. A light above a sealed portal room could previously travel around the roof edge and back through the aperture, even though that continuation of the local world is visually replaced by the destination.
+- Keep portals invisible, noncolliding and nonemissive. Reuse the bounded existing-portal light refresh to remove saved light from the former transparent boundary.
+- Add real Minecraft light-engine regressions for the measured glowstone route, several emitters, stored-light cleanup, internal sources, portal removal and horizontal skylight. Destination light transport and independent shader/mod lighting remain separate capabilities.
+
 ### Experimental shader portal-frame blend (.29 trial)
 
 - Add bounded display-space color matching across the top-level Iris portal stencil seam. Preserve vertical color variation and texture detail; reject sky, depth discontinuities and bright edges.
