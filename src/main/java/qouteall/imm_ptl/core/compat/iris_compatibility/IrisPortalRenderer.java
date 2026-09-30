@@ -49,9 +49,12 @@ public class IrisPortalRenderer extends PortalRenderer {
     
     private boolean portalRenderingNeeded = false;
     private boolean nextFramePortalRenderingNeeded = false;
+    private final PortalFrameBlend frameBlend = new PortalFrameBlend();
+    private boolean frameBlendFailed;
     
     IrisPortalRenderer() {
         NeoForge.EVENT_BUS.addListener(IPGlobal.PreGameRenderEvent.class, preGameRenderEvent -> {
+            if (client.level == null) frameBlend.clear();
             updateNeedsPortalRendering();
         });
     }
@@ -216,6 +219,7 @@ public class IrisPortalRenderer extends PortalRenderer {
         GlStateManager._colorMask(true, true, true, true);
         
         if (RenderStates.getRenderedPortalNum() == 0) {
+            frameBlend.clear();
             return;
         }
         
@@ -226,6 +230,17 @@ public class IrisPortalRenderer extends PortalRenderer {
         RenderTarget mainFrameBuffer = client.getMainRenderTarget();
         mainFrameBuffer.bindWrite(true);
         
+        if (!frameBlendFailed && RenderStates.basicProjectionMatrix != null) {
+            try {
+                frameBlend.apply(deferredFbs[0].fb.frameBufferId,
+                    mainFrameBuffer.viewWidth, mainFrameBuffer.viewHeight,
+                    new Matrix4f(RenderStates.basicProjectionMatrix).invert());
+            } catch (RuntimeException failure) {
+                frameBlendFailed = true;
+                frameBlend.clear();
+                com.mojang.logging.LogUtils.getLogger().warn("IP/Sable: experimental portal frame blend disabled", failure);
+            }
+        }
         deferredFbs[0].fb.blitToScreen(mainFrameBuffer.viewWidth, mainFrameBuffer.viewHeight);
         
         CHelper.checkGlError();

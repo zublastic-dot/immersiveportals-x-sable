@@ -6,6 +6,12 @@ and this project tries to adhere to [Semantic Versioning](https://semver.org/spe
 
 ## [Unreleased Changes]
 
+### Experimental shader portal-frame blend (.29 trial)
+
+- Add bounded display-space color matching across the top-level Iris portal stencil seam. Preserve vertical color variation and texture detail; reject sky, depth discontinuities and bright edges.
+- This is an owner-authorized cosmetic approximation, not cross-dimensional light propagation. .28 remains the rollback baseline.
+
+
 ### Zublastic portal vanilla/LOD boundary (.28 candidate)
 
 - Bound shaders-off portal DH transition distance by destination chunks actually available around the transformed camera. Retained chunks may unload several seconds after stepping away from a portal; DH must not keep a near plane based on the larger main-view distance.
