@@ -73,6 +73,7 @@ public class IPModMainClient {
     
     public static void init() {
         ClientWorldLoader.init();
+        ipl.sable.client.IplClientHostedTrackingResync.init();
         qouteall.imm_ptl.core.lighting.PortalLighting.init();
         
         ClientTeleportationManager.init();

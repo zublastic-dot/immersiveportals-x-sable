@@ -299,9 +299,11 @@ public abstract class SableCrossDimTrackingMixin {
     // 5. Bootstrap: for any cross-dim viewer NOT yet in tracking (e.g. someone
     //    who walked up to a portal in the dest dim without having tracked the
     //    source-dim sub-level before), add them to tracking + emit a wrapped
-    //    sendFullSync. Inert when the viewer was already tracking before
-    //    crossing (which is the common case -- they're retained via @WrapOperation
-    //    above, so they're already in tracking when this runs).
+    //    sendFullSync. Normally inert for an already-tracked viewer. Conventional
+    //    dimension travel can discard the client's hosted world while retaining
+    //    server tracking; a requested replay repairs each eligible ship once.
+    //    Replay never erases tracking, so ordinary removal still handles ships
+    //    whose in-flight allocation arrives after cleanup but becomes ineligible.
     //
     //    Anchored at HEAD of sendBoundsUpdates rather than at the invoke site in
     //    tick(), to avoid colliding with the @Redirect on the same instruction.
@@ -311,6 +313,7 @@ public abstract class SableCrossDimTrackingMixin {
 
     @Inject(method = "sendBoundsUpdates", at = @At("HEAD"), require = 0)
     private void ipl$bootstrapCrossDimViewers(SubLevelContainer container, CallbackInfo ci) {
+        ipl.sable.network.IplHostedTrackingResync.pruneReplays(level, container);
         if (ipl$crossDimViewersBySubLevel.isEmpty()) return;
         for (SubLevel subLevel : container.getAllSubLevels()) {
             if (subLevel.isRemoved()) continue;
@@ -320,10 +323,14 @@ public abstract class SableCrossDimTrackingMixin {
 
             Collection<UUID> tracking = serverSubLevel.getTrackingPlayers();
             for (UUID uuid : crossDim) {
-                if (tracking.contains(uuid)) continue;
                 ServerPlayer viewer = level.getServer().getPlayerList().getPlayer(uuid);
                 if (viewer == null) continue;
-                tracking.add(uuid);
+                boolean alreadyTracking = tracking.contains(uuid);
+                boolean replay = ipl.sable.dim.IplDimAgnostic.isHostingLevel(level)
+                    && ipl.sable.network.IplHostedTrackingResync.needsReplay(
+                        viewer, serverSubLevel.getUniqueId());
+                if (alreadyTracking && !replay) continue;
+                if (!alreadyTracking) tracking.add(uuid);
                 // We're already inside the @Redirect's withForceRedirect wrap when
                 // sendBoundsUpdates is being called from tick. But we may also be called
                 // outside that context (e.g. if sendBoundsUpdates is invoked elsewhere),
@@ -355,6 +362,8 @@ public abstract class SableCrossDimTrackingMixin {
                     // Straddle parity is server state (see IplStraddleSessionSync); a viewer
                     // starting to track mid-crossing needs the current session snapshot too.
                     ipl.sable.transit.IplStraddleSessionSync.sendSnapshotTo(
+                        viewer, serverSubLevel.getUniqueId());
+                    ipl.sable.network.IplHostedTrackingResync.replayed(
                         viewer, serverSubLevel.getUniqueId());
                 }
             }
