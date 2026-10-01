@@ -32,16 +32,17 @@ class PortalLightGpuTest {
     }
     @BeforeEach void prepare() {
         program=link("#version 330 core\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2-1,0,1);}",
-            "#version 330 core\nout vec4 result;uniform vec3 probePosition;\n"+PortalLightShaders.FUNCTION+"\nvoid main(){result=vec4(vec3(.6)*ipPortalLightGain(probePosition),1);}");
+            "#version 330 core\nout vec4 result;uniform vec3 probePosition;uniform vec3 nativeLight;\n"+PortalLightShaders.FUNCTION+"\nvoid main(){result=vec4(nativeLight+ipPortalLightDelta(probePosition,nativeLight),1);}");
         glUseProgram(program);vao=glGenVertexArrays();glBindVertexArray(vao);glViewport(0,0,16,16);
+        glUniform3f(glGetUniformLocation(program,"nativeLight"),.6f,.6f,.6f);
         atlas=glGenTextures();glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_3D,atlas);
         glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
         glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_R,GL_CLAMP_TO_EDGE);
         var values=BufferUtils.createFloatBuffer(32*32*128*4);
         for(int z=0;z<128;z++) for(int y=0;y<32;y++) for(int x=0;x<32;x++) {
             int i=((z*32+y)*32+x)*4;
-            if(z<32 && y<2) { values.put(i,.2f);values.put(i+1,.3f);values.put(i+2,.6f);values.put(i+3,1); }
-            if(z>=32 && z<64 && y<2) { values.put(i,.7f);values.put(i+1,.6f);values.put(i+2,.2f);values.put(i+3,1); }
+            if(z<32 && y<2) { values.put(i,-.48f);values.put(i+1,-.42f);values.put(i+2,-.24f);values.put(i+3,1); }
+            if(z>=32 && z<64 && y<2) { values.put(i,-.18f);values.put(i+1,-.24f);values.put(i+2,-.48f);values.put(i+3,1); }
         }
         glTexImage3D(GL_TEXTURE_3D,0,GL_RGBA16F,32,32,128,0,GL_RGBA,GL_FLOAT,values);
         glUniform1i(glGetUniformLocation(program,"ipPortalLightAtlas"),0);
@@ -68,6 +69,29 @@ class PortalLightGpuTest {
         glUniform1i(glGetUniformLocation(program,"ipPortalLightCount"),0);
         assertArrayEquals(new float[]{.6f,.6f,.6f,1},pixel(.5f,.5f,.5f),.006f);
     }
+    @Test void heldLightKeepsItsColorOnTheFirstFrameWithoutAnAtlasUpdate() {
+        float[] dark=pixel(.5f,.5f,.5f);
+        // The mesh receives a warm dynamic contribution before the next field update.
+        glUniform3f(glGetUniformLocation(program,"nativeLight"),.85f,.8f,.7f);
+        float[] lit=pixel(.5f,.5f,.5f);
+        assertEquals(.25f,lit[0]-dark[0],.008f);
+        assertEquals(.20f,lit[1]-dark[1],.008f);
+        assertEquals(.10f,lit[2]-dark[2],.008f);
+        // Removing it needs no atlas refresh either.
+        glUniform3f(glGetUniformLocation(program,"nativeLight"),.6f,.6f,.6f);
+        assertArrayEquals(dark,pixel(.5f,.5f,.5f),.006f);
+    }
+    @Test void coloredLightChannelsAreNotMultipliedByTheRoomsHue() {
+        float[] dark=pixel(.5f,.5f,.5f);
+        glUniform3f(glGetUniformLocation(program,"nativeLight"),.8f,.6f,.6f);
+        float[] red=pixel(.5f,.5f,.5f);
+        assertEquals(.2f,red[0]-dark[0],.008f);
+        assertEquals(dark[1],red[1],.006f);assertEquals(dark[2],red[2],.006f);
+    }
+    @Test void negativeAmbientOffsetsCannotProduceNegativeLight() {
+        glUniform3f(glGetUniformLocation(program,"nativeLight"),.1f,.1f,.1f);
+        assertArrayEquals(new float[]{0,0,0,1},pixel(.5f,.5f,.5f),.006f);
+    }
     @Test void actualSodiumShaderPairCompilesWithTransport() throws Exception {
         String v=PortalLightShaders.sodium("sodium:blocks/block_layer_opaque.vsh",resource("assets/sodium/shaders/blocks/block_layer_opaque.vsh"));
         String f=PortalLightShaders.sodium("sodium:blocks/block_layer_opaque.fsh",resource("assets/sodium/shaders/blocks/block_layer_opaque.fsh"));
@@ -75,8 +99,9 @@ class PortalLightGpuTest {
     }
     @Test void actualDhShaderPairCompilesWithTransport() throws Exception {
         String path="assets/distanthorizons/shaders/terrain/gl/frag.frag";
-        String f=PortalLightShaders.dh(path,resource(path));assertTrue(f.contains("ipPortalLightGain(vertexWorldPos)"));
-        int p=link(resource("assets/distanthorizons/shaders/terrain/gl/vert.vert"),f);glDeleteProgram(p);
+        String f=PortalLightShaders.dh(path,resource(path));assertTrue(f.contains("ipPortalLightDelta(vertexWorldPos,ipPortalNativeLight)"));
+        String vp="assets/distanthorizons/shaders/terrain/gl/vert.vert";
+        int p=link(PortalLightShaders.dh(vp,resource(vp)),f);glDeleteProgram(p);
     }
     @Test @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="IP_PORTAL_TEST_COLORFUL_JAR",matches=".+")
     void installedColorfulLightingVertexLinksWithOrdinarySodiumFragment() throws Exception {

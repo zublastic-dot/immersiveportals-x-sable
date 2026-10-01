@@ -12,22 +12,20 @@ public final class PortalLightPalette {
         int p=abgr[Math.clamp(sky,0,15)*16+Math.clamp(block,0,15)];
         return new float[]{(p&255)/255f,((p>>>8)&255)/255f,((p>>>16)&255)/255f};
     }
-    public float[] gain(PortalLightPalette incoming, int sky, int block, int remoteSky, int remoteBlock) {
-        return gain(incoming, sky, block, remoteSky, remoteBlock, 1);
-    }
-    public float[] gain(PortalLightPalette incoming, int sky, int block, int remoteSky, int remoteBlock, float replacement) {
+    public float[] offset(PortalLightPalette incoming, int remoteSky, int remoteBlock, float replacement) {
         float weight=Math.clamp(replacement,0,1);
-        float[] nativeLight=rgb(sky,block), floor=rgb(0,0), imported=incoming.rgb(remoteSky,remoteBlock), remoteFloor=incoming.rgb(0,0);
-        float[] gain=new float[3];
+        float[] floor=rgb(0,0), imported=incoming.rgb(remoteSky,remoteBlock), remoteFloor=incoming.rgb(0,0);
+        float[] offset=new float[3];
         for (int i=0;i<3;i++) {
-            // Remove only the native zero-light floor. Preserve the measured contribution
-            // of local sources, then add the light arriving through the aperture.
+            // Cache only the ambient replacement, never a ratio against local light.
+            // Held/entity lights can change between field updates. The shader adds this
+            // offset to the light actually used by the current terrain mesh, preserving
+            // those contributions without a stale multiplier or a second update clock.
             // A dimension's ambient floor is not a luminous block. It must not become
             // a source in the reverse direction either (dark Nether -> Overworld).
-            float desired=Math.min(1,Math.max(0,nativeLight[i]-floor[i])
-                +Math.max(0,imported[i]-remoteFloor[i])+Math.min(floor[i],remoteFloor[i]));
-            gain[i]=1+weight*(desired/Math.max(1/255f,nativeLight[i])-1);
+            offset[i]=weight*(Math.max(0,imported[i]-remoteFloor[i])
+                +Math.min(floor[i],remoteFloor[i])-floor[i]);
         }
-        return gain;
+        return offset;
     }
 }

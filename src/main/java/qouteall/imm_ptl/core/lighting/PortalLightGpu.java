@@ -56,7 +56,7 @@ public final class PortalLightGpu {
                 var values=BufferUtils.createFloatBuffer(32*32*128*4);
                 for(int i=0;i<regions.size();i++) {
                     var region=regions.get(i); var min=region.min();
-                    for(var entry:region.gains().entrySet()) {
+                    for(var entry:region.offsets().entrySet()) {
                         var p=entry.getKey(); int x=p.x()-min.x(),y=p.y()-min.y(),z=p.z()-min.z()+i*32;
                         int offset=((z*32+y)*32+x)*4; float[] rgb=entry.getValue();
                         values.put(offset,rgb[0]);values.put(offset+1,rgb[1]);values.put(offset+2,rgb[2]);values.put(offset+3,1);

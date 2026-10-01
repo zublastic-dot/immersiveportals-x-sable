@@ -1,3 +1,7 @@
+# 0.5.1-zublastic.35
+
+- Keep newly selected held-light colors stable by applying portal ambient replacement additively to the renderer's current lighting, including Colorful Lighting. Preserve the bounded room field and DH support.
+
 # 0.5.1-zublastic.34
 
 - Replace the sealed-room lighting cutoff with bounded transport and local opening visibility; one wall hole no longer discards every interior correction.

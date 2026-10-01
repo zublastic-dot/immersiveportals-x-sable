@@ -1,9 +1,10 @@
-# Portal boundary lighting trial (.34)
+# Portal boundary lighting trial (.35)
 
 Status: experimental ordinary-terrain adapter, not general global illumination.
 The owner rejected .33's whole-room color reset after opening a single wall block.
 Version .34 replaces that sealed-room requirement with local visibility and
-bounded light transport. Live acceptance of .34 remains pending. Shader-pack
+bounded light transport. The .34 opening/reseal and near/far checks passed in
+Portal Lab; .35 addresses the subsequently reproduced held-glowstone color flash. Shader-pack
 transport and per-emitter RGB are still unimplemented requirements.
 
 ## Trigger and behavior
@@ -41,9 +42,17 @@ artifacts. Those limits must not be described as physically exact lighting.
 
 The actual per-dimension lightmap pixels provide time/weather/gamma/status-effect
 color. The renderer removes a weighted portion of the native zero-light floor,
-preserves the measured contribution of local sources, and adds the imported
+preserves the rendered contribution of local sources, and adds the imported
 lightmap contribution. The smaller zero-light floor is retained; the Nether
 ambient floor does not become an emitter in the reverse direction.
+
+Version .35 caches an additive ambient offset instead of dividing by a sampled
+local brightness. The shaders apply that offset to the current mesh's own light
+sample and unlit material color. A newly selected held light therefore keeps its
+RGB contribution even before the slower portal field refresh. This also preserves
+Colorful Lighting's per-vertex sample and leaves terrain outside the field
+unchanged. No field rebuild is requested just because the selected item changed.
+Negative resulting illumination is clamped to zero; there is no hue multiplier.
 
 ## Renderers and state
 
@@ -93,7 +102,8 @@ Regression cases cover the owner's back-wall hole, a roof opening, larger
 openings, a second opaque layer, resealing, unknown samples, an opaque partition,
 bounded open terrain, opposite directions, large/negative coordinates, cached
 open-room geometry, local lamps and ambient mixing. Hidden-context GPU tests
-check terrain shader linking, occupancy, exterior exclusion and atlas isolation.
+check terrain shader linking, occupancy, exterior exclusion, atlas isolation and
+dynamic-light changes while the ambient atlas remains unchanged.
 
 Required live checks remain: the owner's one-block hole and reseal, night/day,
 roof source on/off, local lamps, portal crossing and the near/far DH transition.

@@ -18,7 +18,7 @@ import static qouteall.imm_ptl.core.lighting.PortalLightField.*;
 
 /** Client-only trial. No light storage writes, chunk loads, server hooks or room coordinates. */
 public final class PortalLighting {
-    public record Region(ClientLevel world, Pos min, Map<Pos, float[]> gains) {}
+    public record Region(ClientLevel world, Pos min, Map<Pos, float[]> offsets) {}
     // Value identity survives unloading/recreation of the destination portal entity.
     // The sample mapping also changes when either endpoint moves or is retargeted.
     private record Aperture(ClientLevel world, ClientLevel source, Map<Pos, Pos> samples, Pos inward) {}
@@ -94,17 +94,16 @@ public final class PortalLighting {
             if (REGIONS.remove(a) != null) revision++;
             report(a, "lightmap unavailable"); return;
         }
-        var gains = new HashMap<Pos, float[]>();
+        var offsets = new HashMap<Pos, float[]>();
         int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
         for (var entry : result.field().cells().entrySet()) {
             Pos p = entry.getKey(); Light light = entry.getValue();
-            Light local = result.snapshot().geometry().get(p).light();
-            gains.put(p, nativePalette.gain(incoming, local.sky(), local.block(), light.sky(), light.block(),
+            offsets.put(p, nativePalette.offset(incoming, light.sky(), light.block(),
                 result.field().replacement().get(p)));
             minX = Math.min(minX, p.x()); minY = Math.min(minY, p.y()); minZ = Math.min(minZ, p.z());
         }
-        REGIONS.put(a, new Region(a.world, new Pos(minX, minY, minZ), Map.copyOf(gains))); revision++;
-        report(a, "transport cells=" + gains.size() + (result.usedCache() ? " (cached geometry/light levels; current lightmaps)" : " (live)"));
+        REGIONS.put(a, new Region(a.world, new Pos(minX, minY, minZ), Map.copyOf(offsets))); revision++;
+        report(a, "transport cells=" + offsets.size() + (result.usedCache() ? " (cached geometry/light levels; current lightmaps)" : " (live)"));
     }
 
     private static boolean eligible(Portal p) {
