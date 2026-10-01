@@ -1,0 +1,57 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-light-latency-20261001",
+  "lease_id": "portal-light-latency-20261001",
+  "worker_id": "codex-portal-light-latency-20261001",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-light-latency-20261001/portal-light-latency-20261001",
+  "base_commit": "555e9617b1c26f0ae77e2bccf35c9f18706c9fac",
+  "resources": [
+    "artifact:owner-pc:portal-audio-20260929",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:client-bridge",
+    "domain:modautomator:compatibility/ip-sable",
+    "domain:modautomator:compatibility/ip-sable-rendering",
+    "repo:zublastic-dot/immersiveportals-x-sable:.modautomator/work-manifests/portal-light-latency-20261001.json",
+    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_PORTAL_LIGHT_LATENCY.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/chunk_loading/ImmPtlClientChunkMap.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/lighting",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/mixin/client/MixinPortalLightGeometry.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/resources",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/lighting",
+    "repo:zublastic-dot/modautomator-client-bridge:.modautomator/work-manifests/portal-light-latency-20261001.json",
+    "repo:zublastic-dot/modautomator-client-bridge:README.md",
+    "repo:zublastic-dot/modautomator-client-bridge:docs/PROTOCOL.md",
+    "repo:zublastic-dot/modautomator-client-bridge:gradle.properties",
+    "repo:zublastic-dot/modautomator-client-bridge:src/main/java/dev/modautomator/clientbridge/DebugProbePortalAdapter.java",
+    "repo:zublastic-dot/modautomator-client-bridge:src/test/java/dev/modautomator/clientbridge/DebugProbePortalAdapterTest.java",
+    "repo:zublastic-dot/zublastic-context:.modautomator/work-manifests/portal-light-latency-20261001.json",
+    "repo:zublastic-dot/zublastic-context:history/2026-10-01-portal-light-latency.md",
+    "repo:zublastic-dot/zublastic-ideas:.modautomator/work-manifests/portal-light-latency-20261001.json",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md",
+    "repo:zublastic-dot/zublastic-ideas:modautomator-client-bridge/README.md"
+  ],
+  "paths": [
+    "src/main/java/qouteall/imm_ptl/core/lighting",
+    "src/main/java/qouteall/imm_ptl/core/mixin/client/MixinPortalLightGeometry.java",
+    "src/main/java/qouteall/imm_ptl/core/chunk_loading/ImmPtlClientChunkMap.java",
+    "src/main/resources",
+    "src/test/java/qouteall/imm_ptl/core/lighting",
+    "gradle.properties",
+    "changelog.md",
+    "docs/ZUBLASTIC_PORTAL_LIGHT_LATENCY.md"
+  ],
+  "value_case": {
+    "category": "observable_capability",
+    "statement": "Remove the measured extra portal light latency while preserving wall occlusion and bounded runtime cost.",
+    "acceptance": [
+      "Late-tick source sampling and fast changed-light propagation with cached geometry",
+      "Brightening, darkening, invalidation and GPU upload tests",
+      "Exact builds, CI and reversible Portal Lab probe comparison"
+    ]
+  }
+}

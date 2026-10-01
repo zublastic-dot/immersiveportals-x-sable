@@ -364,3 +364,46 @@ Atlas hardening since the 0.5.0 merge (PR #15):
 ### .30 — remove invisible portal light emission
 
 Portal placeholder blocks now emit zero block light. Existing breakable portal entities recheck their placeholder lighting once per entity load, at most 64 positions per tick, deferring unloaded chunks without force loading. Sable frame coordinates use the plot-hosting level. This removes the old fixed level-15 lamp; it does not implement destination-colored lighting or alter shader frame blending. Existing orphan placeholders without a portal entity are not proactively scanned.
+
+
+## 0.5.1-zublastic.38
+
+Refresh portal light sources each late client tick using cached geometry and
+visibility. Recompute decreasing light promptly; invalidate structure on block
+and chunk changes. Reuse palette tables and GPU atlas storage, uploading only
+changed regions. Adds bounded CPU update timing for the diagnostic probes.
+
+
+## 0.5.1-zublastic.39
+
+Separate ambient replacement from imported emission in the retained portal-light
+atlas. The known Colorful Sodium shader evaluates local emitter gain against
+corrected ambient, preserving its raw RGB contribution rather than subtracting
+Nether ambient after that contribution has already been dimmed. No emitter IDs
+are hardcoded. The .38 refresh/cache behavior is retained.
+
+This corrects the local ambient/emitter calculation; transported block light
+still uses a scalar vanilla lightmap model. Full RGB continuity across a portal
+and arbitrary shader-pack lighting are not claimed.
+
+
+## 0.5.1-zublastic.40 - vanilla block-light response correction
+
+- Normalize the local and transported scalar block-light response in the supported
+  Overworld/Nether pair using current light coordinates and captured palettes.
+  Ambient replacement remains separate; overlapping local/imported levels use a
+  maximum instead of additive double lighting.
+- Keep the known Colorful RGB path from .39 separate. Its engine can be disabled
+  by an unsupported renderer dependency, so presence alone is not proof of use.
+- Candidate implementation: live acceptance must be recorded separately.
+
+
+## 0.5.1-zublastic.41 - admit rotated sources independently
+
+- Evaluate each receiving endpoint separately. A cardinal room can receive light
+  through the actual transform of a rotated source without admitting unsupported
+  rotated receiving grids. Retain the voxel-plane proof and opaque boundaries.
+- Report unsupported receiving orientation with bounded change-only diagnostics.
+- The .40 live run had zero active fields because its two-endpoint angle gate
+  rejected the slightly rotated physical portal. Those screenshots did not
+  validate .40's correction. Live .41 acceptance remains pending.
