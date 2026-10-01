@@ -157,3 +157,42 @@ passed 58 tests. Live performance remains pending: the atlas now occupies 4 MiB
 per world and four dirty regions upload 8 MiB of float input per update, including
 palette-only changes. Retained topology caching does not establish unchanged CPU,
 allocation or upload cost; .38 timing results do not measure these new costs.
+
+## .40 runtime rejection and .41 receiving-endpoint eligibility
+
+The installed .40/bridge alpha.11 crossing captured 215 frames with zero active
+regions and revision zero. Its screenshots cannot establish color correction or
+performance acceptance: the field never activated. The complete ordinary-room
+comparison likewise does not validate an inactive correction.
+
+Recent saved portal NBT matches the measured live position and has an Overworld
+normal (-0.999516671067223, 0.000420215577159, 0.031084524727999), a 1.78146-degree
+rotation. The old gate required both endpoint normals to have a dominant component
+above 0.999999 (about 0.08103 degrees). The Nether receiving plane is cardinal,
+but its remote source is not; both portal entities therefore rejected every field.
+
+.41 admits each receiving endpoint independently. A rotated source is sampled
+through the existing actual plane and full point transform. The receiving grid
+must still be cardinal at the original strict tolerance, and topology construction
+must still prove that every receiving seed occupies one integer coordinate plane.
+The rotated receiving direction remains unsupported and falls back to native
+lighting. No portal or world geometry is changed to satisfy the solver.
+
+Unsupported orientation is reported when an endpoint first appears or changes
+support state, with at most 32 remembered endpoint states. Normal motion within
+an unsupported orientation does not log every tick. Existing field/size/global/
+shape/scaling bounds and shader guards remain in force. Regression tests cover
+the saved normal, both directions, full rotated-source sampling, opaque bounds,
+and rejection of a nonplanar receiving map. Live activation, color continuity,
+and cost require a new run; the game was handed back after the .40 run.
+
+
+The .41 local matrix passed all 345 tests on each DH version, 3.3.2 and 3.3.3,
+with no failures, errors or skips. Both produced the same JAR; the supplied native
+DLL is unchanged. These results do not establish live field activation.
+
+The paired .40 probe terminated after 11 frames when a menu opened, before the
+six off/on/off room screenshots. Separate state/image receipts exist, but that
+probe cannot measure their latency. The 215-frame crossing independently proves
+zero active regions throughout. Future trials must verify nonzero regions and
+point coverage before interpreting visual changes as evidence for this feature.

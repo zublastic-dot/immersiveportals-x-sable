@@ -78,6 +78,7 @@ public final class PortalLighting {
     // Value identity survives unloading/recreation of the destination portal entity.
     // The sample mapping also changes when either endpoint moves or is retargeted.
     private record Aperture(ClientLevel world, ClientLevel source, Map<Pos, Pos> samples, Pos inward) {}
+    private record Endpoint(UUID portal, ResourceKey<Level> target, boolean destination) {}
     private static final class Entry {
         PortalLightSnapshot.Snapshot snapshot;
         PortalLightPalette nativePalette, incomingPalette, referencePalette;
@@ -91,6 +92,9 @@ public final class PortalLighting {
     private static final Map<Aperture, Region> REGIONS = new HashMap<>();
     private static final Map<Aperture, Entry> ENTRIES = new HashMap<>();
     private static final Map<Aperture, String> REASONS = new HashMap<>();
+    // Report at most 32 current endpoint states. Continuous physical motion must
+    // not print a new rejection on every tick merely because its angle changed.
+    private static final Map<Endpoint, Boolean> TARGET_ORIENTATIONS = new HashMap<>();
     private static int tick;
     private static long revision, lastUpdateNanos;
     private static int lastTopologyBuilds, lastPropagationCount, lastPublishedRegions;
@@ -114,7 +118,7 @@ public final class PortalLighting {
         });
     }
     private static void clear() {
-        REGIONS.clear(); ENTRIES.clear(); PALETTES.clear(); REASONS.clear();
+        REGIONS.clear(); ENTRIES.clear(); PALETTES.clear(); REASONS.clear(); TARGET_ORIENTATIONS.clear();
         REVISIONS.clear(); revision++;
     }
     public static void capture(ClientLevel level, int[] pixels) {
@@ -187,14 +191,21 @@ public final class PortalLighting {
         }
         portals.sort(Comparator.comparing(Portal::getUUID));
         var apertures = new LinkedHashSet<Aperture>();
+        var observedOrientations = new HashSet<Endpoint>();
         for (Portal p : portals) {
             ClientLevel world = (ClientLevel) p.level();
             ClientLevel remote = worlds.stream().filter(w -> w.dimension().equals(p.dimensionTo)).findFirst().orElse(null);
             if (remote == null) continue;
             // Either endpoint can keep both views alive while DH draws retained geometry.
-            if (apertures.size() < 16) apertures.add(aperture(world, remote, p, false));
-            if (apertures.size() < 16) apertures.add(aperture(remote, world, p, true));
+            for (boolean destination : new boolean[]{false, true}) {
+                ClientLevel target = destination ? remote : world, source = destination ? world : remote;
+                Pos inward = receivingInward(p.getNormal(), p.getContentDirection(), destination);
+                reportOrientation(p, target, destination, inward != null, observedOrientations);
+                if (inward != null && apertures.size() < 16)
+                    apertures.add(aperture(target, source, p, destination, inward));
+            }
         }
+        TARGET_ORIENTATIONS.keySet().retainAll(observedOrientations);
         for (Aperture old : new ArrayList<>(ENTRIES.keySet())) if (!apertures.contains(old)) {
             remove(old); ENTRIES.remove(old); REASONS.remove(old);
         }
@@ -298,23 +309,49 @@ public final class PortalLighting {
 
     private static boolean eligible(Portal p) {
         return !p.isRemoved() && !p.getIsGlobal() && p.getPortalShape() instanceof RectangularPortalShape
-            && Math.abs(p.getScaling() - 1) < 1e-6 && p.getWidth() <= 30 && p.getHeight() <= 30
-            && axisAligned(p.getNormal()) && axisAligned(p.getContentDirection());
+            && Math.abs(p.getScaling() - 1) < 1e-6 && p.getWidth() <= 30 && p.getHeight() <= 30;
     }
     private static boolean axisAligned(Vec3 n) {
-        return Math.max(Math.abs(n.x), Math.max(Math.abs(n.y), Math.abs(n.z))) > 0.999999;
+        return Double.isFinite(n.x) && Double.isFinite(n.y) && Double.isFinite(n.z)
+            && Math.max(Math.abs(n.x), Math.max(Math.abs(n.y), Math.abs(n.z))) > 0.999999;
     }
-    private static Aperture aperture(ClientLevel world, ClientLevel source, Portal p, boolean destination) {
-        var samples = new HashMap<Pos, Pos>(); Vec3 n = p.getNormal();
-        for (double v = -p.getHeight() / 2 + .5; v < p.getHeight() / 2; v++)
-            for (double u = -p.getWidth() / 2 + .5; u < p.getWidth() / 2; u++) {
-                Vec3 plane = p.getPointInPlane(u, v);
-                Pos here = pos(plane.add(n)), there = pos(p.transformPoint(plane.subtract(n)));
+    /** Only the receiving voxel grid must be cardinal; source positions use the full transform. */
+    static Pos receivingInward(Vec3 normal, Vec3 contentDirection, boolean destination) {
+        Vec3 direction = destination ? contentDirection : normal;
+        if (!axisAligned(direction)) return null;
+        Pos inward = new Pos((int) Math.round(direction.x), (int) Math.round(direction.y), (int) Math.round(direction.z));
+        return Math.abs(inward.x()) + Math.abs(inward.y()) + Math.abs(inward.z()) == 1 ? inward : null;
+    }
+    private static Aperture aperture(ClientLevel world, ClientLevel source, Portal p, boolean destination, Pos inward) {
+        return new Aperture(world, source, apertureSamples(p.getWidth(), p.getHeight(), p.getNormal(),
+            p::getPointInPlane, p::transformPoint, destination), inward);
+    }
+    @FunctionalInterface interface PlanePoint { Vec3 at(double u, double v); }
+    static Map<Pos, Pos> apertureSamples(double width, double height, Vec3 normal, PlanePoint planePoint,
+                                        java.util.function.UnaryOperator<Vec3> transform, boolean destination) {
+        var samples = new HashMap<Pos, Pos>();
+        for (double v = -height / 2 + .5; v < height / 2; v++)
+            for (double u = -width / 2 + .5; u < width / 2; u++) {
+                Vec3 plane = planePoint.at(u, v);
+                Pos here = pos(plane.add(normal)), there = pos(transform.apply(plane.subtract(normal)));
                 samples.put(destination ? there : here, destination ? here : there);
             }
-        Vec3 direction = destination ? p.getContentDirection() : n;
-        Pos inward = new Pos((int) Math.round(direction.x), (int) Math.round(direction.y), (int) Math.round(direction.z));
-        return new Aperture(world, source, Map.copyOf(samples), inward);
+        // Snapshot/buildTopology still proves all receiving cells occupy one integer
+        // plane. No normal rounding or larger angular tolerance relaxes that proof.
+        return Map.copyOf(samples);
+    }
+    private static void reportOrientation(Portal portal, ClientLevel target, boolean destination,
+                                          boolean supported, Set<Endpoint> observed) {
+        Endpoint endpoint = new Endpoint(portal.getUUID(), target.dimension(), destination);
+        if (!TARGET_ORIENTATIONS.containsKey(endpoint) && TARGET_ORIENTATIONS.size() >= 32) return;
+        observed.add(endpoint);
+        Boolean previous = TARGET_ORIENTATIONS.put(endpoint, supported);
+        if (!supported && !Boolean.FALSE.equals(previous)) LogUtils.getLogger().info(
+            "[IP portal light] portal {} target {}: unsupported receiving orientation {}; remote source orientation does not reject a cardinal target",
+            portal.getUUID(), target.dimension().location(), destination ? portal.getContentDirection() : portal.getNormal());
+        else if (supported && Boolean.FALSE.equals(previous)) LogUtils.getLogger().info(
+            "[IP portal light] portal {} target {}: receiving orientation supported again",
+            portal.getUUID(), target.dimension().location());
     }
     private static Pos pos(Vec3 point) {
         BlockPos p = BlockPos.containing(point); return new Pos(p.getX(), p.getY(), p.getZ());

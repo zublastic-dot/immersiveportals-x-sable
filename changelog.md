@@ -396,3 +396,14 @@ and arbitrary shader-pack lighting are not claimed.
 - Keep the known Colorful RGB path from .39 separate. Its engine can be disabled
   by an unsupported renderer dependency, so presence alone is not proof of use.
 - Candidate implementation: live acceptance must be recorded separately.
+
+
+## 0.5.1-zublastic.41 - admit rotated sources independently
+
+- Evaluate each receiving endpoint separately. A cardinal room can receive light
+  through the actual transform of a rotated source without admitting unsupported
+  rotated receiving grids. Retain the voxel-plane proof and opaque boundaries.
+- Report unsupported receiving orientation with bounded change-only diagnostics.
+- The .40 live run had zero active fields because its two-endpoint angle gate
+  rejected the slightly rotated physical portal. Those screenshots did not
+  validate .40's correction. Live .41 acceptance remains pending.
