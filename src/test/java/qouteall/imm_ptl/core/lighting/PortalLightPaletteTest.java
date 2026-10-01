@@ -52,4 +52,16 @@ class PortalLightPaletteTest {
         for(int sky=0;sky<16;sky++)for(int block=1;block<16;block++) nether[sky*16+block]=pixel(220,180,100);
         assertArrayEquals(before,new PortalLightPalette(nether).offset(source,11,0,1));
     }
+    @Test void cachedDeltaTablePreservesEveryPaletteEntryAndExposureWeight() {
+        int[] a=new int[256],b=new int[256];
+        for(int i=0;i<256;i++) { a[i]=pixel(i,255-i,i/2);b[i]=pixel(255-i,i/2,i); }
+        var local=new PortalLightPalette(a);var incoming=new PortalLightPalette(b);
+        var table=local.offsetTable(incoming);
+        for(int sky=0;sky<16;sky++) for(int block=0;block<16;block++) for(float weight:new float[]{0,.25f,.8f,1}) {
+            float[] delta=table[sky*16+block];
+            assertArrayEquals(local.offset(incoming,sky,block,weight),
+                new float[]{delta[0]*weight,delta[1]*weight,delta[2]*weight},1e-6f);
+        }
+        assertTrue(local.matches(a)); a[200]^=0xff; assertFalse(local.matches(a));
+    }
 }

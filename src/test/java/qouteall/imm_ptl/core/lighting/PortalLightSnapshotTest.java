@@ -83,4 +83,100 @@ class PortalLightSnapshotTest {
         assertTrue(result.field().available());
         assertTrue(result.field().cells().values().stream().allMatch(l->l.sky()==0&&l.block()==0));
     }
+    @Test void lightOnlyRefreshReadsEverySourceButNeverReadsTargetGeometry() {
+        var before=live();
+        var reads=new java.util.concurrent.atomic.AtomicInteger();
+        var refreshed=update(p->{fail("unchanged topology must not read target geometry");return Sample.UNKNOWN;},
+            p->{reads.incrementAndGet();return new Sample(Cell.OPEN,new Light(0,12));},
+            aperture(),new Pos(1,0,0),before.snapshot(),false);
+        assertEquals(aperture().size(),reads.get());
+        assertSame(before.snapshot().topology(),refreshed.snapshot().topology());
+        assertSame(before.snapshot().geometry(),refreshed.snapshot().geometry());
+        assertSame(before.field().replacement(),refreshed.field().replacement());
+        assertEquals(new Light(0,8),refreshed.field().cells().get(new Pos(4,4,5)));
+    }
+    @Test void loweredAndRemovedSourcesDoNotLeavePreviousBrightValues() {
+        Reader bright=p->new Sample(Cell.OPEN,new Light(0,15));
+        var before=update(this::room,bright,aperture(),new Pos(1,0,0),null,false);
+        var dimmed=update(p->Sample.UNKNOWN,p->new Sample(Cell.OPEN,new Light(0,7)),
+            aperture(),new Pos(1,0,0),before.snapshot(),false);
+        assertEquals(new Light(0,3),dimmed.field().cells().get(new Pos(4,4,5)));
+        var removed=update(p->Sample.UNKNOWN,p->new Sample(Cell.OPEN,new Light(0,0)),
+            aperture(),new Pos(1,0,0),dimmed.snapshot(),false);
+        assertTrue(removed.field().cells().values().stream().allMatch(l->l.equals(new Light(0,0))));
+        assertSame(before.snapshot().topology(),removed.snapshot().topology());
+    }
+    @Test void changedSourceOpacityTakesEffectWithoutTopologyInvalidation() {
+        var before=live();
+        var blocked=update(p->Sample.UNKNOWN,p->new Sample(Cell.CLOSED,new Light(15,15)),
+            aperture(),new Pos(1,0,0),before.snapshot(),false);
+        assertTrue(blocked.field().available());
+        assertTrue(blocked.field().cells().values().stream().allMatch(l->l.equals(new Light(0,0))));
+        assertSame(before.snapshot().topology(),blocked.snapshot().topology());
+        var opened=update(p->Sample.UNKNOWN,this::source,aperture(),new Pos(1,0,0),blocked.snapshot(),false);
+        assertEquals(before.field(),opened.field());
+    }
+    @Test void unchangedSourcesReuseResultAndBothMaps() {
+        var before=live();
+        var after=update(p->Sample.UNKNOWN,this::source,aperture(),new Pos(1,0,0),before.snapshot(),false);
+        assertSame(before.field(),after.field());
+        assertSame(before.field().cells(),after.field().cells());
+        assertSame(before.field().replacement(),after.field().replacement());
+    }
+    @Test void dirtyUnchangedOccupancyReusesTopologyWhileRefreshingMeasuredLight() {
+        var before=live();
+        var after=update(p->new Sample(room(p).cell(),new Light(0,14)),this::source,
+            aperture(),new Pos(1,0,0),before.snapshot(),true);
+        assertSame(before.snapshot().topology(),after.snapshot().topology());
+        assertSame(before.field(),after.field());
+        assertEquals(14,after.snapshot().geometry().get(new Pos(4,4,5)).light().block());
+    }
+    @Test void dirtyOpeningAndResealingRebuildVisibilityLocally() {
+        var before=live();
+        Reader opened=p->p.x()>5 || p.equals(new Pos(5,4,5)) ? new Sample(Cell.OPEN,new Light(0,0)) : room(p);
+        var hole=update(opened,this::source,aperture(),new Pos(1,0,0),before.snapshot(),true);
+        assertNotSame(before.snapshot().topology(),hole.snapshot().topology());
+        assertTrue(hole.field().replacement().get(new Pos(4,4,5))<1);
+        assertTrue(hole.field().replacement().get(new Pos(1,1,1))>.9);
+        var sealed=update(this::room,this::source,aperture(),new Pos(1,0,0),hole.snapshot(),true);
+        assertNotSame(hole.snapshot().topology(),sealed.snapshot().topology());
+        assertEquals(before.field(),sealed.field());
+    }
+    @Test void dirtyUnloadPreservesTopologyAndReloadReplacesKnownCells() {
+        var before=live();
+        var unloaded=update(p->Sample.UNKNOWN,p->Sample.UNKNOWN,aperture(),new Pos(1,0,0),before.snapshot(),true);
+        assertTrue(unloaded.usedCache());
+        assertSame(before.snapshot().topology(),unloaded.snapshot().topology());
+        assertSame(before.field(),unloaded.field());
+        var reload=update(p->p.x()==3 ? new Sample(Cell.CLOSED,new Light(0,0)) : Sample.UNKNOWN,
+            this::source,aperture(),new Pos(1,0,0),unloaded.snapshot(),true);
+        assertNotSame(unloaded.snapshot().topology(),reload.snapshot().topology());
+        assertFalse(reload.field().cells().containsKey(new Pos(4,4,5)));
+    }
+    @Test void snapshotContainsHaloDependenciesEvenWhenTheyAreNotReachable() {
+        var snapshot=live().snapshot();
+        // Aperture Y1..8/Z1..10, halo padding4, inward depth16, then grid's extra cell.
+        assertTrue(snapshot.geometry().containsKey(new Pos(0,-4,-4)));
+        assertTrue(snapshot.geometry().containsKey(new Pos(17,13,15)));
+        assertFalse(snapshot.field().cells().containsKey(new Pos(17,13,15)));
+    }
+    @Test void partialUnknownSourceDoesNotShrinkApertureOrAmbientVisibility() {
+        Reader partial=p->p.y()==4 && p.z()==5 ? source(p) : Sample.UNKNOWN;
+        var observed=update(this::room,partial,aperture(),new Pos(1,0,0),null,false);
+        assertTrue(observed.field().available());
+        assertEquals(live().field().cells().keySet(),observed.field().cells().keySet());
+        assertEquals(live().field().replacement(),observed.field().replacement());
+        var complete=update(p->Sample.UNKNOWN,this::source,aperture(),new Pos(1,0,0),observed.snapshot(),false);
+        assertSame(observed.snapshot().topology(),complete.snapshot().topology());
+        assertEquals(live().field(),complete.field());
+    }
+    @Test void retargetingOverridesCleanFlagAndDoesNotUseOldSourceSamples() {
+        var before=live();
+        var retargeted=new HashMap<Pos,Pos>();aperture().forEach((p,s)->retargeted.put(p,s.add(100,0,0)));
+        var after=update(p->Sample.UNKNOWN,p->Sample.UNKNOWN,retargeted,new Pos(1,0,0),before.snapshot(),false);
+        assertFalse(after.field().available());assertNull(after.snapshot());
+        var moved=new HashMap<Pos,Pos>();aperture().forEach((p,s)->moved.put(p.add(1,0,0),s));
+        var move=update(p->Sample.UNKNOWN,this::source,moved,new Pos(1,0,0),before.snapshot(),false);
+        assertFalse(move.field().available());assertNull(move.snapshot());
+    }
 }

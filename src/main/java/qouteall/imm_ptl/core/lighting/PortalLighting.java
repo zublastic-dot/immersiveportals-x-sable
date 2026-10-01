@@ -8,7 +8,8 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.NeoForge;
 import qouteall.imm_ptl.core.ClientWorldLoader;
-import qouteall.imm_ptl.core.IPGlobal;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.event.level.ChunkEvent;
 import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.imm_ptl.core.portal.shape.RectangularPortalShape;
@@ -22,28 +23,56 @@ public final class PortalLighting {
     // Value identity survives unloading/recreation of the destination portal entity.
     // The sample mapping also changes when either endpoint moves or is retargeted.
     private record Aperture(ClientLevel world, ClientLevel source, Map<Pos, Pos> samples, Pos inward) {}
+    private static final class Entry {
+        PortalLightSnapshot.Snapshot snapshot;
+        PortalLightPalette nativePalette, incomingPalette;
+        float[][] paletteOffsets;
+        boolean geometryDirty = true;
+        int retryAt;
+        Set<Long> geometryChunks = Set.of(), sourceChunks = Set.of();
+    }
     private static final Map<ClientLevel, PortalLightPalette> PALETTES = new WeakHashMap<>();
+    private static final Map<ClientLevel, Long> REVISIONS = new WeakHashMap<>();
     private static final Map<Aperture, Region> REGIONS = new HashMap<>();
-    private static final Map<Aperture, PortalLightSnapshot.Snapshot> SNAPSHOTS = new HashMap<>();
+    private static final Map<Aperture, Entry> ENTRIES = new HashMap<>();
     private static final Map<Aperture, String> REASONS = new HashMap<>();
-    private static int tick, cursor;
-    private static long revision;
+    private static int tick;
+    private static long revision, lastUpdateNanos;
+    private static int lastTopologyBuilds, lastPropagationCount, lastPublishedRegions;
     public static final boolean ENABLED = !Boolean.getBoolean("imm_ptl.disablePortalLightTransport");
     private PortalLighting() {}
 
     public static void init() {
-        NeoForge.EVENT_BUS.addListener(IPGlobal.PostClientTickEvent.class, event -> update());
+        // Sable dynamic lights refresh at LevelTickEvent.Post. IP's older tick event
+        // fires before that; sample at the end of the whole client tick instead.
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> update());
+        NeoForge.EVENT_BUS.addListener(ChunkEvent.Load.class, event -> {
+            if (event.getLevel() instanceof ClientLevel level)
+                chunkChanged(level, event.getChunk().getPos().x, event.getChunk().getPos().z);
+        });
+        NeoForge.EVENT_BUS.addListener(ChunkEvent.Unload.class, event -> {
+            if (event.getLevel() instanceof ClientLevel level)
+                chunkChanged(level, event.getChunk().getPos().x, event.getChunk().getPos().z);
+        });
         NeoForge.EVENT_BUS.addListener(de.nick1st.imm_ptl.events.ClientExitEvent.class, event -> {
             clear(); PortalLightGpu.clear();
         });
     }
     private static void clear() {
-        REGIONS.clear(); SNAPSHOTS.clear(); PALETTES.clear(); REASONS.clear(); revision++;
+        REGIONS.clear(); ENTRIES.clear(); PALETTES.clear(); REASONS.clear();
+        REVISIONS.clear(); revision++;
     }
     public static void capture(ClientLevel level, int[] pixels) {
-        if (level != null) PALETTES.put(level, new PortalLightPalette(pixels));
+        if (level == null) return;
+        PortalLightPalette previous = PALETTES.get(level);
+        if (previous == null || !previous.matches(pixels)) PALETTES.put(level, new PortalLightPalette(pixels));
     }
     public static long revision() { return revision; }
+    public static long revision(ClientLevel level) { return REVISIONS.getOrDefault(level, 0L); }
+    public static long lastUpdateNanos() { return lastUpdateNanos; }
+    public static int lastTopologyBuilds() { return lastTopologyBuilds; }
+    public static int lastPropagationCount() { return lastPropagationCount; }
+    public static int lastPublishedRegions() { return lastPublishedRegions; }
     public static List<Region> regions(ClientLevel level) {
         if (!ENABLED || IrisInterface.invoker.isShaders()) return List.of();
         return REGIONS.values().stream().filter(r -> r.world == level)
@@ -51,13 +80,50 @@ public final class PortalLighting {
                 .thenComparingInt(r -> r.min.y()).thenComparingInt(r -> r.min.z())).limit(4).toList();
     }
 
+    /** Called only for actual air/solid classification changes, never light-engine writes. */
+    public static void blockChanged(ClientLevel world, BlockPos position) {
+        Pos p = new Pos(position.getX(), position.getY(), position.getZ());
+        ENTRIES.forEach((aperture, entry) -> {
+            if (aperture.world == world && (entry.snapshot == null || entry.snapshot.geometry().containsKey(p))) {
+                entry.geometryDirty = true; entry.retryAt = 0;
+            }
+        });
+    }
+    private static void chunkChanged(ClientLevel world, int x, int z) {
+        ENTRIES.forEach((aperture, entry) -> {
+            long chunk = chunkKey(x, z);
+            if (aperture.world == world && (entry.snapshot == null || entry.geometryChunks.contains(chunk))) {
+                entry.geometryDirty = true; entry.retryAt = 0;
+            }
+            if (aperture.source == world && entry.sourceChunks.contains(chunk)) entry.retryAt = 0;
+        });
+    }
+    private static long chunkKey(int x, int z) { return ((long) x << 32) | (z & 0xffffffffL); }
+    private static Set<Long> chunks(Collection<Pos> positions) {
+        Set<Long> result = new HashSet<>();
+        for (Pos p : positions) result.add(chunkKey(p.x() >> 4, p.z() >> 4));
+        return Set.copyOf(result);
+    }
+    private static void changed(ClientLevel world) {
+        revision++; REVISIONS.put(world, revision);
+    }
+    private static void remove(Aperture aperture) {
+        if (REGIONS.remove(aperture) != null) changed(aperture.world);
+    }
+
     private static void update() {
+        long started = System.nanoTime();
+        lastTopologyBuilds = lastPropagationCount = lastPublishedRegions = 0;
+        try { updateFields(); }
+        finally { lastUpdateNanos = System.nanoTime() - started; }
+    }
+    private static void updateFields() {
         Minecraft mc = Minecraft.getInstance(); tick++;
         if (mc.level == null || !ClientWorldLoader.getIsInitialized()) {
-            if (!REGIONS.isEmpty() || !PALETTES.isEmpty()) clear();
+            if (!ENTRIES.isEmpty() || !PALETTES.isEmpty()) clear();
             return;
         }
-        if (!ENABLED || IrisInterface.invoker.isShaders() || tick % 5 != 0) return;
+        if (!ENABLED || IrisInterface.invoker.isShaders() || mc.isPaused()) return;
         var worlds = new ArrayList<>(ClientWorldLoader.getClientWorlds());
         PortalLightGpu.retain(worlds);
         var portals = new ArrayList<Portal>();
@@ -70,40 +136,68 @@ public final class PortalLighting {
             ClientLevel world = (ClientLevel) p.level();
             ClientLevel remote = worlds.stream().filter(w -> w.dimension().equals(p.dimensionTo)).findFirst().orElse(null);
             if (remote == null) continue;
-            // Either endpoint can keep both views alive. DH may still draw an enclosure
-            // after vanilla has unloaded its chunks and the portal entity inside them.
+            // Either endpoint can keep both views alive while DH draws retained geometry.
             if (apertures.size() < 16) apertures.add(aperture(world, remote, p, false));
             if (apertures.size() < 16) apertures.add(aperture(remote, world, p, true));
         }
-        boolean removed = REGIONS.keySet().removeIf(a -> !apertures.contains(a));
-        SNAPSHOTS.keySet().retainAll(apertures); REASONS.keySet().retainAll(apertures);
-        if (removed) revision++;
+        for (Aperture old : new ArrayList<>(ENTRIES.keySet())) if (!apertures.contains(old)) {
+            remove(old); ENTRIES.remove(old); REASONS.remove(old);
+        }
         if (apertures.isEmpty()) return;
-        Aperture a = new ArrayList<>(apertures).get(Math.floorMod(cursor++, apertures.size()));
-        var result = PortalLightSnapshot.update(p -> sample(a.world, p, false),
-            p -> sample(a.source, p, true), a.samples, a.inward, SNAPSHOTS.get(a));
-        if (!result.field().available()) {
-            SNAPSHOTS.remove(a);
-            if (REGIONS.remove(a) != null) revision++;
-            report(a, result.field().reason()); return;
+        var paletteWorlds = Collections.newSetFromMap(new IdentityHashMap<ClientLevel, Boolean>());
+        for (Aperture a : apertures) { paletteWorlds.add(a.world); paletteWorlds.add(a.source); }
+        for (ClientLevel world : paletteWorlds) refreshPalette(world);
+        // Every field observes current sources this tick; only topology rebuilds are
+        // expensive. Item movement and light storage updates never dirty topology.
+        for (Aperture a : apertures) {
+            Entry entry = ENTRIES.computeIfAbsent(a, ignored -> {
+                Entry created = new Entry(); created.sourceChunks = chunks(a.samples.values()); return created;
+            });
+            if (entry.snapshot == null && tick < entry.retryAt) continue;
+            var previous = entry.snapshot;
+            var result = PortalLightSnapshot.update(p -> sample(a.world, p, false),
+                p -> sample(a.source, p, true), a.samples, a.inward, previous, entry.geometryDirty);
+            entry.geometryDirty = false;
+            if (!result.field().available()) {
+                entry.snapshot = null; entry.retryAt = tick + 5; remove(a);
+                report(a, result.field().reason()); continue;
+            }
+            entry.snapshot = result.snapshot();
+            if (previous == null || previous.topology() != entry.snapshot.topology()) {
+                lastTopologyBuilds++; entry.geometryChunks = chunks(entry.snapshot.geometry().keySet());
+            }
+            if (previous == null || previous.field() != result.field()) lastPropagationCount++;
+            PortalLightPalette nativePalette = PALETTES.get(a.world), incoming = PALETTES.get(a.source);
+            if (nativePalette == null || incoming == null) {
+                remove(a); report(a, "lightmap unavailable"); continue;
+            }
+            if (previous != null && previous.field() == result.field() && entry.nativePalette == nativePalette
+                    && entry.incomingPalette == incoming && REGIONS.containsKey(a)) continue;
+            if (entry.nativePalette != nativePalette || entry.incomingPalette != incoming || entry.paletteOffsets == null)
+                entry.paletteOffsets = nativePalette.offsetTable(incoming);
+            entry.nativePalette = nativePalette; entry.incomingPalette = incoming;
+            var offsets = new HashMap<Pos, float[]>();
+            int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
+            for (var cell : result.field().cells().entrySet()) {
+                Pos p = cell.getKey(); Light light = cell.getValue();
+                float[] delta = entry.paletteOffsets[light.sky() * 16 + light.block()];
+                float weight = result.field().replacement().get(p);
+                offsets.put(p, new float[]{delta[0] * weight, delta[1] * weight, delta[2] * weight});
+                minX = Math.min(minX, p.x()); minY = Math.min(minY, p.y()); minZ = Math.min(minZ, p.z());
+            }
+            Pos min = new Pos(minX, minY, minZ);
+            Region old = REGIONS.get(a);
+            if (old == null || !old.min.equals(min) || !sameOffsets(old.offsets, offsets)) {
+                REGIONS.put(a, new Region(a.world, min, Map.copyOf(offsets)));
+                changed(a.world); lastPublishedRegions++;
+            }
+            report(a, "transport cells=" + offsets.size());
         }
-        SNAPSHOTS.put(a, result.snapshot());
-        refreshPalette(a.world); refreshPalette(a.source);
-        PortalLightPalette nativePalette = PALETTES.get(a.world), incoming = PALETTES.get(a.source);
-        if (nativePalette == null || incoming == null) {
-            if (REGIONS.remove(a) != null) revision++;
-            report(a, "lightmap unavailable"); return;
-        }
-        var offsets = new HashMap<Pos, float[]>();
-        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
-        for (var entry : result.field().cells().entrySet()) {
-            Pos p = entry.getKey(); Light light = entry.getValue();
-            offsets.put(p, nativePalette.offset(incoming, light.sky(), light.block(),
-                result.field().replacement().get(p)));
-            minX = Math.min(minX, p.x()); minY = Math.min(minY, p.y()); minZ = Math.min(minZ, p.z());
-        }
-        REGIONS.put(a, new Region(a.world, new Pos(minX, minY, minZ), Map.copyOf(offsets))); revision++;
-        report(a, "transport cells=" + offsets.size() + (result.usedCache() ? " (cached geometry/light levels; current lightmaps)" : " (live)"));
+    }
+    static boolean sameOffsets(Map<Pos, float[]> a, Map<Pos, float[]> b) {
+        if (a.size() != b.size()) return false;
+        for (var entry : a.entrySet()) if (!Arrays.equals(entry.getValue(), b.get(entry.getKey()))) return false;
+        return true;
     }
 
     private static boolean eligible(Portal p) {

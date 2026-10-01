@@ -8,9 +8,17 @@ public final class PortalLightPalette {
         if (pixels.length != 256) throw new IllegalArgumentException("16 by 16 lightmap required");
         abgr=pixels.clone();
     }
+    public boolean matches(int[] pixels) { return java.util.Arrays.equals(abgr, pixels); }
     public float[] rgb(int sky, int block) {
         int p=abgr[Math.clamp(sky,0,15)*16+Math.clamp(block,0,15)];
         return new float[]{(p&255)/255f,((p>>>8)&255)/255f,((p>>>16)&255)/255f};
+    }
+    /** Reused for every cell sharing these two palettes, rather than allocating four RGB arrays per cell. */
+    public float[][] offsetTable(PortalLightPalette incoming) {
+        float[][] result = new float[256][];
+        for (int sky = 0; sky < 16; sky++) for (int block = 0; block < 16; block++)
+            result[sky * 16 + block] = offset(incoming, sky, block, 1);
+        return result;
     }
     public float[] offset(PortalLightPalette incoming, int remoteSky, int remoteBlock, float replacement) {
         float weight=Math.clamp(replacement,0,1);

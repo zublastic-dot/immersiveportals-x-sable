@@ -83,6 +83,7 @@
     "client.MixinAbstractClientPlayer",
     "client.MixinClientConnection",
     "client.MixinClientLevel",
+    "client.MixinPortalLightGeometry",
     "client.MixinDebugScreenOverlay",
     "client.MixinGlDebug",
     "client.MixinLivingEntity_C",

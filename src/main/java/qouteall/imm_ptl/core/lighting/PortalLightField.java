@@ -19,21 +19,46 @@ public final class PortalLightField {
     public record Result(Map<Pos, Light> cells, Map<Pos, Float> replacement, String reason) {
         public boolean available() { return reason.equals("transport"); }
     }
+    /** Geometry-only proof: dense support, reachable-cell adjacency and ambient visibility. */
+    public static final class Topology {
+        private final Grid grid;
+        private final Pos[] positions;
+        private final Map<Pos,Integer> ordinal;
+        private final int[] neighbors;
+        private final Map<Pos,Float> replacement;
+        private final String reason;
+
+        private Topology(Grid grid, Pos[] positions, Map<Pos,Integer> ordinal, int[] neighbors,
+                         Map<Pos,Float> replacement, String reason) {
+            this.grid=grid;this.positions=positions;this.ordinal=ordinal;this.neighbors=neighbors;
+            this.replacement=replacement;this.reason=reason;
+        }
+        public boolean available() { return reason.equals("transport"); }
+        public String reason() { return reason; }
+        public int cellCount() { return positions.length; }
+        private static Topology rejected(String reason) {
+            return new Topology(null,new Pos[0],Map.of(),new int[0],Map.of(),reason);
+        }
+    }
     private static final int[][] DIRECTIONS = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
     private static final List<Ray> RAYS = rays();
     private static final int DEPTH = 16, HALO = 4;
     private PortalLightField() {}
 
     public static Result solve(World world, Map<Pos, Light> seeds, Pos inward, int maxExtent) {
-        if(seeds.isEmpty()) return rejected("no aperture");
+        return propagate(buildTopology(world,seeds.keySet(),inward,maxExtent),seeds);
+    }
+
+    public static Topology buildTopology(World world, Set<Pos> aperture, Pos inward, int maxExtent) {
+        if(aperture.isEmpty()) return Topology.rejected("no aperture");
         if(Math.abs(inward.x)+Math.abs(inward.y)+Math.abs(inward.z)!=1 || maxExtent<1 || maxExtent>32)
-            return rejected("unsupported bounds");
+            return Topology.rejected("unsupported bounds");
         int axis=inward.x!=0?0:inward.y!=0?1:2, sign=inward.component(axis);
-        int plane=seeds.keySet().iterator().next().component(axis);
-        if(seeds.keySet().stream().anyMatch(p->p.component(axis)!=plane)) return rejected("nonplanar aperture");
+        int plane=aperture.iterator().next().component(axis);
+        if(aperture.stream().anyMatch(p->p.component(axis)!=plane)) return Topology.rejected("nonplanar aperture");
         int[] min={Integer.MAX_VALUE,Integer.MAX_VALUE,Integer.MAX_VALUE};
         int[] max={Integer.MIN_VALUE,Integer.MIN_VALUE,Integer.MIN_VALUE};
-        for(Pos p:seeds.keySet()) for(int a=0;a<3;a++) {
+        for(Pos p:aperture) for(int a=0;a<3;a++) {
             min[a]=Math.min(min[a],p.component(a));max[a]=Math.max(max[a],p.component(a));
         }
         for(int a=0;a<3;a++) {
@@ -41,40 +66,30 @@ public final class PortalLightField {
                 if(sign>0) max[a]+=Math.min(DEPTH,maxExtent)-1;else min[a]-=Math.min(DEPTH,maxExtent)-1;
             } else {
                 int width=max[a]-min[a]+1;
-                if(width>maxExtent) return rejected("unsupported bounds");
+                if(width>maxExtent) return Topology.rejected("unsupported bounds");
                 int pad=Math.min(HALO,(maxExtent-width)/2);min[a]-=pad;max[a]+=pad;
             }
         }
-        var grid=new Grid(world,min,max,axis,sign,seeds.keySet());
-        var cells=new HashMap<Pos,Light>();
+        var grid=new Grid(world,min,max,axis,sign,aperture);
+        var cells=new LinkedHashSet<Pos>();
         var queue=new ArrayDeque<Pos>();
-        for(var seed:seeds.entrySet()) if(grid.cell(seed.getKey())==Cell.OPEN) {
-            cells.put(seed.getKey(),seed.getValue());queue.add(seed.getKey());
+        for(Pos seed:aperture) if(grid.cell(seed)==Cell.OPEN) {
+            cells.add(seed);queue.add(seed);
         }
-        if(cells.isEmpty()) return rejected("blocked or unloaded aperture");
+        if(cells.isEmpty()) return Topology.rejected("blocked or unloaded aperture");
         // Fixed support bounds work even for open terrain. Neither a hole nor an
         // unknown boundary discards other known cells. No unbounded flood is attempted.
         while(!queue.isEmpty()) {
             Pos p=queue.removeFirst();
             for(int[] d:DIRECTIONS) {
                 Pos next=p.add(d[0],d[1],d[2]);
-                if(grid.contains(next) && !cells.containsKey(next) && grid.cell(next)==Cell.OPEN) {
-                    cells.put(next,new Light(0,0));queue.add(next);
+                if(grid.contains(next) && !cells.contains(next) && grid.cell(next)==Cell.OPEN) {
+                    cells.add(next);queue.add(next);
                 }
             }
         }
-        for(Pos p:seeds.keySet()) if(cells.containsKey(p)) queue.add(p);
-        while(!queue.isEmpty()) {
-            Pos p=queue.removeFirst();Light propagated=cells.get(p).step();
-            for(int[] d:DIRECTIONS) {
-                Pos next=p.add(d[0],d[1],d[2]);Light old=cells.get(next);
-                if(old==null) continue;
-                Light merged=old.max(propagated);
-                if(!old.equals(merged)) { cells.put(next,merged);queue.add(next); }
-            }
-        }
         var replacement=new HashMap<Pos,Float>();
-        for(Pos p:cells.keySet()) {
+        for(Pos p:cells) {
             int localViews=0,portalViews=0;
             for(Ray ray:RAYS) {
                 int exit=grid.trace(p,ray);
@@ -86,7 +101,46 @@ public final class PortalLightField {
             float weight=localViews==0?1f:(float)portalViews/(localViews+portalViews);
             replacement.put(p,weight*(localViews==0?1:grid.edgeFade(p)));
         }
-        return new Result(Map.copyOf(cells),Map.copyOf(replacement),"transport");
+        Pos[] positions=cells.toArray(Pos[]::new);
+        var ordinal=new HashMap<Pos,Integer>();
+        for(int i=0;i<positions.length;i++) ordinal.put(positions[i],i);
+        int[] neighbors=new int[positions.length*DIRECTIONS.length];Arrays.fill(neighbors,-1);
+        for(int i=0;i<positions.length;i++) for(int d=0;d<DIRECTIONS.length;d++) {
+            int[] direction=DIRECTIONS[d];Pos p=positions[i].add(direction[0],direction[1],direction[2]);
+            neighbors[i*DIRECTIONS.length+d]=ordinal.getOrDefault(p,-1);
+        }
+        return new Topology(grid,positions,Map.copyOf(ordinal),neighbors,Map.copyOf(replacement),"transport");
+    }
+
+    /** Rebuild only light values from the current seeds, so decreases cannot leave stale light. */
+    public static Result propagate(Topology topology, Map<Pos,Light> seeds) {
+        if(!topology.available()) return rejected(topology.reason);
+        int count=topology.positions.length;
+        byte[] sky=new byte[count],block=new byte[count];
+        int[] queue=new int[count];boolean[] queued=new boolean[count];
+        int head=0,tail=0,pending=0;
+        for(var seed:seeds.entrySet()) {
+            Integer index=topology.ordinal.get(seed.getKey());
+            if(index==null || !topology.grid.aperture[topology.grid.index(seed.getKey().x,seed.getKey().y,seed.getKey().z)]) continue;
+            Light light=seed.getValue();
+            sky[index]=(byte)Math.max(sky[index],light.sky);block[index]=(byte)Math.max(block[index],light.block);
+            if((sky[index]>0 || block[index]>0) && !queued[index]) {
+                queue[tail]=index;tail=(tail+1)%count;pending++;queued[index]=true;
+            }
+        }
+        while(pending>0) {
+            int index=queue[head];head=(head+1)%count;pending--;queued[index]=false;
+            int nextSky=Math.max(0,sky[index]-1),nextBlock=Math.max(0,block[index]-1);
+            for(int direction=0;direction<DIRECTIONS.length;direction++) {
+                int next=topology.neighbors[index*DIRECTIONS.length+direction];
+                if(next<0 || (sky[next]>=nextSky && block[next]>=nextBlock)) continue;
+                sky[next]=(byte)Math.max(sky[next],nextSky);block[next]=(byte)Math.max(block[next],nextBlock);
+                if(!queued[next]) { queue[tail]=next;tail=(tail+1)%count;pending++;queued[next]=true; }
+            }
+        }
+        var cells=new HashMap<Pos,Light>();
+        for(int i=0;i<count;i++) cells.put(topology.positions[i],new Light(sky[i],block[i]));
+        return new Result(Map.copyOf(cells),topology.replacement,"transport");
     }
 
     /** Dense immutable geometry makes the visibility loop allocation-free. */

@@ -364,3 +364,11 @@ Atlas hardening since the 0.5.0 merge (PR #15):
 ### .30 — remove invisible portal light emission
 
 Portal placeholder blocks now emit zero block light. Existing breakable portal entities recheck their placeholder lighting once per entity load, at most 64 positions per tick, deferring unloaded chunks without force loading. Sable frame coordinates use the plot-hosting level. This removes the old fixed level-15 lamp; it does not implement destination-colored lighting or alter shader frame blending. Existing orphan placeholders without a portal entity are not proactively scanned.
+
+
+## 0.5.1-zublastic.38
+
+Refresh portal light sources each late client tick using cached geometry and
+visibility. Recompute decreasing light promptly; invalidate structure on block
+and chunk changes. Reuse palette tables and GPU atlas storage, uploading only
+changed regions. Adds bounded CPU update timing for the diagnostic probes.
