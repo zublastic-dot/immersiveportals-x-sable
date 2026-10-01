@@ -4,7 +4,11 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.dimension.BuiltinDimensionTypes;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.NeoForge;
 import qouteall.imm_ptl.core.ClientWorldLoader;
@@ -19,8 +23,29 @@ import static qouteall.imm_ptl.core.lighting.PortalLightField.*;
 
 /** Client-only trial. No light storage writes, chunk loads, server hooks or room coordinates. */
 public final class PortalLighting {
+    /** Transported scalar coordinates and immutable lightmaps for the known vanilla palette path. */
+    public record VanillaData(Map<Pos, float[]> cells, PortalLightPalette nativePalette,
+                              PortalLightPalette referencePalette) {
+        public VanillaData {
+            Objects.requireNonNull(nativePalette); Objects.requireNonNull(referencePalette);
+            var copy = new HashMap<Pos, float[]>();
+            cells.forEach((pos, value) -> {
+                if (value == null || value.length != 3 || !Float.isFinite(value[0])
+                        || !Float.isFinite(value[1]) || !Float.isFinite(value[2])
+                        || value[0] < 0 || value[0] > 15 || value[1] < 0 || value[1] > 15
+                        || value[2] < 0 || value[2] > 1)
+                    throw new IllegalArgumentException("Vanilla portal cells require sky, block and replacement weight");
+                copy.put(pos, value.clone());
+            });
+            cells = Map.copyOf(copy);
+        }
+        boolean matches(VanillaData other) {
+            return other != null && nativePalette == other.nativePalette
+                && referencePalette == other.referencePalette && sameOffsets(cells, other.cells);
+        }
+    }
     public record Region(ClientLevel world, Pos min, Map<Pos, float[]> offsets,
-                         Map<Pos, float[]> ambientOffsets) {
+                         Map<Pos, float[]> ambientOffsets, VanillaData vanilla) {
         public Region {
             Objects.requireNonNull(min);
             if (offsets == ambientOffsets) {
@@ -30,13 +55,24 @@ public final class PortalLighting {
                     throw new IllegalArgumentException("Portal light banks must cover the same cells");
                 offsets = Map.copyOf(offsets); ambientOffsets = Map.copyOf(ambientOffsets);
             }
+            if (vanilla != null && !offsets.keySet().equals(vanilla.cells.keySet()))
+                throw new IllegalArgumentException("Vanilla portal metadata must cover the light banks");
+        }
+        /** Compatibility for consumers of the total and ambient banks. */
+        public Region(ClientLevel world, Pos min, Map<Pos, float[]> offsets,
+                      Map<Pos, float[]> ambientOffsets) {
+            this(world, min, offsets, ambientOffsets, null);
         }
         /** Compatibility for total-only callers; runtime publishes the actual ambient split. */
         public Region(ClientLevel world, Pos min, Map<Pos, float[]> offsets) {
             this(world, min, offsets, offsets);
         }
         boolean matches(Pos nextMin, Map<Pos, float[]> total, Map<Pos, float[]> ambient) {
-            return min.equals(nextMin) && sameOffsets(offsets, total) && sameOffsets(ambientOffsets, ambient);
+            return matches(nextMin, total, ambient, null);
+        }
+        boolean matches(Pos nextMin, Map<Pos, float[]> total, Map<Pos, float[]> ambient, VanillaData nextVanilla) {
+            return min.equals(nextMin) && sameOffsets(offsets, total) && sameOffsets(ambientOffsets, ambient)
+                && (vanilla == null ? nextVanilla == null : vanilla.matches(nextVanilla));
         }
     }
     // Value identity survives unloading/recreation of the destination portal entity.
@@ -44,7 +80,7 @@ public final class PortalLighting {
     private record Aperture(ClientLevel world, ClientLevel source, Map<Pos, Pos> samples, Pos inward) {}
     private static final class Entry {
         PortalLightSnapshot.Snapshot snapshot;
-        PortalLightPalette nativePalette, incomingPalette;
+        PortalLightPalette nativePalette, incomingPalette, referencePalette;
         float[][] paletteOffsets;
         boolean geometryDirty = true;
         int retryAt;
@@ -190,12 +226,15 @@ public final class PortalLighting {
             if (nativePalette == null || incoming == null) {
                 remove(a); report(a, "lightmap unavailable"); continue;
             }
+            PortalLightPalette reference = vanillaReference(a.world, a.source, nativePalette, incoming);
             if (previous != null && previous.field() == result.field() && entry.nativePalette == nativePalette
-                    && entry.incomingPalette == incoming && REGIONS.containsKey(a)) continue;
+                    && entry.incomingPalette == incoming && entry.referencePalette == reference
+                    && REGIONS.containsKey(a)) continue;
             if (entry.nativePalette != nativePalette || entry.incomingPalette != incoming || entry.paletteOffsets == null)
                 entry.paletteOffsets = nativePalette.offsetTable(incoming);
-            entry.nativePalette = nativePalette; entry.incomingPalette = incoming;
+            entry.nativePalette = nativePalette; entry.incomingPalette = incoming; entry.referencePalette = reference;
             var offsets = new HashMap<Pos, float[]>();
+            Map<Pos, float[]> vanillaCells = reference == null ? null : new HashMap<>();
             // Most dark fields have no incoming block light: share their maps/arrays
             // until the first cell actually needs a distinct ambient bank.
             Map<Pos, float[]> ambientOffsets = null;
@@ -204,6 +243,7 @@ public final class PortalLighting {
                 Pos p = cell.getKey(); Light light = cell.getValue();
                 float[] delta = entry.paletteOffsets[light.sky() * 16 + light.block()];
                 float weight = result.field().replacement().get(p);
+                if (vanillaCells != null) vanillaCells.put(p, new float[]{light.sky(), light.block(), weight});
                 float[] total = new float[]{delta[0] * weight, delta[1] * weight, delta[2] * weight};
                 offsets.put(p, total);
                 if (light.block() != 0 && ambientOffsets == null) ambientOffsets = new HashMap<>(offsets);
@@ -216,9 +256,10 @@ public final class PortalLighting {
             }
             Pos min = new Pos(minX, minY, minZ);
             if (ambientOffsets == null) ambientOffsets = offsets;
+            VanillaData vanilla = vanillaCells == null ? null : new VanillaData(vanillaCells, nativePalette, reference);
             Region old = REGIONS.get(a);
-            if (old == null || !old.matches(min, offsets, ambientOffsets)) {
-                REGIONS.put(a, new Region(a.world, min, offsets, ambientOffsets));
+            if (old == null || !old.matches(min, offsets, ambientOffsets, vanilla)) {
+                REGIONS.put(a, new Region(a.world, min, offsets, ambientOffsets, vanilla));
                 changed(a.world); lastPublishedRegions++;
             }
             report(a, "transport cells=" + offsets.size());
@@ -228,6 +269,31 @@ public final class PortalLighting {
         if (a.size() != b.size()) return false;
         for (var entry : a.entrySet()) if (!Arrays.equals(entry.getValue(), b.get(entry.getKey()))) return false;
         return true;
+    }
+
+    private static PortalLightPalette vanillaReference(ClientLevel world, ClientLevel source,
+                                                       PortalLightPalette nativePalette, PortalLightPalette incoming) {
+        if (!vanillaPair(world.dimension(), source.dimension(), world.dimensionType().effectsLocation(),
+                source.dimensionType().effectsLocation(), world.dimensionType().ambientLight(),
+                source.dimensionType().ambientLight(), world.effects().forceBrightLightmap(),
+                source.effects().forceBrightLightmap())) return null;
+        // Both directions use the same metadata-selected reference. Day, gamma,
+        // palette flicker and camera crossing cannot flip it by changing RGB floors.
+        return world.dimension().equals(Level.OVERWORLD) ? nativePalette : incoming;
+    }
+
+    static boolean vanillaPair(ResourceKey<Level> world, ResourceKey<Level> source,
+                               ResourceLocation worldEffects, ResourceLocation sourceEffects,
+                               float worldAmbient, float sourceAmbient,
+                               boolean worldForceBright, boolean sourceForceBright) {
+        if (worldForceBright || sourceForceBright || !Float.isFinite(worldAmbient)
+                || !Float.isFinite(sourceAmbient)) return false;
+        boolean worldOverworld = world.equals(Level.OVERWORLD) && source.equals(Level.NETHER);
+        boolean sourceOverworld = source.equals(Level.OVERWORLD) && world.equals(Level.NETHER);
+        if (!worldOverworld && !sourceOverworld) return false;
+        return worldEffects.equals(worldOverworld ? BuiltinDimensionTypes.OVERWORLD_EFFECTS : BuiltinDimensionTypes.NETHER_EFFECTS)
+            && sourceEffects.equals(worldOverworld ? BuiltinDimensionTypes.NETHER_EFFECTS : BuiltinDimensionTypes.OVERWORLD_EFFECTS)
+            && (worldOverworld ? worldAmbient < sourceAmbient : sourceAmbient < worldAmbient);
     }
 
     private static boolean eligible(Portal p) {

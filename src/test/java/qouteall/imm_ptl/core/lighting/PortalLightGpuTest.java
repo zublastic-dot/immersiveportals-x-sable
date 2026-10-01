@@ -38,14 +38,14 @@ class PortalLightGpuTest {
         atlas=glGenTextures();glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_3D,atlas);
         glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
         glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_R,GL_CLAMP_TO_EDGE);
-        var values=BufferUtils.createFloatBuffer(32*32*256*4);
+        var values=BufferUtils.createFloatBuffer(32*64*256*4);
         for(int z=0;z<256;z++) for(int y=0;y<32;y++) for(int x=0;x<32;x++) {
-            int i=((z*32+y)*32+x)*4;
+            int i=((z*64+y)*32+x)*4;
             int slotZ=z%128;
             if(slotZ<32 && y<2) { values.put(i,-.48f);values.put(i+1,-.42f);values.put(i+2,-.24f);values.put(i+3,1); }
             if(slotZ>=32 && slotZ<64 && y<2) { values.put(i,-.18f);values.put(i+1,-.24f);values.put(i+2,-.48f);values.put(i+3,1); }
         }
-        glTexImage3D(GL_TEXTURE_3D,0,GL_RGBA16F,32,32,256,0,GL_RGBA,GL_FLOAT,values);
+        glTexImage3D(GL_TEXTURE_3D,0,GL_RGBA16F,32,64,256,0,GL_RGBA,GL_FLOAT,values);
         glUniform1i(glGetUniformLocation(program,"ipPortalLightAtlas"),0);
         glUniform1i(glGetUniformLocation(program,"ipPortalLightCount"),1);
         for(int i=0;i<4;i++)glUniform3f(glGetUniformLocation(program,"ipPortalLightOrigin["+i+"]"),i*40,0,0);
@@ -100,7 +100,7 @@ class PortalLightGpuTest {
     }
     @Test void actualDhShaderPairCompilesWithTransport() throws Exception {
         String path="assets/distanthorizons/shaders/terrain/gl/frag.frag";
-        String f=PortalLightShaders.dh(path,resource(path));assertTrue(f.contains("ipPortalLightDelta(vertexWorldPos,ipPortalNativeLight)"));
+        String f=PortalLightShaders.dh(path,resource(path));assertTrue(f.contains("ipPortalLightDelta(vertexWorldPos,ipPortalNativeLight,ipPortalVanillaLightUv)"));
         String vp="assets/distanthorizons/shaders/terrain/gl/vert.vert";
         int p=link(PortalLightShaders.dh(vp,resource(vp)),f);glDeleteProgram(p);
     }

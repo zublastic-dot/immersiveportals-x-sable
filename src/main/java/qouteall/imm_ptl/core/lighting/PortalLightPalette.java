@@ -24,6 +24,25 @@ public final class PortalLightPalette {
     public float[] ambientOffset(PortalLightPalette incoming, int remoteSky, float replacement) {
         return offset(incoming, remoteSky, 0, replacement);
     }
+    /**
+     * Known vanilla-path local/transported block response, separate from ambient replacement.
+     * The draw merges scalar strengths with max before sampling a shared reference palette;
+     * it never adds a second emitter RGB to an already lit native sample. Keep the sky row:
+     * gamma and clipping mean P(s,b)-P(s,0) cannot be replaced by the zero-sky curve.
+     * This is lightmap-space appearance, not linear radiance or a change to world light storage.
+     */
+    public float[] vanillaBlockOffset(PortalLightPalette reference, int nativeSky, int nativeBlock,
+                                      int remoteSky, int remoteBlock, float replacement) {
+        float weight = Math.clamp(replacement, 0, 1);
+        int sky = Math.max(nativeSky, remoteSky), block = Math.max(nativeBlock, remoteBlock);
+        float[] referenceLit = reference.rgb(sky, block), referenceAmbient = reference.rgb(sky, 0);
+        float[] nativeLit = rgb(nativeSky, nativeBlock), nativeAmbient = rgb(nativeSky, 0);
+        float[] result = new float[3];
+        for (int channel = 0; channel < 3; channel++)
+            result[channel] = weight * (referenceLit[channel] - referenceAmbient[channel]
+                - nativeLit[channel] + nativeAmbient[channel]);
+        return result;
+    }
     public float[] offset(PortalLightPalette incoming, int remoteSky, int remoteBlock, float replacement) {
         float weight=Math.clamp(replacement,0,1);
         float[] floor=rgb(0,0), imported=incoming.rgb(remoteSky,remoteBlock), remoteFloor=incoming.rgb(0,0);

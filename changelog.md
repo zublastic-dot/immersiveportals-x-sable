@@ -385,3 +385,14 @@ are hardcoded. The .38 refresh/cache behavior is retained.
 This corrects the local ambient/emitter calculation; transported block light
 still uses a scalar vanilla lightmap model. Full RGB continuity across a portal
 and arbitrary shader-pack lighting are not claimed.
+
+
+## 0.5.1-zublastic.40 - vanilla block-light response correction
+
+- Normalize the local and transported scalar block-light response in the supported
+  Overworld/Nether pair using current light coordinates and captured palettes.
+  Ambient replacement remains separate; overlapping local/imported levels use a
+  maximum instead of additive double lighting.
+- Keep the known Colorful RGB path from .39 separate. Its engine can be disabled
+  by an unsupported renderer dependency, so presence alone is not proof of use.
+- Candidate implementation: live acceptance must be recorded separately.

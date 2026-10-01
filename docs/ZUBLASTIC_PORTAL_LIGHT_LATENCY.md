@@ -94,3 +94,66 @@ must not be advertised as completing that remaining work.
 Bridge alpha.10 admits the unchanged public .39 field/timing ABI. Its legacy
 ambient_offset_rgb remains the total CPU offset, not this draw-time gain term.
 Live crossing acceptance is pending until a complete focused capture succeeds.
+
+
+## .40 follow-up: ordinary lightmap composition
+
+Live .39 crossing evidence (2026-10-01, runtime39-crossing.json) reproduced the
+warm-to-cold change in both traversal directions across 215 captured ticks.
+Current startup logs and installed bytecode establish that Colorful 2.5.1 rejects
+Veil 4.3.2 and disables its entire colored engine; the actual terrain shader is
+ordinary Sodium. Thus .39's Colorful-specific branch was not exercised in this
+live test. See colorful39-runtime-disabled.md in the owner artifact directory.
+
+Vanilla's dimension ambient affects the block-light response, including nonlinear
+RGB curves, clamping and gamma. Subtracting the dark native floor N(0,0) does not
+remove the ambient influence from N(s,b) at b>0. The current draw can therefore
+become colder while CPU field offsets remain unchanged. This is distinct from
+Colorful's dormant RGB propagation and world-ownership concerns.
+
+The .40 compatibility policy is bounded to confirmed vanilla Overworld/Nether
+lightmap models. Both directions select the captured Overworld palette as a
+stable reference because its intrinsic dimension ambient is lower. The reference
+is never chosen by a per-frame observed RGB minimum. Unsupported dimension pairs,
+forced-bright models and shader packs retain the prior behavior.
+
+For one region, let E(P,s,b)=P(s,b)-P(s,0), w be replacement weight, A the signed
+ambient-only offset, and r denote transported levels. The ordinary path computes:
+
+    candidate = currentNativeLight + A
+              + w * (E(reference,max(s,r.sky),max(b,r.block)) - E(native,s,b))
+
+The block/sky coordinates come from the current terrain draw. This removes the
+native scalar emitter response and inserts a common response for the strongest
+local/imported scalar level. It preserves the original interpolated native-light
+residual, keeps ambient replacement separate, and avoids summing two copies of
+the same scalar light during handoff. Matching occupancy and per-region metadata
+are required before merging portal candidates. Palette sampling is bilinear;
+interpolating scalar levels is not claimed identical to Minecraft's interpolation
+of separately sampled vertex RGB at every fractional coordinate.
+
+The single atlas expands to 32x64x256, keeping the GL3.3 minimum depth bound.
+Existing total/ambient banks remain in y0..31. Transported sky/block/weight and
+separate occupancy use y32..63,z0..127. Native/reference 16x16 palette slices use
+y32..47,z128+32*region and z129+32*region. Paired publication and repair cover all
+banks and palettes. Current held-light changes do not require reading local light
+into the CPU field or rebuilding its topology.
+
+Known valid Colorful RGB continues through .39's independent draw-time gain
+correction. This is not a Colorful version override, a claim of arbitrary RGB/GI
+transport, or a universal physical-light reconstruction from final RGB lightmaps.
+Build and live acceptance for .40 must be recorded after implementation.
+
+The gate requires exact Overworld/Nether dimension IDs and matching vanilla
+effects IDs, finite intrinsic ambient values with Overworld strictly lower, and
+neither effects model forcing a bright lightmap. Unknown, equal or reversed
+models keep the .39 path. Valid nonzero decoded Colorful emission uses its .39
+branch; zero/invalid packed-color samples use Colorful's vanilla fallback and
+can therefore use .40 scalar correction.
+
+Local .40 validation passed 337 tests without failures, errors or skips against
+both DH 3.3.2 and 3.3.3, including actual framebuffer regressions. Bridge alpha.11
+passed 58 tests. Live performance remains pending: the atlas now occupies 4 MiB
+per world and four dirty regions upload 8 MiB of float input per update, including
+palette-only changes. Retained topology caching does not establish unchanged CPU,
+allocation or upload cost; .38 timing results do not measure these new costs.

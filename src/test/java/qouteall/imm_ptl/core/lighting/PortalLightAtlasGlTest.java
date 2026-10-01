@@ -16,6 +16,7 @@ import static org.lwjgl.opengl.GL33.*;
 @EnabledIfSystemProperty(named="ipsable.glTests",matches="true")
 class PortalLightAtlasGlTest {
     private static long window;
+    private static final java.nio.FloatBuffer readback=BufferUtils.createFloatBuffer(32*64*256*4);
     private static final int[] UNPACK_KEYS={GL_UNPACK_ALIGNMENT,GL_UNPACK_ROW_LENGTH,GL_UNPACK_IMAGE_HEIGHT,
         GL_UNPACK_SKIP_PIXELS,GL_UNPACK_SKIP_ROWS,GL_UNPACK_SKIP_IMAGES,GL_UNPACK_SWAP_BYTES};
 
@@ -47,19 +48,21 @@ class PortalLightAtlasGlTest {
         int previous=glGetInteger(GL_TEXTURE_BINDING_3D);
         try {
             glBindTexture(GL_TEXTURE_3D,atlas.texture);
-            var pixels=BufferUtils.createFloatBuffer(32*32*256*4);
+            var pixels=readback.clear();
             glGetTexImage(GL_TEXTURE_3D,0,GL_RGBA,GL_FLOAT,pixels);
-            int offset=((z*32+y)*32+x)*4;
+            int offset=((z*64+y)*32+x)*4;
             return new float[]{pixels.get(offset),pixels.get(offset+1),pixels.get(offset+2),pixels.get(offset+3)};
         } finally { glBindTexture(GL_TEXTURE_3D,previous); }
     }
 
-    private static void mark(PortalLightGpu.Atlas atlas,int z) {
+    private static void mark(PortalLightGpu.Atlas atlas,int z) { mark(atlas,0,0,z); }
+
+    private static void mark(PortalLightGpu.Atlas atlas,int x,int y,int z) {
         int previous=glGetInteger(GL_TEXTURE_BINDING_3D);
         try {
             glBindTexture(GL_TEXTURE_3D,atlas.texture);
             var marker=BufferUtils.createFloatBuffer(4).put(new float[]{.75f,.5f,.25f,1});marker.flip();
-            glTexSubImage3D(GL_TEXTURE_3D,0,0,0,z,1,1,1,GL_RGBA,GL_FLOAT,marker);
+            glTexSubImage3D(GL_TEXTURE_3D,0,x,y,z,1,1,1,GL_RGBA,GL_FLOAT,marker);
         } finally { glBindTexture(GL_TEXTURE_3D,previous); }
     }
 
@@ -68,7 +71,7 @@ class PortalLightAtlasGlTest {
             assertEquals(1,atlas.update(1,List.of(region(10,-.25f,.5f,.75f))));
             glBindTexture(GL_TEXTURE_3D,atlas.texture);
             assertEquals(32,glGetTexLevelParameteri(GL_TEXTURE_3D,0,GL_TEXTURE_WIDTH));
-            assertEquals(32,glGetTexLevelParameteri(GL_TEXTURE_3D,0,GL_TEXTURE_HEIGHT));
+            assertEquals(64,glGetTexLevelParameteri(GL_TEXTURE_3D,0,GL_TEXTURE_HEIGHT));
             assertEquals(256,glGetTexLevelParameteri(GL_TEXTURE_3D,0,GL_TEXTURE_DEPTH));
             assertEquals(GL_RGBA16F,glGetTexLevelParameteri(GL_TEXTURE_3D,0,GL_TEXTURE_INTERNAL_FORMAT));
             assertArrayEquals(new float[]{-.25f,.5f,.75f,1},texel(atlas,0,0,0),.001f);
@@ -252,6 +255,127 @@ class PortalLightAtlasGlTest {
             assertArrayEquals(new float[]{.4f,.5f,.6f,1},texel(atlas,0,0,128),.001f);
             assertRestored(other,buffer,sampler,hostile);
         } finally { glDeleteTextures(other);glDeleteBuffers(buffer);glDeleteSamplers(sampler); }
+    }
+
+
+    private static PortalLightPalette palette(int blue) {
+        int[] pixels=new int[256];
+        for(int sky=0;sky<16;sky++) for(int block=0;block<16;block++)
+            pixels[sky*16+block]=0xff000000|(blue<<16)|((sky*17)<<8)|(block*17);
+        return new PortalLightPalette(pixels);
+    }
+
+    private static PortalLighting.Region vanillaRegion(int origin,float sky,float block,float weight,int blue) {
+        var base=region(origin,.1f,.2f,.3f);
+        return new PortalLighting.Region(null,base.min(),base.offsets(),base.ambientOffsets(),
+            new PortalLighting.VanillaData(Map.of(base.min(),new float[]{sky,block,weight}),palette(blue),palette(255-blue)));
+    }
+
+    private static void assertSlotEmpty(PortalLightGpu.Atlas atlas,int slot) {
+        // Read once, then check every channel in all four 32-cube quadrants.
+        texel(atlas,0,0,0);
+        for(int bank=0;bank<2;bank++) for(int z=0;z<32;z++) for(int y=0;y<64;y++) for(int x=0;x<32;x++) {
+            int offset=((((bank*4+slot)*32+z)*64+y)*32+x)*4;
+            for(int c=0;c<4;c++) if(readback.get(offset+c)!=0)
+                fail("Removed atlas slot retained data at "+x+","+y+","+((bank*4+slot)*32+z));
+        }
+    }
+
+    @Test void vanillaMetadataAndPalettesKeepCoordinatesOccupancyAndZeroPadding() {
+        try(var atlas=new PortalLightGpu.Atlas()) {
+            var min=new PortalLightField.Pos(10,40,-90);var edge=min.add(31,31,31);
+            var offsets=Map.of(min,new float[]{.1f,.2f,.3f},edge,new float[]{-.1f,-.2f,-.3f});
+            var metadata=Map.of(min,new float[]{12,9,.375f},edge,new float[]{0,15,0});
+            var region=new PortalLighting.Region(null,min,offsets,offsets,
+                new PortalLighting.VanillaData(metadata,palette(34),palette(221)));
+            assertEquals(1,atlas.update(1,List.of(region)));
+            assertArrayEquals(new float[]{12,9,.375f,1},texel(atlas,0,32,0),.001f);
+            // Replacement zero is an occupied input cell, not a missing sample.
+            assertArrayEquals(new float[]{0,15,0,1},texel(atlas,31,63,31),.001f);
+            assertArrayEquals(new float[]{0,0,34/255f,1},texel(atlas,0,32,128),.001f);
+            assertArrayEquals(new float[]{1,1,34/255f,1},texel(atlas,15,47,128),.001f);
+            assertArrayEquals(new float[]{1,0,221/255f,1},texel(atlas,15,32,129),.001f);
+            assertArrayEquals(new float[]{0,1,221/255f,1},texel(atlas,0,47,129),.001f);
+            assertArrayEquals(new float[4],texel(atlas,16,32,128));
+            assertArrayEquals(new float[4],texel(atlas,0,48,129));
+            assertArrayEquals(new float[4],texel(atlas,0,32,130));
+            assertArrayEquals(new float[4],texel(atlas,31,63,159));
+            assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,0),.001f);
+            assertArrayEquals(new float[]{-.1f,-.2f,-.3f,1},texel(atlas,31,31,159),.001f);
+        }
+    }
+
+    @Test void scalarOrPaletteOnlyPublicationUpdatesOneSlotAndReusesTheOther() {
+        try(var atlas=new PortalLightGpu.Atlas()) {
+            var a=vanillaRegion(10,12,9,.25f,34);var b=vanillaRegion(50,4,6,.75f,51);
+            atlas.update(1,List.of(a,b));
+            mark(atlas,32);mark(atlas,160);mark(atlas,0,32,32);mark(atlas,0,32,160);mark(atlas,0,32,161);
+            var metadataOnly=new PortalLighting.Region(null,a.min(),a.offsets(),a.ambientOffsets(),
+                new PortalLighting.VanillaData(Map.of(a.min(),new float[]{13,10,.5f}),a.vanilla().nativePalette(),a.vanilla().referencePalette()));
+            assertEquals(1,atlas.update(2,List.of(metadataOnly,b)));
+            assertArrayEquals(new float[]{13,10,.5f,1},texel(atlas,0,32,0),.001f);
+            var paletteOnly=new PortalLighting.Region(null,a.min(),a.offsets(),a.ambientOffsets(),
+                new PortalLighting.VanillaData(metadataOnly.vanilla().cells(),palette(68),palette(187)));
+            assertEquals(1,atlas.update(3,List.of(paletteOnly,b)));
+            assertArrayEquals(new float[]{13,10,.5f,1},texel(atlas,0,32,0),.001f);
+            assertArrayEquals(new float[]{0,0,68/255f,1},texel(atlas,0,32,128),.001f);
+            assertArrayEquals(new float[]{0,0,187/255f,1},texel(atlas,0,32,129),.001f);
+            assertEquals(0,atlas.update(4,List.of(paletteOnly,b)));
+            for(int z:new int[]{32,160}) assertArrayEquals(new float[]{.75f,.5f,.25f,1},texel(atlas,0,0,z));
+            for(int z:new int[]{32,160,161}) assertArrayEquals(new float[]{.75f,.5f,.25f,1},texel(atlas,0,32,z));
+        }
+    }
+
+    @Test void allVanillaSlotsReorderClearAndDisableForLegacyRegions() {
+        try(var atlas=new PortalLightGpu.Atlas()) {
+            var regions=new java.util.ArrayList<PortalLighting.Region>();
+            for(int i=0;i<4;i++) regions.add(vanillaRegion(i*40,i,15-i,i/4f,17*(i+1)));
+            assertEquals(4,atlas.update(1,regions));
+            for(int i=0;i<4;i++) {
+                assertArrayEquals(new float[]{i,15-i,i/4f,1},texel(atlas,0,32,i*32),.001f);
+                assertArrayEquals(new float[]{0,0,17*(i+1)/255f,1},texel(atlas,0,32,128+i*32),.001f);
+                assertArrayEquals(new float[]{1,1,(255-17*(i+1))/255f,1},texel(atlas,15,47,129+i*32),.001f);
+            }
+            var reversed=List.of(regions.get(3),regions.get(2),regions.get(1),regions.get(0));
+            assertEquals(4,atlas.update(2,reversed));
+            assertArrayEquals(new float[]{3,12,.75f,1},texel(atlas,0,32,0),.001f);
+            assertArrayEquals(new float[]{0,15,0,1},texel(atlas,0,32,96),.001f);
+            assertArrayEquals(new float[]{0,0,17/255f,1},texel(atlas,0,32,224),.001f);
+            assertEquals(3,atlas.update(3,reversed.subList(0,1)));
+            for(int i=1;i<4;i++) assertSlotEmpty(atlas,i);
+            // A legacy region must clear any former metadata/palettes, not inherit them.
+            var legacy=region(120,.1f,.2f,.3f);
+            assertEquals(1,atlas.update(4,List.of(legacy)));
+            assertArrayEquals(new float[4],texel(atlas,0,32,0));
+            assertArrayEquals(new float[4],texel(atlas,0,32,128));
+            assertArrayEquals(new float[4],texel(atlas,15,47,129));
+            assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,0),.001f);
+            assertEquals(1,atlas.update(5,List.of()));assertSlotEmpty(atlas,0);
+        }
+    }
+
+    @Test void failedUploadRepairsMetadataAndPalettesAlongWithBothOffsetBanks() {
+        try(var atlas=new PortalLightGpu.Atlas()) {
+            var a=vanillaRegion(10,12,9,.25f,34);var b=vanillaRegion(50,4,6,.75f,51);
+            atlas.update(1,List.of(a,b));
+            var replacement=vanillaRegion(10,3,2,.5f,102);
+            var bad=new PortalLighting.Region(null,b.min(),b.offsets(),Map.of(b.min(),new float[]{1,1}),
+                new PortalLighting.VanillaData(Map.of(b.min(),new float[]{15,15,1}),palette(119),palette(136)));
+            // First slot has already changed all four quadrants. Second slot has
+            // changed total/scalar data before its invalid ambient array fails.
+            assertThrows(IllegalArgumentException.class,()->atlas.update(2,List.of(replacement,bad)));
+            assertEquals(2,atlas.update(1,List.of(a,b)));
+            for(int i=0;i<2;i++) {
+                var original=i==0?a:b;
+                float[] scalar=original.vanilla().cells().get(original.min());
+                assertArrayEquals(new float[]{scalar[0],scalar[1],scalar[2],1},texel(atlas,0,32,i*32),.001f);
+                assertArrayEquals(new float[]{0,0,(i==0?34:51)/255f,1},texel(atlas,0,32,128+i*32),.001f);
+                assertArrayEquals(new float[]{0,0,(i==0?221:204)/255f,1},texel(atlas,0,32,129+i*32),.001f);
+                assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,i*32),.001f);
+                assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,128+i*32),.001f);
+            }
+            assertEquals(0,atlas.update(1,List.of(a,b)));
+        }
     }
 
     private static void assertRestored(int texture,int buffer,int sampler,int[] unpack) {

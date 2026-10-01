@@ -85,4 +85,79 @@ class PortalLightPaletteTest {
             assertArrayEquals(palette.ambientOffset(old,sky,weight),palette.ambientOffset(changed,sky,weight));
         assertFalse(Arrays.equals(palette.offset(old,9,12,1),palette.offset(changed,9,12,1)));
     }
+
+    private PortalLightPalette palette(int red, int green, int blue, int[][] entries) {
+        int[] pixels = new int[256]; Arrays.fill(pixels, pixel(red, green, blue));
+        for (int[] entry : entries) pixels[entry[0] * 16 + entry[1]] = pixel(entry[2], entry[3], entry[4]);
+        return new PortalLightPalette(pixels);
+    }
+    private float[] vanillaCandidate(PortalLightPalette nativePalette, PortalLightPalette incoming,
+                                     PortalLightPalette reference, int nativeSky, int nativeBlock,
+                                     int remoteSky, int remoteBlock, float weight) {
+        float[] result = nativePalette.rgb(nativeSky, nativeBlock);
+        float[] ambient = nativePalette.ambientOffset(incoming, remoteSky, weight);
+        float[] block = nativePalette.vanillaBlockOffset(reference, nativeSky, nativeBlock,
+            remoteSky, remoteBlock, weight);
+        for (int c = 0; c < 3; c++) result[c] += ambient[c] + block[c];
+        return result;
+    }
+    @Test void warmFloorSubtractionCannotTurnASaturatedWhiteEmitterBlue() {
+        // Vanilla 1.21.1 at gamma .5, midnight, no flicker: both B14 entries
+        // saturate to white, but their dark baselines differ significantly.
+        var nether = palette(98,80,67,new int[][]{{0,14,252,252,252}});
+        var overworld = palette(25,25,25,new int[][]{{0,14,252,252,252}});
+        float[] old = nether.rgb(0,14), ambient = nether.ambientOffset(overworld,0,1);
+        for (int c=0;c<3;c++) old[c] += ambient[c];
+        assertArrayEquals(new float[]{179/255f,197/255f,210/255f},old,1e-6f);
+        assertArrayEquals(overworld.rgb(0,14),vanillaCandidate(nether,overworld,overworld,0,14,0,0,1),1e-6f);
+    }
+    @Test void noBlockLightLeavesTheIndependentAmbientReplacementUnchanged() {
+        var nether = palette(98,80,67,new int[][]{{7,0,110,100,100}});
+        var overworld = palette(25,25,25,new int[][]{{12,0,150,180,200}});
+        for (float weight : new float[]{0,.25f,1}) {
+            assertArrayEquals(new float[3],nether.vanillaBlockOffset(overworld,7,0,12,0,weight),1e-6f);
+            float[] expected = nether.rgb(7,0), ambient = nether.ambientOffset(overworld,12,weight);
+            for (int c=0;c<3;c++) expected[c] += ambient[c];
+            assertArrayEquals(expected,vanillaCandidate(nether,overworld,overworld,7,0,12,0,weight),1e-6f);
+        }
+    }
+    @Test void reverseDirectionKeepsOverworldEmittersWhenNetherHasNoStrongerLight() {
+        var overworld = palette(25,25,25,new int[][]{{0,12,221,212,194},{12,0,150,180,200},{12,12,240,242,248}});
+        var nether = palette(98,80,67,new int[][]{{0,12,231,225,213}});
+        for (int sky : new int[]{0,12}) for (int remoteBlock : new int[]{0,8,12})
+            assertArrayEquals(overworld.rgb(sky,12),
+                vanillaCandidate(overworld,nether,overworld,sky,12,0,remoteBlock,1),1e-6f);
+    }
+    @Test void localAndTransportedBlockLevelsComposeByMaximumWithoutAddingLightTwice() {
+        var nether = palette(98,80,67,new int[][]{{0,8,178,160,130},{0,12,231,225,213}});
+        var overworld = palette(25,25,25,new int[][]{{0,8,151,129,96},{0,12,221,212,194}});
+        for (int[] levels : new int[][]{{12,8},{8,12},{12,12}})
+            assertArrayEquals(overworld.rgb(0,12),
+                vanillaCandidate(nether,overworld,overworld,0,levels[0],0,levels[1],1),1e-6f);
+    }
+    @Test void blockResponseUsesEffectiveDaytimeSkyInsteadOfAZeroSkyLookup() {
+        var nether = palette(98,80,67,new int[][]{{0,8,178,160,130}});
+        var overworld = palette(25,25,25,new int[][]{{0,8,151,129,96},{12,0,150,180,200},{12,8,225,230,240}});
+        // The same emitter has a smaller display-RGB increment on a bright sky
+        // baseline because the captured lightmap already includes gamma/clipping.
+        assertArrayEquals(overworld.rgb(12,8),
+            vanillaCandidate(nether,overworld,overworld,0,8,12,0,1),1e-6f);
+        assertFalse(Arrays.equals(nether.vanillaBlockOffset(overworld,0,8,0,0,1),
+            nether.vanillaBlockOffset(overworld,0,8,12,0,1)));
+    }
+    @Test void currentNativeSkyRowIsRemovedBeforeInstallingTheReferenceResponse() {
+        var nether = palette(98,80,67,new int[][]{{9,0,120,130,140},{9,8,200,190,180}});
+        var overworld = palette(25,25,25,new int[][]{{0,8,151,129,96},{9,0,100,120,140},{9,8,210,215,220}});
+        assertArrayEquals(new float[]{30/255f,35/255f,40/255f},
+            nether.vanillaBlockOffset(overworld,9,8,0,0,1),1e-6f);
+    }
+    @Test void replacementWeightInterpolatesTheResponseAndZeroLeavesNativeLightExact() {
+        var nether = palette(98,80,67,new int[][]{{0,12,231,225,213}});
+        var overworld = palette(25,25,25,new int[][]{{0,12,221,212,194}});
+        for (float weight : new float[]{0,.25f,.7f,1}) {
+            float[] expected = nether.rgb(0,12), target = overworld.rgb(0,12);
+            for (int c=0;c<3;c++) expected[c] += weight * (target[c]-expected[c]);
+            assertArrayEquals(expected,vanillaCandidate(nether,overworld,overworld,0,12,0,0,weight),1e-6f);
+        }
+    }
 }
