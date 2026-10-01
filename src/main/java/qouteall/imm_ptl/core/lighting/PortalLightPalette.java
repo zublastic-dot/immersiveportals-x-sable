@@ -13,6 +13,10 @@ public final class PortalLightPalette {
         return new float[]{(p&255)/255f,((p>>>8)&255)/255f,((p>>>16)&255)/255f};
     }
     public float[] gain(PortalLightPalette incoming, int sky, int block, int remoteSky, int remoteBlock) {
+        return gain(incoming, sky, block, remoteSky, remoteBlock, 1);
+    }
+    public float[] gain(PortalLightPalette incoming, int sky, int block, int remoteSky, int remoteBlock, float replacement) {
+        float weight=Math.clamp(replacement,0,1);
         float[] nativeLight=rgb(sky,block), floor=rgb(0,0), imported=incoming.rgb(remoteSky,remoteBlock), remoteFloor=incoming.rgb(0,0);
         float[] gain=new float[3];
         for (int i=0;i<3;i++) {
@@ -22,7 +26,7 @@ public final class PortalLightPalette {
             // a source in the reverse direction either (dark Nether -> Overworld).
             float desired=Math.min(1,Math.max(0,nativeLight[i]-floor[i])
                 +Math.max(0,imported[i]-remoteFloor[i])+Math.min(floor[i],remoteFloor[i]));
-            gain[i]=desired/Math.max(1/255f,nativeLight[i]);
+            gain[i]=1+weight*(desired/Math.max(1/255f,nativeLight[i])-1);
         }
         return gain;
     }

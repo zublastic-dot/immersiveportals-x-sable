@@ -21,7 +21,7 @@ public final class PortalLighting {
     public record Region(ClientLevel world, Pos min, Map<Pos, float[]> gains) {}
     // Value identity survives unloading/recreation of the destination portal entity.
     // The sample mapping also changes when either endpoint moves or is retargeted.
-    private record Aperture(ClientLevel world, ClientLevel source, Map<Pos, Pos> samples) {}
+    private record Aperture(ClientLevel world, ClientLevel source, Map<Pos, Pos> samples, Pos inward) {}
     private static final Map<ClientLevel, PortalLightPalette> PALETTES = new WeakHashMap<>();
     private static final Map<Aperture, Region> REGIONS = new HashMap<>();
     private static final Map<Aperture, PortalLightSnapshot.Snapshot> SNAPSHOTS = new HashMap<>();
@@ -81,8 +81,8 @@ public final class PortalLighting {
         if (apertures.isEmpty()) return;
         Aperture a = new ArrayList<>(apertures).get(Math.floorMod(cursor++, apertures.size()));
         var result = PortalLightSnapshot.update(p -> sample(a.world, p, false),
-            p -> sample(a.source, p, true), a.samples, SNAPSHOTS.get(a));
-        if (!result.field().enclosed()) {
+            p -> sample(a.source, p, true), a.samples, a.inward, SNAPSHOTS.get(a));
+        if (!result.field().available()) {
             SNAPSHOTS.remove(a);
             if (REGIONS.remove(a) != null) revision++;
             report(a, result.field().reason()); return;
@@ -99,11 +99,12 @@ public final class PortalLighting {
         for (var entry : result.field().cells().entrySet()) {
             Pos p = entry.getKey(); Light light = entry.getValue();
             Light local = result.snapshot().geometry().get(p).light();
-            gains.put(p, nativePalette.gain(incoming, local.sky(), local.block(), light.sky(), light.block()));
+            gains.put(p, nativePalette.gain(incoming, local.sky(), local.block(), light.sky(), light.block(),
+                result.field().replacement().get(p)));
             minX = Math.min(minX, p.x()); minY = Math.min(minY, p.y()); minZ = Math.min(minZ, p.z());
         }
         REGIONS.put(a, new Region(a.world, new Pos(minX, minY, minZ), Map.copyOf(gains))); revision++;
-        report(a, "enclosed cells=" + gains.size() + (result.usedCache() ? " (cached geometry/light levels; current lightmaps)" : " (live)"));
+        report(a, "transport cells=" + gains.size() + (result.usedCache() ? " (cached geometry/light levels; current lightmaps)" : " (live)"));
     }
 
     private static boolean eligible(Portal p) {
@@ -122,7 +123,9 @@ public final class PortalLighting {
                 Pos here = pos(plane.add(n)), there = pos(p.transformPoint(plane.subtract(n)));
                 samples.put(destination ? there : here, destination ? here : there);
             }
-        return new Aperture(world, source, Map.copyOf(samples));
+        Vec3 direction = destination ? p.getContentDirection() : n;
+        Pos inward = new Pos((int) Math.round(direction.x), (int) Math.round(direction.y), (int) Math.round(direction.z));
+        return new Aperture(world, source, Map.copyOf(samples), inward);
     }
     private static Pos pos(Vec3 point) {
         BlockPos p = BlockPos.containing(point); return new Pos(p.getX(), p.getY(), p.getZ());

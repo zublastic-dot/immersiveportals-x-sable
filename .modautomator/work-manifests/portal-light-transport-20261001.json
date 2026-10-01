@@ -46,7 +46,7 @@
   ],
   "value_case": {
     "category": "observable_capability",
-    "statement": "Implement bounded portal aperture lighting for enclosed rooms using the owner replica comparison; preserve native local sources and all existing fixes.",
+    "statement": "Implement bounded portal aperture lighting with local visibility for closed and partly open rooms, using the owner replica and one-block-hole comparisons; preserve native local sources and existing fixes.",
     "acceptance": [
       "Occlusion and attenuation regression tests",
       "No world light-storage mutation or global dimension dimming",

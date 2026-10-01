@@ -1,3 +1,8 @@
+# 0.5.1-zublastic.34
+
+- Replace the sealed-room lighting cutoff with bounded transport and local opening visibility; one wall hole no longer discards every interior correction.
+- Preserve cached destination geometry and current lightmaps across unloads; known edits update the local field. Ordinary Sodium/DH terrain only; shader-pack and per-emitter RGB integration remain pending.
+
 ## 0.5.1-zublastic.33 - retain enclosure lighting across chunk unloads
 
 Either portal endpoint now maintains both lighting directions. Verified enclosure geometry and measured light levels survive destination chunk/entity unloads for DH rendering, while current lightmaps keep time and weather responsive. Known geometry changes invalidate incomplete proofs; portal motion, retargeting and removal discard their mappings. This session-local cache requires an initial live measurement. Adds unload/reload, moved-aperture, local-lamp and partial-boundary regressions.

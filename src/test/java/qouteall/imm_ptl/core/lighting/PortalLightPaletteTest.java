@@ -36,4 +36,11 @@ class PortalLightPaletteTest {
         var local=new PortalLightPalette(overworld);
         assertArrayEquals(new float[]{1,1,1},local.gain(new PortalLightPalette(nether),0,0,0,0),1e-6f);
     }
+    @Test void localExposureBlendsContinuouslyAndLeavesUncorrectedTerrainIntact() {
+        int[] nether=new int[256],night=new int[256];Arrays.fill(nether,pixel(60,42,30));Arrays.fill(night,pixel(12,16,28));
+        var local=new PortalLightPalette(nether);var source=new PortalLightPalette(night);
+        float[] full=local.gain(source,0,0,11,0,1),half=local.gain(source,0,0,11,0,.5f);
+        assertArrayEquals(new float[]{1,1,1},local.gain(source,0,0,11,0,0),1e-6f);
+        for(int c=0;c<3;c++) assertEquals((1+full[c])*.5f,half[c],1e-6);
+    }
 }
