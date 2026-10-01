@@ -1,3 +1,24 @@
+# 0.5.1-zublastic.36
+
+- Preserve Sable collision bookkeeping when rejecting excessive entity movement, avoiding a null collision-record crash. The 60-block movement limit remains enforced. Includes the .35 held-light colour correction.
+
+# 0.5.1-zublastic.35
+
+- Keep newly selected held-light colors stable by applying portal ambient replacement additively to the renderer's current lighting, including Colorful Lighting. Preserve the bounded room field and DH support.
+
+# 0.5.1-zublastic.34
+
+- Replace the sealed-room lighting cutoff with bounded transport and local opening visibility; one wall hole no longer discards every interior correction.
+- Preserve cached destination geometry and current lightmaps across unloads; known edits update the local field. Ordinary Sodium/DH terrain only; shader-pack and per-emitter RGB integration remain pending.
+
+## 0.5.1-zublastic.33 - retain enclosure lighting across chunk unloads
+
+Either portal endpoint now maintains both lighting directions. Verified enclosure geometry and measured light levels survive destination chunk/entity unloads for DH rendering, while current lightmaps keep time and weather responsive. Known geometry changes invalidate incomplete proofs; portal motion, retargeting and removal discard their mappings. This session-local cache requires an initial live measurement. Adds unload/reload, moved-aperture, local-lamp and partial-boundary regressions.
+
+## 0.5.1-zublastic.32 — portal enclosure lighting trial
+
+Adds a bounded client-only portal light field for enclosed air volumes, shared by Sodium and DH ordinary terrain rendering. Removes the local dimension ambient floor inside recognized enclosures and imports attenuated light from the linked opening. No world light data changes. Shader packs and per-emitter RGB transport remain unsupported; see `docs/ZUBLASTIC_PORTAL_LIGHT.md` for exact limits and acceptance checks.
+
 # Changelog
 
 All notable changes to this project will be documented in this file.  

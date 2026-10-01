@@ -42,21 +42,22 @@ public abstract class MixinSodiumShaderLoader {
     ) {
         String shaderSource = operation.call(name);
         String nameStr = name.toString();
+        String geometryName = qouteall.imm_ptl.core.lighting.PortalLightShaders.sodiumGeometryName(nameStr);
         String transformed = ShaderCodeTransformation.transform(
             shaderType == ShaderType.VERTEX ? Program.Type.VERTEX : Program.Type.FRAGMENT,
-            nameStr, shaderSource
+            geometryName, shaderSource
         );
 
         String key = shaderType + ":" + nameStr;
         if (IPL$SEEN_SODIUM.putIfAbsent(key, Boolean.TRUE) == null) {
             boolean changed = !shaderSource.equals(transformed);
-            boolean inList = ShaderCodeTransformation.shouldAddUniform(nameStr);
+            boolean inList = ShaderCodeTransformation.shouldAddUniform(geometryName);
             IPL$PROBE_LOG.info(
                 "[IPL-PROBE-A-SODIUM] type={} name='{}' inAffectedList={} regexChangedSource={}",
                 shaderType, nameStr, inList, changed
             );
         }
 
-        return transformed;
+        return qouteall.imm_ptl.core.lighting.PortalLightShaders.sodium(nameStr, transformed);
     }
 }

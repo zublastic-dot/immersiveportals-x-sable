@@ -31,6 +31,7 @@ import qouteall.imm_ptl.core.IPGlobal;
 import qouteall.imm_ptl.core.IPMcHelper;
 import qouteall.imm_ptl.core.api.ImmPtlEntityExtension;
 import qouteall.imm_ptl.core.collision.PortalCollisionHandler;
+import qouteall.imm_ptl.core.collision.CollisionMovementPass;
 import qouteall.imm_ptl.core.ducks.IEEntity;
 import qouteall.imm_ptl.core.miscellaneous.IPVanillaCopy;
 import qouteall.imm_ptl.core.portal.EndPortalEntity;
@@ -122,6 +123,9 @@ public abstract class MixinEntity implements IEEntity, ImmPtlEntityExtension {
     private Vec3 redirectHandleCollisions(Entity entity, Vec3 attemptedMove, Operation<Vec3> original) {
         if (!IPGlobal.enableServerCollision) {
             if (!entity.level().isClientSide()) {
+                // Sable still reads collision bookkeeping later in move(), even
+                // when IP's configuration intentionally bypasses server movement.
+                original.call(entity, Vec3.ZERO);
                 if (entity instanceof Player) {
                     return attemptedMove;
                 }
@@ -131,7 +135,8 @@ public abstract class MixinEntity implements IEEntity, ImmPtlEntityExtension {
             }
         }
 
-        if (attemptedMove.lengthSqr() > 60 * 60) {
+        boolean excessiveMovement = CollisionMovementPass.isExcessive(attemptedMove);
+        if (excessiveMovement) {
             // avoid loading too many chunks in collision calculation and lag the server
             if (IMM_PTL_LOG_COUNTER.tryDecrement()) {
                 LOGGER.error(
@@ -141,7 +146,6 @@ public abstract class MixinEntity implements IEEntity, ImmPtlEntityExtension {
                 );
             }
 
-            return Vec3.ZERO;
         }
 
         // Base pass: ALWAYS delegate through the operation chain first. With Sable
@@ -149,7 +153,10 @@ public abstract class MixinEntity implements IEEntity, ImmPtlEntityExtension {
         // floor and populating sable$collisionInfo); without Sable it bottoms out
         // at vanilla collide(). Either way this is the result we return when no
         // portal collision is active -- identical to upstream in that case.
-        Vec3 sableResult = (Vec3) original.call(entity, attemptedMove);
+        Vec3 sableResult = CollisionMovementPass.run(entity, attemptedMove, original);
+        if (excessiveMovement) {
+            return Vec3.ZERO;
+        }
 
         if (!IPGlobal.crossPortalCollision
             || ip_portalCollisionHandler == null
