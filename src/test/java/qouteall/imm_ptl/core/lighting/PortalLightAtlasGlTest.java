@@ -47,7 +47,7 @@ class PortalLightAtlasGlTest {
         int previous=glGetInteger(GL_TEXTURE_BINDING_3D);
         try {
             glBindTexture(GL_TEXTURE_3D,atlas.texture);
-            var pixels=BufferUtils.createFloatBuffer(32*32*128*4);
+            var pixels=BufferUtils.createFloatBuffer(32*32*256*4);
             glGetTexImage(GL_TEXTURE_3D,0,GL_RGBA,GL_FLOAT,pixels);
             int offset=((z*32+y)*32+x)*4;
             return new float[]{pixels.get(offset),pixels.get(offset+1),pixels.get(offset+2),pixels.get(offset+3)};
@@ -69,31 +69,36 @@ class PortalLightAtlasGlTest {
             glBindTexture(GL_TEXTURE_3D,atlas.texture);
             assertEquals(32,glGetTexLevelParameteri(GL_TEXTURE_3D,0,GL_TEXTURE_WIDTH));
             assertEquals(32,glGetTexLevelParameteri(GL_TEXTURE_3D,0,GL_TEXTURE_HEIGHT));
-            assertEquals(128,glGetTexLevelParameteri(GL_TEXTURE_3D,0,GL_TEXTURE_DEPTH));
+            assertEquals(256,glGetTexLevelParameteri(GL_TEXTURE_3D,0,GL_TEXTURE_DEPTH));
             assertEquals(GL_RGBA16F,glGetTexLevelParameteri(GL_TEXTURE_3D,0,GL_TEXTURE_INTERNAL_FORMAT));
             assertArrayEquals(new float[]{-.25f,.5f,.75f,1},texel(atlas,0,0,0),.001f);
+            assertArrayEquals(new float[]{-.25f,.5f,.75f,1},texel(atlas,0,0,128),.001f);
             assertArrayEquals(new float[4],texel(atlas,1,0,0));
+            assertArrayEquals(new float[4],texel(atlas,1,0,128));
         }
     }
 
     @Test void unchangedRegionDoesNotUploadEvenWhenTheDimensionRevisionChanges() {
         try(var atlas=new PortalLightGpu.Atlas()) {
             var a=region(10,-.25f,.5f,.75f);
-            atlas.update(1,List.of(a));mark(atlas,0);
+            atlas.update(1,List.of(a));mark(atlas,0);mark(atlas,128);
             assertEquals(0,atlas.update(1,List.of(a)));
             assertEquals(0,atlas.update(2,List.of(a)));
             // A GPU marker absent from the CPU region proves no redundant upload occurred.
             assertArrayEquals(new float[]{.75f,.5f,.25f,1},texel(atlas,0,0,0));
+            assertArrayEquals(new float[]{.75f,.5f,.25f,1},texel(atlas,0,0,128));
         }
     }
 
     @Test void changingOneRegionDoesNotReallocateOrOverwriteAnotherSlot() {
         try(var atlas=new PortalLightGpu.Atlas()) {
             var a=region(10,-.25f,.5f,.75f);var b=region(50,.1f,.2f,.3f);
-            assertEquals(2,atlas.update(1,List.of(a,b)));mark(atlas,0);
+            assertEquals(2,atlas.update(1,List.of(a,b)));mark(atlas,0);mark(atlas,128);
             assertEquals(1,atlas.update(2,List.of(a,region(50,.4f,.5f,.6f))));
             assertArrayEquals(new float[]{.75f,.5f,.25f,1},texel(atlas,0,0,0));
+            assertArrayEquals(new float[]{.75f,.5f,.25f,1},texel(atlas,0,0,128));
             assertArrayEquals(new float[]{.4f,.5f,.6f,1},texel(atlas,0,0,32),.001f);
+            assertArrayEquals(new float[]{.4f,.5f,.6f,1},texel(atlas,0,0,160),.001f);
         }
     }
 
@@ -104,6 +109,8 @@ class PortalLightAtlasGlTest {
             assertEquals(2,atlas.update(2,List.of(b,a)));
             assertArrayEquals(new float[]{.4f,.5f,.6f,1},texel(atlas,0,0,0),.001f);
             assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,32),.001f);
+            assertArrayEquals(new float[]{.4f,.5f,.6f,1},texel(atlas,0,0,128),.001f);
+            assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,160),.001f);
         }
     }
 
@@ -114,12 +121,16 @@ class PortalLightAtlasGlTest {
             assertEquals(2,atlas.update(2,List.of(b)));
             assertArrayEquals(new float[]{.4f,.5f,.6f,1},texel(atlas,0,0,0),.001f);
             assertArrayEquals(new float[4],texel(atlas,0,0,32));
+            assertArrayEquals(new float[4],texel(atlas,0,0,160));
             assertEquals(1,atlas.update(3,List.of()));
             assertArrayEquals(new float[4],texel(atlas,0,0,0));
+            assertArrayEquals(new float[4],texel(atlas,0,0,128));
             assertEquals(0,atlas.update(4,List.of()));
             assertEquals(1,atlas.update(5,List.of(a)));
             assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,0),.001f);
             assertArrayEquals(new float[4],texel(atlas,0,0,32));
+            assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,128),.001f);
+            assertArrayEquals(new float[4],texel(atlas,0,0,160));
         }
     }
 
@@ -131,6 +142,7 @@ class PortalLightAtlasGlTest {
             assertArrayEquals(new float[]{.4f,.5f,.6f,1},texel(atlas,1,0,0),.001f);
             assertEquals(1,atlas.update(2,List.of(a)));
             assertArrayEquals(new float[4],texel(atlas,1,0,0));
+            assertArrayEquals(new float[4],texel(atlas,1,0,128));
         }
     }
 
@@ -143,6 +155,48 @@ class PortalLightAtlasGlTest {
             assertEquals(0,overworld.update(5,List.of(a)));
             assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(overworld,0,0,0),.001f);
             assertArrayEquals(new float[]{.6f,.7f,.8f,1},texel(nether,0,0,0),.001f);
+            assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(overworld,0,0,128),.001f);
+            assertArrayEquals(new float[]{.6f,.7f,.8f,1},texel(nether,0,0,128),.001f);
+        }
+    }
+
+    @Test void ambientOnlyPublicationUpdatesItsBankWithoutTouchingAnotherRegion() {
+        try(var atlas=new PortalLightGpu.Atlas()) {
+            var a=region(10,.5f,.6f,.7f);var b=region(50,.2f,.3f,.4f);
+            var split=new PortalLighting.Region(null,a.min(),a.offsets(),
+                Map.of(a.min(),new float[]{-.2f,-.1f,.05f}));
+            atlas.update(1,List.of(split,b));mark(atlas,32);mark(atlas,160);
+            assertArrayEquals(new float[]{.5f,.6f,.7f,1},texel(atlas,0,0,0),.001f);
+            assertArrayEquals(new float[]{-.2f,-.1f,.05f,1},texel(atlas,0,0,128),.001f);
+            var changed=new PortalLighting.Region(null,a.min(),a.offsets(),
+                Map.of(a.min(),new float[]{-.3f,-.15f,.1f}));
+            assertEquals(1,atlas.update(2,List.of(changed,b)));
+            assertArrayEquals(new float[]{.5f,.6f,.7f,1},texel(atlas,0,0,0),.001f);
+            assertArrayEquals(new float[]{-.3f,-.15f,.1f,1},texel(atlas,0,0,128),.001f);
+            assertArrayEquals(new float[]{.75f,.5f,.25f,1},texel(atlas,0,0,32));
+            assertArrayEquals(new float[]{.75f,.5f,.25f,1},texel(atlas,0,0,160));
+        }
+    }
+
+    @Test void allFourSlotsKeepDistinctBanksAtTheirLastTexelAndClearTheFinalSlot() {
+        try(var atlas=new PortalLightGpu.Atlas()) {
+            var regions=new java.util.ArrayList<PortalLighting.Region>();
+            for(int i=0;i<4;i++) {
+                var min=new PortalLightField.Pos(i*40,0,0);var last=min.add(31,31,31);
+                regions.add(new PortalLighting.Region(null,min,
+                    Map.of(last,new float[]{.1f*(i+1),.5f,.75f}),
+                    Map.of(last,new float[]{-.1f*(i+1),-.25f,.05f})));
+            }
+            assertEquals(4,atlas.update(1,regions));
+            for(int i=0;i<4;i++) {
+                assertArrayEquals(new float[]{.1f*(i+1),.5f,.75f,1},texel(atlas,31,31,i*32+31),.001f);
+                assertArrayEquals(new float[]{-.1f*(i+1),-.25f,.05f,1},texel(atlas,31,31,128+i*32+31),.001f);
+                assertArrayEquals(new float[4],texel(atlas,30,31,i*32+31));
+                assertArrayEquals(new float[4],texel(atlas,30,31,128+i*32+31));
+            }
+            assertEquals(1,atlas.update(2,regions.subList(0,3)));
+            assertArrayEquals(new float[4],texel(atlas,31,31,127));
+            assertArrayEquals(new float[4],texel(atlas,31,31,255));
         }
     }
 
@@ -150,13 +204,30 @@ class PortalLightAtlasGlTest {
         try(var atlas=new PortalLightGpu.Atlas()) {
             var a=region(10,.1f,.2f,.3f);var b=region(50,.4f,.5f,.6f);
             atlas.update(1,List.of(a,b));
-            var bad=new PortalLighting.Region(null,new PortalLightField.Pos(0,0,0),
-                Map.of(new PortalLightField.Pos(32,0,0),new float[]{1,1,1}));
+            // Total bank succeeds before the second bank fails. The first region has
+            // already uploaded both banks too, so all visible bank pairs need repair.
+            var bad=new PortalLighting.Region(null,b.min(),
+                Map.of(b.min(),new float[]{.9f,.9f,.9f}),Map.of(b.min(),new float[]{1,1}));
             assertThrows(IllegalArgumentException.class,()->atlas.update(2,List.of(region(10,.8f,.8f,.8f),bad)));
             assertEquals(2,atlas.update(1,List.of(a,b)));
             assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,0),.001f);
             assertArrayEquals(new float[]{.4f,.5f,.6f,1},texel(atlas,0,0,32),.001f);
+            assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,128),.001f);
+            assertArrayEquals(new float[]{.4f,.5f,.6f,1},texel(atlas,0,0,160),.001f);
             assertEquals(0,atlas.update(1,List.of(a,b)));
+        }
+    }
+
+    @Test void nonFiniteAmbientOffsetCannotPublishABrokenBankPair() {
+        try(var atlas=new PortalLightGpu.Atlas()) {
+            var good=region(10,.1f,.2f,.3f);
+            for(float invalid:new float[]{Float.NaN,Float.POSITIVE_INFINITY}) {
+                var bad=new PortalLighting.Region(null,good.min(),good.offsets(),
+                    Map.of(good.min(),new float[]{invalid,0,0}));
+                assertThrows(IllegalArgumentException.class,()->atlas.update(2,List.of(bad)));
+                assertEquals(1,atlas.update(1,List.of(good)));
+                assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,128),.001f);
+            }
         }
     }
 
@@ -170,6 +241,7 @@ class PortalLightAtlasGlTest {
             atlas.update(1,List.of(region(10,.1f,.2f,.3f)));
             assertRestored(other,buffer,sampler,hostile);
             assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,0),.001f);
+            assertArrayEquals(new float[]{.1f,.2f,.3f,1},texel(atlas,0,0,128),.001f);
             var bad=new PortalLighting.Region(null,new PortalLightField.Pos(0,0,0),
                 Map.of(new PortalLightField.Pos(32,0,0),new float[]{1,1,1}));
             assertThrows(IllegalArgumentException.class,()->atlas.update(2,List.of(bad)));
@@ -177,6 +249,7 @@ class PortalLightAtlasGlTest {
             // A failed publication must not suppress a valid retry at that revision.
             assertEquals(1,atlas.update(2,List.of(region(10,.4f,.5f,.6f))));
             assertArrayEquals(new float[]{.4f,.5f,.6f,1},texel(atlas,0,0,0),.001f);
+            assertArrayEquals(new float[]{.4f,.5f,.6f,1},texel(atlas,0,0,128),.001f);
             assertRestored(other,buffer,sampler,hostile);
         } finally { glDeleteTextures(other);glDeleteBuffers(buffer);glDeleteSamplers(sampler); }
     }

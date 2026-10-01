@@ -11,7 +11,7 @@ import static org.lwjgl.opengl.GL33.*;
 
 /** One atlas per loaded dimension; bindings have explicit draw-scoped restoration. */
 public final class PortalLightGpu {
-    private static final int EDGE=32, SLOTS=4, SLOT_FLOATS=EDGE*EDGE*EDGE*4;
+    private static final int EDGE=32, SLOTS=4, BANKS=2, SLOT_FLOATS=EDGE*EDGE*EDGE*4;
     private static final int[] UNPACK_KEYS={GL_UNPACK_ALIGNMENT,GL_UNPACK_ROW_LENGTH,GL_UNPACK_IMAGE_HEIGHT,
         GL_UNPACK_SKIP_PIXELS,GL_UNPACK_SKIP_ROWS,GL_UNPACK_SKIP_IMAGES,GL_UNPACK_SWAP_BYTES};
     // All atlas work runs on the render thread. Reuse one slot-sized staging buffer
@@ -25,7 +25,7 @@ public final class PortalLightGpu {
         private long revision=Long.MIN_VALUE;
         private List<PortalLighting.Region> regions=List.of();
 
-        /** Returns the number of actual slot uploads; publishes metadata only after success. */
+        /** Returns dirty region slots (two bank uploads each); publishes only after both banks succeed. */
         int update(long nextRevision,List<PortalLighting.Region> nextRegions) {
             if(nextRegions.size()>SLOTS) throw new IllegalArgumentException("Too many portal light regions");
             if(contentsValid && revision==nextRevision) return 0;
@@ -52,19 +52,24 @@ public final class PortalLightGpu {
                     // GL 3.3 baseline: allocate once, then replace complete 32-cube slots.
                     // Unoccupied slots are never sampled; each newly occupied slot is
                     // fully initialized by the upload below before count is published.
-                    glTexImage3D(GL_TEXTURE_3D,0,GL_RGBA16F,EDGE,EDGE,EDGE*SLOTS,0,GL_RGBA,GL_FLOAT,(FloatBuffer)null);
+                    glTexImage3D(GL_TEXTURE_3D,0,GL_RGBA16F,EDGE,EDGE,EDGE*SLOTS*BANKS,0,GL_RGBA,GL_FLOAT,(FloatBuffer)null);
                     glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
                     glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_3D,GL_TEXTURE_WRAP_R,GL_CLAMP_TO_EDGE);
                     allocated=true;
                 }
                 for(int i=0;i<SLOTS;i++) if((dirty&(1<<i))!=0) {
                     if(staging==null) staging=BufferUtils.createFloatBuffer(SLOT_FLOATS);
-                    staging.clear();
-                    MemoryUtil.memSet(MemoryUtil.memAddress(staging),0,(long)SLOT_FLOATS*Float.BYTES);
-                    if(i<next.size()) fill(staging,next.get(i));
-                    // Removed slots and cells absent from a replacement are explicitly
-                    // zeroed, including alpha, so an old field cannot bleed into a new one.
-                    glTexSubImage3D(GL_TEXTURE_3D,0,0,0,i*EDGE,EDGE,EDGE,EDGE,GL_RGBA,GL_FLOAT,staging);
+                    for(int bank=0;bank<BANKS;bank++) {
+                        staging.clear();
+                        MemoryUtil.memSet(MemoryUtil.memAddress(staging),0,(long)SLOT_FLOATS*Float.BYTES);
+                        if(i<next.size()) {
+                            var region=next.get(i);
+                            fill(staging,region.min(),bank==0?region.offsets():region.ambientOffsets());
+                        }
+                        // Total z=0..127; ambient-only z=128..255. Removed cells/slots
+                        // clear both alpha masks, retaining one slot-sized staging buffer.
+                        glTexSubImage3D(GL_TEXTURE_3D,0,0,0,(bank*SLOTS+i)*EDGE,EDGE,EDGE,EDGE,GL_RGBA,GL_FLOAT,staging);
+                    }
                 }
             } catch(RuntimeException | Error failure) {
                 // An earlier slot may already have uploaded. Force the next attempt
@@ -80,13 +85,14 @@ public final class PortalLightGpu {
             return Integer.bitCount(dirty);
         }
 
-        private static void fill(FloatBuffer values,PortalLighting.Region region) {
-            var min=region.min();
-            for(var entry:region.offsets().entrySet()) {
+        private static void fill(FloatBuffer values,PortalLightField.Pos min,Map<PortalLightField.Pos,float[]> offsets) {
+            for(var entry:offsets.entrySet()) {
                 var p=entry.getKey(); int x=p.x()-min.x(),y=p.y()-min.y(),z=p.z()-min.z();
                 float[] rgb=entry.getValue();
                 if(x<0 || x>=EDGE || y<0 || y>=EDGE || z<0 || z>=EDGE || rgb.length!=3)
                     throw new IllegalArgumentException("Invalid portal light atlas cell");
+                for(float channel:rgb) if(!Float.isFinite(channel))
+                    throw new IllegalArgumentException("Non-finite portal light atlas offset");
                 int offset=((z*EDGE+y)*EDGE+x)*4;
                 values.put(offset,rgb[0]);values.put(offset+1,rgb[1]);values.put(offset+2,rgb[2]);values.put(offset+3,1);
             }

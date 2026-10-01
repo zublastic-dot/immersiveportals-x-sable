@@ -372,3 +372,16 @@ Refresh portal light sources each late client tick using cached geometry and
 visibility. Recompute decreasing light promptly; invalidate structure on block
 and chunk changes. Reuse palette tables and GPU atlas storage, uploading only
 changed regions. Adds bounded CPU update timing for the diagnostic probes.
+
+
+## 0.5.1-zublastic.39
+
+Separate ambient replacement from imported emission in the retained portal-light
+atlas. The known Colorful Sodium shader evaluates local emitter gain against
+corrected ambient, preserving its raw RGB contribution rather than subtracting
+Nether ambient after that contribution has already been dimmed. No emitter IDs
+are hardcoded. The .38 refresh/cache behavior is retained.
+
+This corrects the local ambient/emitter calculation; transported block light
+still uses a scalar vanilla lightmap model. Full RGB continuity across a portal
+and arbitrary shader-pack lighting are not claimed.

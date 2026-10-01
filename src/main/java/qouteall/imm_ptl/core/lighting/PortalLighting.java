@@ -19,7 +19,26 @@ import static qouteall.imm_ptl.core.lighting.PortalLightField.*;
 
 /** Client-only trial. No light storage writes, chunk loads, server hooks or room coordinates. */
 public final class PortalLighting {
-    public record Region(ClientLevel world, Pos min, Map<Pos, float[]> offsets) {}
+    public record Region(ClientLevel world, Pos min, Map<Pos, float[]> offsets,
+                         Map<Pos, float[]> ambientOffsets) {
+        public Region {
+            Objects.requireNonNull(min);
+            if (offsets == ambientOffsets) {
+                offsets = Map.copyOf(offsets); ambientOffsets = offsets;
+            } else {
+                if (!offsets.keySet().equals(ambientOffsets.keySet()))
+                    throw new IllegalArgumentException("Portal light banks must cover the same cells");
+                offsets = Map.copyOf(offsets); ambientOffsets = Map.copyOf(ambientOffsets);
+            }
+        }
+        /** Compatibility for total-only callers; runtime publishes the actual ambient split. */
+        public Region(ClientLevel world, Pos min, Map<Pos, float[]> offsets) {
+            this(world, min, offsets, offsets);
+        }
+        boolean matches(Pos nextMin, Map<Pos, float[]> total, Map<Pos, float[]> ambient) {
+            return min.equals(nextMin) && sameOffsets(offsets, total) && sameOffsets(ambientOffsets, ambient);
+        }
+    }
     // Value identity survives unloading/recreation of the destination portal entity.
     // The sample mapping also changes when either endpoint moves or is retargeted.
     private record Aperture(ClientLevel world, ClientLevel source, Map<Pos, Pos> samples, Pos inward) {}
@@ -177,18 +196,29 @@ public final class PortalLighting {
                 entry.paletteOffsets = nativePalette.offsetTable(incoming);
             entry.nativePalette = nativePalette; entry.incomingPalette = incoming;
             var offsets = new HashMap<Pos, float[]>();
+            // Most dark fields have no incoming block light: share their maps/arrays
+            // until the first cell actually needs a distinct ambient bank.
+            Map<Pos, float[]> ambientOffsets = null;
             int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
             for (var cell : result.field().cells().entrySet()) {
                 Pos p = cell.getKey(); Light light = cell.getValue();
                 float[] delta = entry.paletteOffsets[light.sky() * 16 + light.block()];
                 float weight = result.field().replacement().get(p);
-                offsets.put(p, new float[]{delta[0] * weight, delta[1] * weight, delta[2] * weight});
+                float[] total = new float[]{delta[0] * weight, delta[1] * weight, delta[2] * weight};
+                offsets.put(p, total);
+                if (light.block() != 0 && ambientOffsets == null) ambientOffsets = new HashMap<>(offsets);
+                if (ambientOffsets != null) {
+                    float[] ambient = entry.paletteOffsets[light.sky() * 16];
+                    ambientOffsets.put(p, light.block() == 0 ? total : new float[]{
+                        ambient[0] * weight, ambient[1] * weight, ambient[2] * weight});
+                }
                 minX = Math.min(minX, p.x()); minY = Math.min(minY, p.y()); minZ = Math.min(minZ, p.z());
             }
             Pos min = new Pos(minX, minY, minZ);
+            if (ambientOffsets == null) ambientOffsets = offsets;
             Region old = REGIONS.get(a);
-            if (old == null || !old.min.equals(min) || !sameOffsets(old.offsets, offsets)) {
-                REGIONS.put(a, new Region(a.world, min, Map.copyOf(offsets)));
+            if (old == null || !old.matches(min, offsets, ambientOffsets)) {
+                REGIONS.put(a, new Region(a.world, min, offsets, ambientOffsets));
                 changed(a.world); lastPublishedRegions++;
             }
             report(a, "transport cells=" + offsets.size());

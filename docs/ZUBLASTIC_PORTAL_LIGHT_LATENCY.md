@@ -59,3 +59,38 @@ check that topology-build counts stay zero during light-only motion, measure upd
 cost, and verify structural changes still block/unblock light correctly. Passing a
 build is not live acceptance; exact hashes and test outcomes belong in the task
 artifact report and canonical context history.
+
+
+## Version .39: local Colorful ambient/emitter separation
+
+The known Colorful Sodium path computes native sky/ambient plus powered RGB
+emission multiplied by max(0.3, 1 - nativeAmbient.r). Previously, portal ambient
+replacement was added after this attenuation. Removing warm Nether ambient
+therefore left the local emitter attenuated by ambient that was no longer drawn.
+
+Each immutable Region now contains total offsets and ambient-only offsets. Both
+banks share one 32 x 32 x 256 RGBA16F atlas, four region slots per bank. Geometry
+and source refresh bounds remain unchanged; a dirty slot uploads both banks and
+partial failures require repair before metadata is published.
+
+For the exact known packed Colorful ABI, the vertex adapter preserves native
+ambient and decoded powered emitter RGB. Each occupied region applies:
+
+    totalDelta + emitterRGB * (gain(max(nativeAmbient + ambientDelta, 0))
+                              - gain(nativeAmbient))
+
+The adjustment is calculated before overlap merging and uses this draw's emitter
+values. No held-light ratio is cached. Vanilla, DH and Colorful fallback samples
+retain the existing total-offset result. The shader-pack guard remains in place.
+
+This is a local emitter correction, not complete source-RGB transfer. Across the
+portal, block light still arrives as scalar brightness colored through the source
+vanilla palette. Colorful's installed 2.5.1 engine has global storage and async
+work reading mutable Minecraft.level; copying it under a guessed dimension key
+would not establish source ownership. Complete RGB continuity needs explicit
+world ownership and source lifecycle handling. The local gain correction alone
+must not be advertised as completing that remaining work.
+
+Bridge alpha.10 admits the unchanged public .39 field/timing ABI. Its legacy
+ambient_offset_rgb remains the total CPU offset, not this draw-time gain term.
+Live crossing acceptance is pending until a complete focused capture succeeds.

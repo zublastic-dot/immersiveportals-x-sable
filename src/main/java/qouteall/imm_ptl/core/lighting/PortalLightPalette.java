@@ -20,15 +20,21 @@ public final class PortalLightPalette {
             result[sky * 16 + block] = offset(incoming, sky, block, 1);
         return result;
     }
+    /** Ambient/sky replacement before adding local emitters. Runtime reuses each table's block-zero entry. */
+    public float[] ambientOffset(PortalLightPalette incoming, int remoteSky, float replacement) {
+        return offset(incoming, remoteSky, 0, replacement);
+    }
     public float[] offset(PortalLightPalette incoming, int remoteSky, int remoteBlock, float replacement) {
         float weight=Math.clamp(replacement,0,1);
         float[] floor=rgb(0,0), imported=incoming.rgb(remoteSky,remoteBlock), remoteFloor=incoming.rgb(0,0);
         float[] offset=new float[3];
         for (int i=0;i<3;i++) {
-            // Cache only the ambient replacement, never a ratio against local light.
+            // Cache a signed replacement/import, never a ratio against local light.
             // Held/entity lights can change between field updates. The shader adds this
-            // offset to the light actually used by the current terrain mesh, preserving
-            // those contributions without a stale multiplier or a second update clock.
+            // offset to the light actually used by the current terrain mesh. The separate
+            // block-zero entry lets Colorful Lighting replace ambient before its current
+            // local emitter contribution; total-only consumers retain this full delta.
+            // Incoming block light remains scalar lightmap transport, not source RGB/GI.
             // A dimension's ambient floor is not a luminous block. It must not become
             // a source in the reverse direction either (dark Nether -> Overworld).
             offset[i]=weight*(Math.max(0,imported[i]-remoteFloor[i])
