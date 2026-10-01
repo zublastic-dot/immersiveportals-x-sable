@@ -1,3 +1,7 @@
+# 0.5.1-zublastic.37
+
+- Restore hosted Sable structures after client world cleanup by requesting an authenticated viewer tracking replay. Normal visibility checks resend the complete structure; other players and rendering settings remain unaffected.
+
 # 0.5.1-zublastic.36
 
 - Preserve Sable collision bookkeeping when rejecting excessive entity movement, avoiding a null collision-record crash. The 60-block movement limit remains enforced. Includes the .35 held-light colour correction.
