@@ -1,3 +1,7 @@
+# 0.5.1-zublastic.36
+
+- Preserve Sable collision bookkeeping when rejecting excessive entity movement, avoiding a null collision-record crash. The 60-block movement limit remains enforced. Includes the .35 held-light colour correction.
+
 # 0.5.1-zublastic.35
 
 - Keep newly selected held-light colors stable by applying portal ambient replacement additively to the renderer's current lighting, including Colorful Lighting. Preserve the bounded room field and DH support.
