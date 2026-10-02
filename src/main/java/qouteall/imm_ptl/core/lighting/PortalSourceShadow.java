@@ -35,6 +35,10 @@ public final class PortalSourceShadow {
         if (initialized) return;
         initialized = true;
         NeoForge.EVENT_BUS.addListener(de.nick1st.imm_ptl.events.ClientExitEvent.class, event -> clear());
+        NeoForge.EVENT_BUS.addListener(qouteall.imm_ptl.core.IPGlobal.PreGameRenderEvent.class, event -> {
+            if (qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface.invoker.isIrisPresent())
+                qouteall.imm_ptl.core.compat.iris_compatibility.IrisSourceShadowRefresh.beforePrimaryRender();
+        });
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> {
             if (Minecraft.getInstance().level == null || !PortalShaderLighting.supported()) clear();
             else if (ClientWorldLoader.getIsInitialized()) retain(ClientWorldLoader.getClientWorlds());
@@ -71,9 +75,18 @@ public final class PortalSourceShadow {
         }
     }
 
-    public static void invalidatePipeline(Object pipeline) { STORE.invalidatePipeline(pipeline); }
+    public static void invalidatePipeline(Object pipeline) {
+        STORE.invalidatePipeline(pipeline);
+        if (!PortalSourceRefreshPolicy.isRendering()
+            && qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface.invoker.isIrisPresent())
+            qouteall.imm_ptl.core.compat.iris_compatibility.IrisSourceShadowRefresh.clear();
+    }
     public static void retain(Collection<ClientLevel> worlds) { STORE.retain(worlds); }
-    public static void clear() { STORE.clear(); warned = false; diagnostics = 0; }
+    public static void clear() {
+        STORE.clear(); warned = false; diagnostics = 0;
+        if (qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface.invoker.isIrisPresent())
+            qouteall.imm_ptl.core.compat.iris_compatibility.IrisSourceShadowRefresh.clear();
+    }
 
     /** Immutable camera/time/matrix metadata paired with one owned, unchanged depth image. */
     public static final class Snapshot {

@@ -290,3 +290,50 @@ verified; `.46` installation is also verified and its sunlight repair remains
 incomplete. `.47` installation is verified but its sunlight repair is rejected.
 Cache behavior, `.48` deployment and sunlight behavior, and performance
 improvement are not live-accepted.
+
+## Observer-independent source refresh candidate (.49)
+
+The exact `.48` head `9f6832d6488840e39e1e4e7437c278879587c6c0`
+passed hosted CI run 37048231908 and was installed on 2026-10-02 at
+18:37:50 UTC. NVIDIA runtime capture then succeeded with native unsized depth
+format 6402 and 24 depth bits. This resolves the source-copy rejection; it does
+not establish sunlight continuity. Startup still stalled in native shader
+linking, with total game/world loading reported as 364.29486 seconds.
+
+The owner subsequently reported sunlight disappearing after physically crossing
+into the Nether room and returning when the portal edge entered the camera view.
+Only actual source Iris shadow passes refresh `.48` snapshots, which expire
+after two seconds or 40 ticks. An invisible source world therefore loses that
+input and falls back to the strict CPU mask. This is a confirmed code path.
+Two bounded agent trials at fixed time 8000 used server teleportation and camera
+rotation. The second verified rendered-portal counts 1, 0, 1, but the wall
+remained dark throughout; those trials did not reproduce the owner's recovery.
+Position, view and the running daylight cycle were restored. No block edits ran.
+The owner's missing-LOD report resolved after crossing and has stayed resolved;
+no ongoing DH failure is established. The reported block-edit freeze was
+explicitly retracted because shader reload was bound to the left mouse button.
+
+`.49` requests a bounded native source-world render before the primary pass
+when a nearby receiving region needs a fresh source shadow. Its virtual camera
+is transformed through the aperture independently of portal visibility. At most
+one source refresh runs per frame, with a 250 ms cadence, a bounded offscreen
+target and loaded client geometry only. Recursive portal rendering and discarded
+DH color/fade work are suppressed; real source shadow rendering is preserved.
+The existing snapshot freshness and memory limits remain. Recoverable failures
+disable auxiliary refresh until reset and retain the conservative fallback.
+World/camera, Iris, graphics and DH history restoration are part of this change.
+Bounded producer and draw-consumer diagnostics distinguish missing regions from
+missing native depth. Build, live continuity and performance validation of this
+candidate remain pending; it is not yet an accepted fix.
+
+The auxiliary source pass uses Iris's bounded box culling for shadow casters,
+within the lesser of native caster distance and effective source render
+distance. Main-view and visible-portal culling are unchanged. Actual native
+frustum tests cover a caster omitted by a preceding camera orientation.
+The full `.49` matrix passed 547 tests on each DH version, with zero failures,
+errors or skips, including 15 installed shader-pack GL cases. Both builds
+produced SHA-256 `cf5ed03ff9f0039e680466d85afe3ca954a7dafd17eafd47982b8f80ac62ce94`;
+the native payload is unchanged. The matrix completed at 20:26:24 UTC on
+2026-10-02. These tests use AMD; NVIDIA runtime continuity and performance
+remain unverified. The additional physical-crossing baseline submitted no
+gameplay actions because the game had already exited normally.

@@ -457,3 +457,10 @@ Fix Iris shader-option observation when JCPP replaces its source argument before
 - Accept Iris native unsized depth textures, preserve their allocation type and precision, and report bounded capture rejection reasons.
 - Keep receiving-ray traversal bounded through a runtime uniform to avoid constant-loop expansion in native entity and hand shader variants.
 - Exercise the real Iris unsized depth allocation and complete native shader linking in GPU regressions.
+
+
+## 0.5.1-zublastic.49
+
+- Refresh source shader shadows for nearby receiving rooms independently of whether the portal is visible, using a bounded offscreen native pass.
+- Restore graphics/world state on auxiliary completion or failure and keep discarded color work out of DH main-view history.
+- Preserve source freshness, memory limits and strict fallback; add bounded producer/consumer diagnostics. Live continuity and performance verification remain pending.

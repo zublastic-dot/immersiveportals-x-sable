@@ -16,6 +16,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import qouteall.imm_ptl.core.lighting.PortalShaderLighting;
 import qouteall.imm_ptl.core.lighting.PortalSourceShadow;
 
@@ -26,6 +27,17 @@ public abstract class MixinIrisSourceShadowCapture {
     @Shadow @Final private ShadowRenderTargets targets;
     @Shadow @Final private float halfPlaneLength;
     @Shadow @Final private float renderDistanceMultiplier;
+
+    @Inject(method = "createShadowFrustum", at = @At("RETURN"), cancellable = true)
+    private void ip_sourceCastersIndependentOfView(float multiplier,
+            net.irisshaders.iris.shadows.frustum.FrustumHolder previous,
+            CallbackInfoReturnable<net.irisshaders.iris.shadows.frustum.FrustumHolder> cir) {
+        if (!qouteall.imm_ptl.core.lighting.PortalSourceRefreshPolicy.isRendering()) return;
+        cir.setReturnValue(qouteall.imm_ptl.core.compat.iris_compatibility.IrisSourceShadowFrustum.select(
+            cir.getReturnValue(), halfPlaneLength, multiplier,
+            net.irisshaders.iris.gui.option.IrisVideoSettings.shadowDistance,
+            Minecraft.getInstance().options.getEffectiveRenderDistance()));
+    }
 
     // TAIL deliberately excludes the earlier return for disabled shadow distance.
     // A pipeline RETURN hook would otherwise publish last frame's matrices as fresh.

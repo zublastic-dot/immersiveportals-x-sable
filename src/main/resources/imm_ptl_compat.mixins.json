@@ -54,6 +54,7 @@
     "iris.MixinIrisPortalSunGenericProgram",
     "iris.MixinIrisPortalSunFullscreenProgram",
     "iris.MixinIrisSourceShadowCapture",
+    "iris.IEIrisGbufferPrograms",
     "iris.IEIrisEuphoriaShaderPack",
     "iris.MixinIrisEuphoriaPipelineManager",
     "iris.MixinEuphoriaDimensionShaderRefresh"

@@ -22,7 +22,9 @@
     "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/IPGlobal.java",
     "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/IPModMain.java",
     "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/IPModMainClient.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/dh_compatibility/DhAuxiliaryRenderPolicy.java",
     "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/iris_compatibility",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/mixin/dh/MixinDhClientApi.java",
     "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/mixin/iris",
     "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/lighting",
     "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/platform_specific/IPConfig.java",
@@ -55,7 +57,9 @@
     "src/main/java/ipl/sable/transit/IplShipPortalAnchor.java",
     "src/main/java/qouteall/imm_ptl/core/lighting",
     "src/test/java/qouteall/imm_ptl/core/lighting",
-    "src/main/java/qouteall/imm_ptl/core/compat/mixin/iris"
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/iris",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/dh/MixinDhClientApi.java",
+    "src/main/java/qouteall/imm_ptl/core/compat/dh_compatibility/DhAuxiliaryRenderPolicy.java"
   ],
   "value_case": {
     "category": "observable_capability",

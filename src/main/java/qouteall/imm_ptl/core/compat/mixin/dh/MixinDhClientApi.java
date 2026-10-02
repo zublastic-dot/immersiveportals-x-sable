@@ -18,6 +18,8 @@ import java.util.function.UnaryOperator;
 import org.spongepowered.asm.mixin.injection.At;
 import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalRendering;
 import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalTaa;
+import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
+import qouteall.imm_ptl.core.lighting.PortalSourceRefreshPolicy;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
 
 @Pseudo
@@ -37,6 +39,12 @@ public class MixinDhClientApi implements DhCameraSpeedHistory {
     }
     @WrapMethod(method = "renderLodLayer")
     private void ip_renderScope(boolean deferred, Operation<Void> original) {
+        // The discarded source color image must not update the main view's DH
+        // history. Native source shadow geometry is still needed by Iris.
+        if (PortalSourceRefreshPolicy.isRendering()) {
+            if (IrisInterface.invoker.isRenderingShadowMap()) original.call(deferred);
+            return;
+        }
         DhPortalTaa.maintain();
         if (!PortalRendering.isRendering()) { original.call(deferred); return; }
         try (var scope = DhPortalRendering.begin()) {
@@ -46,6 +54,7 @@ public class MixinDhClientApi implements DhCameraSpeedHistory {
 
     @WrapMethod(method = {"renderFadeOpaque", "renderFadeTransparent"})
     private void ip_fadeScope(Operation<Void> original) {
+        if (PortalSourceRefreshPolicy.isRendering() && !IrisInterface.invoker.isRenderingShadowMap()) return;
         if (!PortalRendering.isRendering()) { original.call(); return; }
         // Fade rebuilds RenderParams after renderLodLayer has returned. Reapply
         // the same oblique projection and disable clip distance for its quad.
@@ -72,6 +81,15 @@ public class MixinDhClientApi implements DhCameraSpeedHistory {
     @WrapOperation(method = "renderLodLayer", at = @At(value = "INVOKE",
         target = "Lcom/seibel/distanthorizons/core/render/CameraZoom;update(Lcom/seibel/distanthorizons/core/api/internal/rendering/DhRenderState;)V"))
     private void ip_keepMainZoom(CameraZoom zoom, DhRenderState state, Operation<Void> original) {
-        if (!PortalRendering.isRendering()) original.call(zoom, state);
+        if (!PortalRendering.isRendering() && !PortalSourceRefreshPolicy.isRendering()) original.call(zoom, state);
+    }
+
+    @WrapOperation(method = "renderLodLayer", at = @At(value = "INVOKE",
+        target = "Lcom/seibel/distanthorizons/core/wrapperInterfaces/modAccessor/IImmersivePortalsAccessor;isRenderingPortal()Z"), require = 1)
+    private boolean ip_keepMainCameraSpeed(IImmersivePortalsAccessor accessor, Operation<Boolean> original) {
+        // DH samples camera speed before checking whether this is a shadow pass.
+        // This one call excludes auxiliary views from that sample only; it does
+        // not pretend to be a portal at the independent DH render-event veto.
+        return PortalSourceRefreshPolicy.isRendering() || original.call(accessor);
     }
 }

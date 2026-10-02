@@ -26,6 +26,8 @@ public final class PortalShaderGpu {
     private static Atlas inertAtlas;
     private static final Map<ClientLevel,Set<Integer>> OBSERVED_BINDINGS=new IdentityHashMap<>();
     private static int observedCount;
+    private static final Map<ClientLevel,Set<Integer>> OBSERVED_LIGHT_STATES=new IdentityHashMap<>();
+    private static int lightStateDiagnostics;
     // Render-thread-only staging; no full-atlas allocation on a field or sun update.
     private static FloatBuffer cellStaging;
     private static ByteBuffer shadowStaging;
@@ -143,7 +145,8 @@ public final class PortalShaderGpu {
     public static void clear() {
         for(var atlas:ATLASES.values()) atlas.close();
         if(inertAtlas!=null) { inertAtlas.close();inertAtlas=null; }
-        ATLASES.clear();OBSERVED_BINDINGS.clear();observedCount=0;warned=false;
+        ATLASES.clear();OBSERVED_BINDINGS.clear();OBSERVED_LIGHT_STATES.clear();
+        observedCount=0;lightStateDiagnostics=0;warned=false;
     }
 
     public static void retain(Collection<ClientLevel> worlds) {
@@ -152,6 +155,7 @@ public final class PortalShaderGpu {
             entry.getValue().close();return true;
         });
         OBSERVED_BINDINGS.keySet().removeIf(world->worlds.stream().noneMatch(w->w==world));
+        OBSERVED_LIGHT_STATES.keySet().removeIf(world->worlds.stream().noneMatch(w->w==world));
     }
 
     public static PortalLightGpu.Binding bind() {
@@ -167,7 +171,10 @@ public final class PortalShaderGpu {
         glUniform1i(count,0);
         List<PortalShaderLighting.Region> regions=world==null?List.of():PortalShaderLighting.regions(world);
         Atlas atlas=ATLASES.get(world);
-        if(regions.isEmpty()) return bindInert(program,world);
+        if(regions.isEmpty()) {
+            observeLightState(world,regions,List.of());
+            return bindInert(program,world);
+        }
         boolean created=atlas==null;
         if(created) atlas=new Atlas();
         try {
@@ -183,6 +190,7 @@ public final class PortalShaderGpu {
                 observedCount++;
                 LogUtils.getLogger().info("[IP shader light] bound program {} for {} with {} regions",program,world.dimension().location(),regions.size());
             }
+            if(binding!=EMPTY) observeLightState(world,regions,snapshots);
             return binding;
         } catch(RuntimeException | Error failure) {
             if(created) atlas.close();
@@ -191,6 +199,21 @@ public final class PortalShaderGpu {
             if(!warned) { warned=true;LogUtils.getLogger().warn("[IP shader light] disabled draw after binding failure",failure); }
             return bindInert(program,world);
         }
+    }
+
+    /** Bounded diagnostics from the actual draw consumer, not merely the capture producer. */
+    private static void observeLightState(ClientLevel world,List<PortalShaderLighting.Region> regions,
+                                          List<PortalSourceShadow.Snapshot> snapshots) {
+        if(world==null || lightStateDiagnostics>=16) return;
+        int depthMask=0;
+        for(int i=0;i<snapshots.size();i++) if(snapshots.get(i)!=null) depthMask|=1<<i;
+        boolean portalView=PortalRendering.isRendering();
+        int key=(regions.size()<<5)|(depthMask<<1)|(portalView?1:0);
+        if(!OBSERVED_LIGHT_STATES.computeIfAbsent(world,w->new HashSet<>()).add(key)) return;
+        lightStateDiagnostics++;
+        LogUtils.getLogger().info("[IP shader light] draw consumer {} view={}, regions={}, nativeDepthMask={}, generations={}",
+            world.dimension().location(),portalView?"portal":"direct",regions.size(),depthMask,
+            snapshots.stream().map(s->s==null?0L:s.generation()).toList());
     }
 
     private static PortalLightGpu.Binding bindInert(int program,ClientLevel world) {
