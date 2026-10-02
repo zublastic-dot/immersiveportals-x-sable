@@ -31,6 +31,7 @@ import qouteall.imm_ptl.core.render.MyGameRenderer;
 import qouteall.imm_ptl.core.render.MyRenderHelper;
 import qouteall.imm_ptl.core.render.TransformationManager;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
+import qouteall.imm_ptl.core.render.impostor.PortalImpostorManager;
 import qouteall.imm_ptl.core.render.context_management.RenderStates;
 import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
 import qouteall.q_misc_util.my_util.Plane;
@@ -171,9 +172,6 @@ public abstract class PortalRenderer {
         }
         
         double distance = portal.getDistanceToNearestPointInPortal(cameraPos);
-        if (distance > getRenderRange()) {
-            return true;
-        }
         
         if (IPCGlobal.earlyFrustumCullingPortal) {
             // frustum culling does not work when portal is very close
@@ -190,7 +188,10 @@ public abstract class PortalRenderer {
         }
         
         boolean predicateTest = NeoForge.EVENT_BUS.post(new PortalRenderingPredicateEvent(portal)).canRender();
-        return !predicateTest;
+        if (!predicateTest) return true;
+        double liveRange = getRenderRange();
+        if (PortalImpostorManager.useCachedInsteadOfLive(portal, distance, liveRange)) return true;
+        return distance > liveRange;
     }
 
     /** True when no point in this portal's thin aperture can survive the active inner clip. */

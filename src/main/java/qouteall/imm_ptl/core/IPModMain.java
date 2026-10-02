@@ -88,6 +88,7 @@ public class IPModMain {
         GlobalPortalStorage.init();
         
         EntitySync.init();
+        qouteall.imm_ptl.core.render.impostor.PortalImpostorSync.initServer();
         
         ServerTeleportationManager.init();
         

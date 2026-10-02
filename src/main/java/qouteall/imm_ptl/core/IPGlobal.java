@@ -61,6 +61,11 @@ public class IPGlobal {
     public static boolean cacheGlBuffer = true;
     
     public static boolean reducedPortalRendering = false;
+
+    public static boolean portalImpostors = true;
+    public static int portalImpostorLiveDistance = 128;
+    public static int portalImpostorMaxDistance = 2048;
+    public static int portalImpostorResolution = 256;
     
     public static boolean useSecondaryEntityVertexConsumer = true;
     

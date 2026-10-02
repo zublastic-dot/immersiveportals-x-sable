@@ -21,6 +21,7 @@ import qouteall.imm_ptl.core.render.MyRenderHelper;
 import qouteall.imm_ptl.core.render.SecondaryFrameBuffer;
 import qouteall.imm_ptl.core.render.ViewAreaRenderer;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
+import qouteall.imm_ptl.core.render.impostor.PortalImpostorManager;
 import qouteall.imm_ptl.core.render.context_management.RenderStates;
 import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
 import qouteall.imm_ptl.core.render.renderer.PortalRenderer;
@@ -51,6 +52,7 @@ public class IrisPortalRenderer extends PortalRenderer {
     private boolean nextFramePortalRenderingNeeded = false;
     private final PortalFrameBlend frameBlend = new PortalFrameBlend();
     private boolean frameBlendFailed;
+    private boolean cachedPortalRendered;
     
     IrisPortalRenderer() {
         NeoForge.EVENT_BUS.addListener(IPGlobal.PreGameRenderEvent.class, preGameRenderEvent -> {
@@ -67,6 +69,7 @@ public class IrisPortalRenderer extends PortalRenderer {
     @Override
     public void prepareRendering() {
         Validate.isTrue(!PortalRendering.isRendering());
+        cachedPortalRendered = false;
     
         // As I tested, in Nvidia videocard, glCopyImageSubData can convert depth32 into depth24stencil8.
         // but in AMD videocard it cannot. AMD videocard only supports converting depth32 into depth32stencil8.
@@ -124,7 +127,10 @@ public class IrisPortalRenderer extends PortalRenderer {
         RenderTarget mcFrameBuffer = client.getMainRenderTarget();
         int portalLayer = PortalRendering.getPortalLayer();
         
-        if (portalRenderingNeeded) {
+        // A distant cached aperture can be the only portal in a frame. Preserve the
+        // parent color and depth even when no recursive destination render is needed.
+        boolean cachedRenderingNeeded = portalLayer == 0 && PortalImpostorManager.needsRendering();
+        if (portalRenderingNeeded || cachedRenderingNeeded) {
             CHelper.doCheckGlError();
             
             // copy depth from mc fb to deferred fb
@@ -166,6 +172,10 @@ public class IrisPortalRenderer extends PortalRenderer {
         renderPortals(modelView);
         
         if (portalLayer == 0) {
+            if (portalRenderingNeeded || cachedRenderingNeeded) {
+                cachedPortalRendered = PortalImpostorManager.renderCached(modelView,
+                    RenderSystem.getProjectionMatrix(), deferredFbs[0].fb, 0);
+            }
             finish();
         }
         
@@ -218,19 +228,22 @@ public class IrisPortalRenderer extends PortalRenderer {
     private void finish() {
         GlStateManager._colorMask(true, true, true, true);
         
-        if (RenderStates.getRenderedPortalNum() == 0) {
+        if (RenderStates.getRenderedPortalNum() == 0 && !cachedPortalRendered) {
             frameBlend.clear();
             return;
         }
         
-        if (!portalRenderingNeeded) {
+        if (!portalRenderingNeeded && !cachedPortalRendered) {
             return;
         }
         
         RenderTarget mainFrameBuffer = client.getMainRenderTarget();
         mainFrameBuffer.bindWrite(true);
         
-        if (!frameBlendFailed && RenderStates.basicProjectionMatrix != null) {
+        // This is a spatial seam correction, not temporal blending. Cached-only
+        // apertures have no nonzero stencil seam and need no full-screen correction.
+        if (RenderStates.getRenderedPortalNum() == 0) frameBlend.clear();
+        if (RenderStates.getRenderedPortalNum() > 0 && !frameBlendFailed && RenderStates.basicProjectionMatrix != null) {
             try {
                 frameBlend.apply(deferredFbs[0].fb.frameBufferId,
                     mainFrameBuffer.viewWidth, mainFrameBuffer.viewHeight,
@@ -266,6 +279,7 @@ public class IrisPortalRenderer extends PortalRenderer {
         // this is important
         client.getMainRenderTarget().bindWrite(true);
         
+        Matrix4f sourceProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
         renderPortalContent(portal);
         
         int innerLayer = PortalRendering.getPortalLayer();
@@ -277,6 +291,8 @@ public class IrisPortalRenderer extends PortalRenderer {
         if (innerLayer > PortalRendering.getMaxPortalLayer()) {
             return;
         }
+        PortalImpostorManager.capture(portal, modelView, sourceProjection,
+            deferredFbs[innerLayer].fb, deferredFbs[outerLayer].fb, innerLayer);
         
         deferredFbs[outerLayer].fb.bindWrite(true);
         

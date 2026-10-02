@@ -15,6 +15,7 @@ import qouteall.imm_ptl.core.render.MyRenderHelper;
 import qouteall.imm_ptl.core.render.ViewAreaRenderer;
 import qouteall.imm_ptl.core.render.context_management.FogRendererContext;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
+import qouteall.imm_ptl.core.render.impostor.PortalImpostorManager;
 import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
 
 import java.util.List;
@@ -68,6 +69,8 @@ public class RendererUsingStencil extends PortalRenderer {
         for (Portal portal : portalsToRender) {
             doRenderPortal(portal, modelView);
         }
+        PortalImpostorManager.renderCached(modelView, RenderSystem.getProjectionMatrix(),
+            client.getMainRenderTarget(), PortalRendering.getPortalLayer());
     }
     
     @Override
@@ -148,9 +151,12 @@ public class RendererUsingStencil extends PortalRenderer {
         
         setStencilStateForWorldRendering();
         
+        Matrix4f sourceProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
         renderPortalContent(portal);
         
         PortalRendering.popPortalLayer();
+        PortalImpostorManager.capture(portal, modelView, sourceProjection,
+            client.getMainRenderTarget(), client.getMainRenderTarget(), thisPortalStencilValue);
         // pop portal layer before restoring depth, for clipping, see ViewAreaRenderer
         
         if (!portal.isFuseView()) {

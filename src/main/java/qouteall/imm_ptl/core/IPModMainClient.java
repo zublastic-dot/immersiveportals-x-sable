@@ -75,6 +75,7 @@ public class IPModMainClient {
         ClientWorldLoader.init();
         ipl.sable.client.IplClientHostedTrackingResync.init();
         qouteall.imm_ptl.core.lighting.PortalLighting.init();
+        qouteall.imm_ptl.core.render.impostor.PortalImpostorManager.init();
         
         ClientTeleportationManager.init();
         

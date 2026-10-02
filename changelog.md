@@ -426,3 +426,10 @@ and arbitrary shader-pack lighting are not claimed.
 ## 0.5.1-zublastic.43
 
 Fix Iris shader-option observation when JCPP replaces its source argument before returning. Retain the original dimension header while observing the preprocessed output; exclude End lighting settings. Shader lighting still requires live acceptance.
+
+
+## 0.5.1-zublastic.44
+
+- Cache bounded portal-local destination images and draw them at distant static or Sable-carried apertures after live rendering stops.
+- Add authoritative metadata leases, depth/stencil occlusion, cutoff hysteresis and a completed-live-view re-entry blend.
+- Preserve the .43 shader-light observer repair; cached pictures do not simulate new sunlight or destination activity.
