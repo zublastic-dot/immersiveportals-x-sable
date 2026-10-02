@@ -1,11 +1,13 @@
 # Distant portal image cache
 
-Candidate: `0.5.1-zublastic.44`, built on `.43`
-`7bad42b05c10a4b5c960cf08e7966d1fe2da3dcb`. The owner authorized this as a
-separate distant-portal feature. The complete local matrix passed 478 tests on
-each of DH 3.3.2 and 3.3.3, with zero failures, errors or skips. Hosted CI,
-installation and live verification are still pending at this checkpoint.
-The preceding `.43` sunlight/shader correction is also not live-accepted.
+Candidate: `0.5.1-zublastic.45`, following installed `.44` source
+`6432bf24897f543162f3d6e662c3393b0f39c9ea`. The owner authorized the image cache as a
+separate distant-portal feature. `.44` passed 478 tests on each DH version and
+hosted CI, but live tests have not demonstrated a captured or displayed image.
+`.45` adds capture-rejection diagnostics and fixes a separately reproduced
+sunlight checkerboard defect. Its full local matrix passed 490 tests on each of
+DH 3.3.2 and 3.3.3, with zero failures, errors or skips. Hosted CI, installation
+and live validation are pending.
 
 ## Behavior
 
@@ -88,7 +90,7 @@ and compares them at validation. These identify the carrier, parent dimension,
 local position and local orientation, independently of its moving world pose.
 Reassigning either endpoint under the same portal UUID therefore revokes the old
 lease, including while the source entity is dormant. This read-only lookup does
-not load an entity or world. These checks are included in the passing local matrix.
+not load an entity or world. These checks are included in the passing `.44` matrix.
 
 `PortalImpostorManager.RenderEvent` is the additional deny-only visibility hook
 for cached faces, including faces with no tracked portal entity. Tracked faces
@@ -121,7 +123,7 @@ white rooms have matching lighting.
 
 ## Evidence and verification
 
-The completed local matrix includes the following automated coverage:
+The completed `.44` local matrix includes the following automated coverage:
 
 - `PortalImpostorPolicyTest`: engine headroom, malformed inputs, cold/invalid
   images, oscillation/hysteresis, completion-gated fade, repeated re-entry and
@@ -142,6 +144,44 @@ Both result receipts and full XML reports are under
 on 2026-10-02 at 12:25:32 UTC. Native test evidence was preserved. This verifies the
 local source/build/test snapshot, not its deployment or live behavior.
 
+The `.44` source was published in draft IP PR 28, passed exact-head hosted CI run
+37007327221, and was installed in Portal Lab on 2026-10-02 at 12:37:45 UTC. Both
+the installation receipt and original `.42` rollback JAR were preserved; other
+mods and 4849 checked settings remained unchanged.
+
+Two `.44` live routes did not establish cache activation. The first, lasting
+52.422 seconds, showed a foreground pillar partly obscuring the aperture, making
+the 99.5% coverage gate a plausible rejection. The elevated `live44-high-02` route
+then showed a clean whole aperture at the near position but still produced no
+capture log, and the distant left portal disappeared. Foreground obstruction
+alone therefore does not explain the unresolved capture failure. Both runs used
+six teleports including restoration, with zero time or block-change commands.
+The elevated route saved all six screenshots and restored the player; its
+`route_complete=false` flag records a final post-capture state read reaching the
+conservative cleanup reserve, not failed restoration.
+
+`.45` records capture rejections at most once per ten seconds: inactive/ineligible
+renderer, invalid or partly offscreen aperture projection, unavailable GPU
+capture, or measured usable coverage below 99.5%. These messages diagnose the
+remaining issue; adding them is not a capture fix or proof of successful caching.
+
+The related `.45` sunlight fix packs explicitly observed portal-plane occupancy
+into the finite shader atlas. The old final half-block DDA handling accepted only
+25 of 100 rays in a source-clear reproduction. Known open plane cells now
+participate in traversal; unavailable cells without retained observations and
+solid cells remain blocked. Ambient interpolation has separate original-field
+bounds so this occupancy padding contributes no ambient light or edge darkening.
+The focused regression run passed 60 tests, including 14 GPU tests, and the new
+regression fails with the pre-fix shader. The completed `.45` matrix then passed
+490 tests on each of DH 3.3.2 and 3.3.3, with zero failures, errors or skips.
+Both builds produced JAR SHA-256
+`1cac23c2be662ad3eb94b1a7d33e3f00d7adb6275c7a64989c40b5d84bee1087`.
+Receipts/full XML reports are in the evidence root's `build45/` directory;
+the final run completed on 2026-10-02 at 13:38:12 UTC. Installed Complementary
+Unbound r5.9.3 + Euphoria Patches 1.10.5 programs and actual GPU tests are included.
+The native payload is unchanged. This source/test evidence does not establish
+live checkerboard repair or successful image-cache admission.
+
 Live acceptance still needs a recorded near/far/near flight, frame alignment while
 the Sable carrier moves, ordinary terrain occlusion, source-entity untracking,
 portal/link/carrier changes, shader/reload/world transitions, and a capture showing
@@ -152,5 +192,6 @@ authorization. Record cache diagnostics (`entries`, `captures`, `draws`,
 
 Canonical checkpoint: zublastic-context
 `history/2026-10-02-portal-impostor.md`. Local evidence root:
-`M:/PortalAudioCompat-20260929/portal-impostor/`. No performance improvement,
-installation, live acceptance or completed lighting correction is claimed here.
+`M:/PortalAudioCompat-20260929/portal-impostor/`. `.44` installation is verified;
+cache behavior, `.45` deployment, performance improvement and completed lighting
+correction are not live-accepted.

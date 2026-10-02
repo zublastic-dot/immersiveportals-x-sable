@@ -49,6 +49,7 @@ public final class PortalImpostorManager {
     private static final Map<UUID, Portal> LIVE = new HashMap<>();
     private static final AtomicLong RELOAD = new AtomicLong();
     private static long resourceEpoch, nextCapture, nextSubscribe, nextReport, captures, draws, failures;
+    private static long nextCaptureReport;
     private static Object connection, world, renderer, pipeline;
     private static String shaderPack;
     private static int windowWidth, windowHeight, frame = -1;
@@ -212,7 +213,11 @@ public final class PortalImpostorManager {
     /** Receives already-completed destination color, with source stencil coverage when shared. */
     public static void capture(Portal portal, Matrix4f modelView, Matrix4f projection,
                                RenderTarget colorSource, RenderTarget coverageSource, int stencilReference) {
-        if (!prepare() || !eligible(portal)) return;
+        if (!prepare() || !eligible(portal)) {
+            if (!PortalRendering.isRendering() && !IrisInterface.invoker.isRenderingShadowMap())
+                captureSkipped(portal, "inactive or ineligible; renderer=" + IPCGlobal.renderer.getClass().getSimpleName());
+            return;
+        }
         long now = System.nanoTime();
         Entry existing = ENTRIES.get(portal.getUUID());
         boolean reentry = existing != null && existing.state.decide(
@@ -235,15 +240,24 @@ public final class PortalImpostorManager {
         var projected = PortalImpostorProjection.create(modelView, projection,
             portal.getOriginPos().subtract(CHelper.getCurrentCameraPos()), portal.getAxisW(), portal.getAxisH(),
             portal.getWidth(), portal.getHeight());
-        if (projected.isEmpty() || !projected.get().fullyVisible()) return;
+        if (projected.isEmpty() || !projected.get().fullyVisible()) {
+            captureSkipped(portal, projected.isEmpty() ? "invalid projection" : "aperture partly outside view");
+            return;
+        }
         nextCapture = now + CAPTURE_INTERVAL;
         PortalImpostorGpu.Frame acquired = null;
         try {
             var image = PortalImpostorGpu.capture(projected.get(), colorSource.getColorTextureId(),
                 coverageSource.frameBufferId, stencilReference, colorSource.viewWidth, colorSource.viewHeight,
                 PortalImpostorPolicy.resolution(IPGlobal.portalImpostorResolution));
-            if (image == null) return;
-            if (image.coverageFraction() < .995) { image.close(); return; }
+            if (image == null) {
+                captureSkipped(portal, "GPU capture unavailable; source=" + colorSource.viewWidth + "x" + colorSource.viewHeight);
+                return;
+            }
+            if (image.coverageFraction() < .995) {
+                captureSkipped(portal, "usable aperture coverage=" + image.coverageFraction());
+                image.close(); return;
+            }
             acquired = image;
             var metadata = PortalImpostorMetadata.fromPortal(portal);
             Entry e = existing;
@@ -275,6 +289,13 @@ public final class PortalImpostorManager {
             if (acquired != null) acquired.close();
             fail(failure);
         }
+    }
+
+    private static void captureSkipped(Portal portal, String reason) {
+        long now = System.nanoTime();
+        if (now < nextCaptureReport) return;
+        nextCaptureReport = now + 10_000_000_000L;
+        LOG.info("[PortalImpostor] capture skipped for {}: {}", portal.getUUID(), reason);
     }
 
     public static boolean renderCached(Matrix4f modelView, Matrix4f projection,

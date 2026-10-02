@@ -4,6 +4,8 @@ uniform int ipSunPortalView;
 uniform sampler3D ipSunAtlas;
 uniform sampler2DArray ipSunSourceShadow;
 uniform vec3 ipSunOrigin[4];
+uniform vec3 ipSunAmbientMin[4];
+uniform vec3 ipSunAmbientMax[4];
 uniform vec3 ipSunPlane[4];
 uniform vec3 ipSunInward[4];
 uniform vec3 ipSunU[4];
@@ -30,9 +32,13 @@ vec4 ipSunVoxel(int i,ivec3 p) {
 }
 vec4 ipSunData(int i,vec3 point) {
     vec3 local=point-ipSunOrigin[i];
+    vec3 center=floor(local)+0.5;
+    // The observed portal-plane layer carries occlusion only, not ambient light.
+    // Keep the original field's normalized edge interpolation independent of it.
+    if(any(lessThan(center,ipSunAmbientMin[i])) || any(greaterThan(center,ipSunAmbientMax[i]))) return vec4(0.0);
     // An opaque or unobserved voxel cannot borrow ambient from its neighbor.
     if(ipSunVoxel(i,ivec3(floor(local))).a<0.5) return vec4(0.0);
-    vec3 coord=clamp(local,vec3(0.5),vec3(31.5));
+    vec3 coord=clamp(local,ipSunAmbientMin[i],ipSunAmbientMax[i]);
     vec4 value=texture(ipSunAtlas,vec3(coord.xy/32.0,(coord.z+float(i)*32.0)/128.0));
     if(value.a<0.0001) return vec4(0.0);
     return vec4(value.rgb/value.a,1.0);
@@ -54,8 +60,8 @@ vec2 ipSunLightmap(vec3 point,vec3 normal,vec2 original) {
     return result;
 }
 // Exact aperture intersection, followed by bounded voxel DDA on the receiving side.
-// At the final cell intersecting the portal plane, its placeholder belongs to the
-// opening. Earlier opaque/unknown cells and rays outside the finite field stop light.
+// The atlas includes the explicitly observed layer containing the portal plane.
+// No missing voxel is inferred to be an opening: opaque/unknown cells stop light.
 float ipSunVisibility(int i,vec3 point) {
     vec3 ray=ipSunDirection[i];
     float denom=dot(ray,ipSunInward[i]);
@@ -79,12 +85,7 @@ float ipSunVisibility(int i,vec3 point) {
     if(abs(ray.z)<0.0000001) next.z=1e20;
     for(int n=0;n<100;n++) {
         float t=min(next.x,min(next.y,next.z));
-        if(ipSunVoxel(i,cell).a<0.5) {
-            // Only the final portal-plane cell is exempt, never a wall in the grid.
-            if(ipSunInGrid(cell) || t<distance-0.00001) return 0.0;
-            vec3 center=ipSunOrigin[i]+vec3(cell)+0.5;
-            if(abs(dot(center-ipSunPlane[i],ipSunInward[i]))>0.50001) return 0.0;
-        }
+        if(ipSunVoxel(i,cell).a<0.5) return 0.0;
         if(t>=distance-0.00001) return source;
         // Supercover: check every voxel touched at a simultaneous edge/corner.
         bvec3 tied=lessThanEqual(next,vec3(t+0.000001));

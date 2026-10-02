@@ -433,3 +433,9 @@ Fix Iris shader-option observation when JCPP replaces its source argument before
 - Cache bounded portal-local destination images and draw them at distant static or Sable-carried apertures after live rendering stops.
 - Add authoritative metadata leases, depth/stencil occlusion, cutoff hysteresis and a completed-live-view re-entry blend.
 - Preserve the .43 shader-light observer repair; cached pictures do not simulate new sunlight or destination activity.
+
+## 0.5.1-zublastic.45
+
+- Correct portal sunlight ray traversal at the final aperture layer using observed occupancy, retaining solid and unknown block occlusion.
+- Preserve ambient interpolation independently of the additional aperture occupancy.
+- Report bounded portal image capture rejection diagnostics for in-game verification.

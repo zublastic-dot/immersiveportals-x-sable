@@ -246,6 +246,8 @@ public final class PortalShaderGpu {
         for(int i=0;i<regions.size();i++) {
             var r=regions.get(i);var a=r.aperture();var min=r.min();
             vector(program,"ipSunOrigin",i,new Vec3(min.x()-camera.x,min.y()-camera.y,min.z()-camera.z));
+            vector(program,"ipSunAmbientMin",i,ambientCenter(r.ambientMin(),min));
+            vector(program,"ipSunAmbientMax",i,ambientCenter(r.ambientMax(),min));
             vector(program,"ipSunPlane",i,a.center().subtract(camera));
             vector(program,"ipSunInward",i,a.inward());vector(program,"ipSunU",i,a.u());vector(program,"ipSunV",i,a.v());
             glUniform2f(location(program,"ipSunHalfSize",i),(float)(a.width()*.5),(float)(a.height()*.5));
@@ -268,6 +270,11 @@ public final class PortalShaderGpu {
             };
             vector(program,"ipSunSourceWeather",i,weather);
         }
+    }
+
+    /** Atlas-local cell-center bounds keep occupancy padding out of ambient interpolation. */
+    static Vec3 ambientCenter(PortalLightField.Pos p,PortalLightField.Pos min) {
+        return new Vec3(p.x()-min.x()+.5,p.y()-min.y()+.5,p.z()-min.z()+.5);
     }
 
     private static int location(int program,String name,int slot) { return glGetUniformLocation(program,name+"["+slot+"]"); }
