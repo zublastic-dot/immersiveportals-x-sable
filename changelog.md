@@ -421,3 +421,8 @@ and arbitrary shader-pack lighting are not claimed.
   Sable compatibility addon with the updated Sable Dynamic Lights adapter.
 - Validation and limits: docs/ZUBLASTIC_PORTAL_SHADER_LIGHT.md. Live acceptance
   remains pending; unsupported packs retain their original lighting.
+
+
+## 0.5.1-zublastic.43
+
+Fix Iris shader-option observation when JCPP replaces its source argument before returning. Retain the original dimension header while observing the preprocessed output; exclude End lighting settings. Shader lighting still requires live acceptance.

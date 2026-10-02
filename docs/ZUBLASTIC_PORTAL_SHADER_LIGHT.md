@@ -80,8 +80,14 @@ per section per update pass, preserving next-pass freshness and world identity.
 
 The separate SDL `.2` candidate passed all 31 tests and hosted CI at
 `fbba28d7f53fccdbd8f6a1262315ab8b610ee361` (Sable-Dynamic-Lights PR 2). Installation
-and live acceptance remain pending. A successful build does not establish correct
+completed for `.42`/SDL `.2` with ScalableLux and SableScalableLux; live acceptance remains pending. A successful build does not establish correct
 in-game lighting.
 
 Canonical task: `portal-shader-light-20261002`; base IP commit
 `8c09f2d11501985ec82c3e8ecc0d9ec22c9aadf3`.
+
+## Live activation correction (.43)
+
+The `.42` runtime loaded the complete requested stack and bound the Nether shader fields, but direct sunlight remained inactive. Iris 1.8.14 JCPP replaces its source argument with preprocessed output before returning; the RETURN injection therefore lost the original dimension header. `.43` wraps the preprocessing call so the original header survives, then observes the returned option-expanded output. End shader settings remain excluded. A live daylight, occlusion and crossing trial is still required.
+
+The `.43` local matrix passes all 422 tests on each of DH 3.3.2 and 3.3.3, with no skips/failures/errors. The six added regressions exercise the compiled wrapper around the real Iris preprocessor and verify the target argument-reassignment contract, Overworld/Nether observation, End exclusion, reload updates and error transparency. Both complete JARs have SHA-256 `6b89cb6d50095c0824efa683c34ecf369d0ec1a1c79d489833eec6eba620ac19`. Live transformed-Mixin activation and visual verification remain pending.

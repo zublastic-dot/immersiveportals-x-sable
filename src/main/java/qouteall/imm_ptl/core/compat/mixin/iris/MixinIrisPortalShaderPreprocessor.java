@@ -1,25 +1,29 @@
 package qouteall.imm_ptl.core.compat.mixin.iris;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.helpers.StringPair;
 import net.irisshaders.iris.shaderpack.preprocessor.JcppProcessor;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import qouteall.imm_ptl.core.lighting.PortalShaderPackAdapter;
 
 @Mixin(value = JcppProcessor.class, remap = false)
 public class MixinIrisPortalShaderPreprocessor {
-    @Inject(method = "glslPreprocessSource", at = @At("RETURN"))
-    private static void ip_observeSourceOptions(String source, Iterable<StringPair> defines,
-                                                CallbackInfoReturnable<String> cir) {
-        if (Iris.getIrisConfig() == null) return;
+    @WrapMethod(method = "glslPreprocessSource", require = 1)
+    private static String ip_observeSourceOptions(String source, Iterable<StringPair> defines,
+                                                  Operation<String> original) {
+        // Iris reassigns its source argument to the preprocessed text before
+        // returning. A RETURN injector therefore loses the dimension directives.
+        // A wrapper keeps the original immutable source in a separate call frame.
+        String preprocessed = original.call(source, defines);
+        if (Iris.getIrisConfig() == null) return preprocessed;
         // This family has a separate END_SUN_ANGLE. Never publish that setting as
         // the source Overworld's direction when an End pipeline is compiled later.
         String header = source.substring(0, Math.min(512, source.length()));
-        if (!header.contains("#define OVERWORLD") && !header.contains("#define NETHER")) return;
+        if (!header.contains("#define OVERWORLD") && !header.contains("#define NETHER")) return preprocessed;
         PortalShaderPackAdapter.observePreprocessed(
-            Iris.getIrisConfig().getShaderPackName().orElse(""), cir.getReturnValue());
+            Iris.getIrisConfig().getShaderPackName().orElse(""), preprocessed);
+        return preprocessed;
     }
 }
