@@ -407,3 +407,17 @@ and arbitrary shader-pack lighting are not claimed.
 - The .40 live run had zero active fields because its two-endpoint angle gate
   rejected the slightly rotated physical portal. Those screenshots did not
   validate .40's correction. Live .41 acceptance remains pending.
+
+
+## 0.5.1-zublastic.42 - bounded portal shader sunlight (candidate)
+
+- Add an in-memory adapter for the installed Complementary Unbound 5.9.3 /
+  Euphoria 1.10.5 pack: source ambient, transformed sunlight/moonlight, aperture
+  shadows, directional shading and bounded Nether fog integration.
+- Bind world-specific scalar/geometry atlases across terrain, Iris and DH draws;
+  preserve renderer texture and sampler state.
+- Sample propagated source block light so radial held-light fallback cannot cross
+  source-side walls. Portal Lab's requested baseline includes ScalableLux and its
+  Sable compatibility addon with the updated Sable Dynamic Lights adapter.
+- Validation and limits: docs/ZUBLASTIC_PORTAL_SHADER_LIGHT.md. Live acceptance
+  remains pending; unsupported packs retain their original lighting.

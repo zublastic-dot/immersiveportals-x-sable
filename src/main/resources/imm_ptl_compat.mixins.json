@@ -46,6 +46,13 @@
     "dh.MixinDhSsaoApply",
     "real_camera.MixinRealCameraCore",
     "iris.MixinIrisPortalEyeBrightness",
+    "iris.MixinIrisPortalShaderIncludes",
+    "iris.MixinIrisPortalSunGeometry",
+    "iris.MixinIrisPortalShaderPreprocessor",
+    "iris.MixinIrisPortalSunExtendedShader",
+    "iris.MixinIrisPortalSunLodProgram",
+    "iris.MixinIrisPortalSunGenericProgram",
+    "iris.MixinIrisPortalSunFullscreenProgram",
     "iris.IEIrisEuphoriaShaderPack",
     "iris.MixinIrisEuphoriaPipelineManager",
     "iris.MixinEuphoriaDimensionShaderRefresh"

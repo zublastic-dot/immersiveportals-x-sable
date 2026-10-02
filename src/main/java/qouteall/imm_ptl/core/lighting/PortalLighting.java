@@ -102,6 +102,7 @@ public final class PortalLighting {
     private PortalLighting() {}
 
     public static void init() {
+        PortalShaderLighting.init();
         // Sable dynamic lights refresh at LevelTickEvent.Post. IP's older tick event
         // fires before that; sample at the end of the whole client tick instead.
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> update());
@@ -141,6 +142,7 @@ public final class PortalLighting {
 
     /** Called only for actual air/solid classification changes, never light-engine writes. */
     public static void blockChanged(ClientLevel world, BlockPos position) {
+        PortalShaderLighting.blockChanged(world, position);
         Pos p = new Pos(position.getX(), position.getY(), position.getZ());
         ENTRIES.forEach((aperture, entry) -> {
             if (aperture.world == world && (entry.snapshot == null || entry.snapshot.geometry().containsKey(p))) {
@@ -215,14 +217,15 @@ public final class PortalLighting {
         for (ClientLevel world : paletteWorlds) refreshPalette(world);
         // Every field observes current sources this tick; only topology rebuilds are
         // expensive. Item movement and light storage updates never dirty topology.
+        var lightSamples=PortalLightSamples.pass();
         for (Aperture a : apertures) {
             Entry entry = ENTRIES.computeIfAbsent(a, ignored -> {
                 Entry created = new Entry(); created.sourceChunks = chunks(a.samples.values()); return created;
             });
             if (entry.snapshot == null && tick < entry.retryAt) continue;
             var previous = entry.snapshot;
-            var result = PortalLightSnapshot.update(p -> sample(a.world, p, false),
-                p -> sample(a.source, p, true), a.samples, a.inward, previous, entry.geometryDirty);
+            var result = PortalLightSnapshot.update(p -> sample(a.world, p, false, lightSamples),
+                p -> sample(a.source, p, true, lightSamples), a.samples, a.inward, previous, entry.geometryDirty);
             entry.geometryDirty = false;
             if (!result.field().available()) {
                 entry.snapshot = null; entry.retryAt = tick + 5; remove(a);
@@ -356,13 +359,13 @@ public final class PortalLighting {
     private static Pos pos(Vec3 point) {
         BlockPos p = BlockPos.containing(point); return new Pos(p.getX(), p.getY(), p.getZ());
     }
-    private static PortalLightSnapshot.Sample sample(ClientLevel world, Pos pos, boolean source) {
+    private static PortalLightSnapshot.Sample sample(ClientLevel world, Pos pos, boolean source,PortalLightSamples.Pass<ClientLevel> lightSamples) {
         BlockPos block = new BlockPos(pos.x(), pos.y(), pos.z());
         if (world.isOutsideBuildHeight(block) || !world.hasChunkAt(block)) return PortalLightSnapshot.Sample.UNKNOWN;
         var state = world.getBlockState(block);
         boolean open = source ? state.getLightBlock(world, block) < 15 : state.isAir();
         return new PortalLightSnapshot.Sample(open ? Cell.OPEN : Cell.CLOSED,
-            new Light(world.getBrightness(LightLayer.SKY, block), world.getBrightness(LightLayer.BLOCK, block)));
+            new Light(world.getBrightness(LightLayer.SKY, block), lightSamples.block(world, block)));
     }
     private static void refreshPalette(ClientLevel level) {
         Minecraft mc = Minecraft.getInstance(); ClientLevel old = mc.level;

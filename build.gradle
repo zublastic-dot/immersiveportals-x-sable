@@ -258,6 +258,9 @@ dependencies {
     implementation "org.sinytra.forgified-fabric-api:fabric-rendering-data-attachment-v1:0.3.49+73761d2e19"
     implementation "org.sinytra.forgified-fabric-api:fabric-renderer-api-v1:3.4.1+9125b6dc19"
     implementation "maven.modrinth:iris:1.8.14-beta.1+1.21.1-neoforge"
+    // Iris carries these as JarJar payloads, which plain JUnit does not unpack.
+    testImplementation "org.anarres:jcpp:1.4.14"
+    testImplementation "io.github.douira:glsl-transformer:3.0.0-pre3"
 
     // Compile against the oldest supported DH ABI; CI also tests the exact 3.3.3 release.
     // Never embed DH in this fork. A local inspected JAR may be used offline.
@@ -315,6 +318,7 @@ tasks.named('build').configure { dependsOn('jarJar') }
 tasks.named('test', Test).configure {
     useJUnitPlatform()
     systemProperty 'ipsable.glTests', providers.gradleProperty('dhGlTests').getOrElse('false')
+    systemProperty 'ipsable.shaderPack', providers.gradleProperty('shaderPack').getOrElse('')
     maxHeapSize = '512m'
     maxParallelForks = 1
     testLogging { events 'passed', 'skipped', 'failed' }
