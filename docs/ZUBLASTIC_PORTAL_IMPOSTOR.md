@@ -199,8 +199,42 @@ produced JAR SHA-256
 `371db6c7d6f3ca7e76cc1198e549f29a0a6fc717bc5bbe5a9cc1c1abb0059c72`.
 The final matrix completed on 2026-10-02 at 14:32:48 UTC. The installed shader-pack
 programs and actual GPU tests passed; the native payload remains unchanged.
-Source promotion, hosted CI, deployment and the live sunlight comparison are
-still pending. Passing this regression does not establish runtime repair.
+Exact-head hosted CI run 37021686371 passed for commit
+`0ce9c4d1c43b55361601e3abe67c2454c569e541`. `.46` was installed at 14:47:25 UTC
+on 2026-10-02, preserving the other mods, 6105 checked settings, and the `.45`
+rollback JAR. The owner subsequently observed sunlight, but also a bottom-up
+loss of that sunlight after time 9000 and sharper shadow edges than the replica.
+These reports prevent treating `.46` as a completed sunlight repair.
+
+The source-clear CPU reproduction exposes the loaded-chunk boundary: as the sun
+angle changes, lower aperture rows require source cells farther west to trace
+to the build ceiling. Unobserved cells block those rays. The controlled fixture
+produces 1024, 864, 544, 256 and zero lit samples with no solid obstacle, while
+fully observed air stays lit. Live probes separately found air at x=-16 and an
+unloaded chunk at x=-17, y=319, z=218. A stationary 30-second trial at time 9000
+saved four screenshots and left the player's pose and inventory unchanged;
+that particular trial remained lit and did not reproduce the owner's cutoff.
+The source reproduction and observed boundary support the diagnosis, but they
+must not be described as a successful live reproduction.
+
+The `.47` candidate uses a completed source Iris opaque-depth snapshot and its
+matching source camera, projection, sun direction and clock. Native-sized owned
+images have a 64 MiB/four-image bound, are invalidated on lifecycle changes, and
+expire after two seconds or 40 ticks. The supported pack's filter settings are
+applied to the complete path: each sample checks the aperture, receiving-side
+occupancy and source depth. Source depth is compared at the aperture, so source
+geometry behind the opening cannot cast a fictitious receiving-room shadow.
+The conservative CPU mask remains the fallback when a valid snapshot is absent.
+Colored translucent source shadows are outside this candidate's opaque-depth
+support. Receiving geometry uses voxel traversal and an approximate depth bias;
+exact pixel-identical softness is not established. The complete `.47` matrix
+passed 522 tests on each DH version, with zero failures, errors or skips,
+including ten actual installed-pack GL compilation cases and the production
+GPU tests. Both builds produced JAR SHA-256
+`316942595d01e3b342db1fa161658af826c6b31b85a3718fc1d0ceb9d6af9eac`.
+The final matrix completed at 17:02:42 UTC on 2026-10-02; evidence is in `build47/`
+under the artifact root. Native payload hash remains unchanged. Hosted CI,
+deployment and live acceptance are still pending.
 
 No automated `.45` gameplay commands or flight ran: attempts stopped before
 mutations because flight was disabled, user activity intervened, or the world
@@ -220,5 +254,6 @@ authorization. Record cache diagnostics (`entries`, `captures`, `draws`,
 Canonical checkpoint: zublastic-context
 `history/2026-10-02-portal-impostor.md`. Local evidence root:
 `M:/PortalAudioCompat-20260929/portal-impostor/`. `.44` and `.45` installations are
-verified; `.45` sunlight is rejected. Cache behavior, `.46` repair/deployment and
+verified; `.46` installation is also verified and its sunlight repair remains
+incomplete. Cache behavior, `.47` deployment and sunlight behavior, and
 performance improvement are not live-accepted.

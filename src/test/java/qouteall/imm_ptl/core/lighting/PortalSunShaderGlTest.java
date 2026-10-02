@@ -13,7 +13,7 @@ import static org.lwjgl.opengl.GL33.*;
 @EnabledIfSystemProperty(named="ipsable.glTests",matches="true")
 class PortalSunShaderGlTest {
     static long window;
-    int program,atlas,shadow,vao;
+    int program,atlas,shadow,depth,vao;
     float[] cells;
     @BeforeAll static void context() {
         assertTrue(glfwInit());glfwDefaultWindowHints();glfwWindowHint(GLFW_VISIBLE,GLFW_FALSE);
@@ -29,8 +29,10 @@ class PortalSunShaderGlTest {
             assertNotNull(in);resource=new String(in.readAllBytes(),StandardCharsets.UTF_8);
         }
         program=PortalLightGpuTest.link("#version 330 core\nvoid main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);gl_Position=vec4(p*2-1,0,1);}",
-            "#version 330 core\nout vec4 result;uniform vec3 probe;uniform vec3 probeNormal;uniform vec3 sweepU;uniform vec3 sweepV;uniform int mode;\n"
-            +"vec3 ipSunPackScene(int i,float sky,float direct,vec3 normal,float viewDistance,float localBlock,float emission,out float blockMultiplier);\nfloat ipSunPackDirectionShade(int i,vec3 normal);\n"+resource
+            "#version 330 core\nout vec4 result;uniform vec3 probe;uniform vec3 probeNormal;uniform vec3 sweepU;uniform vec3 sweepV;uniform int mode;uniform float testFilterRadius;\n"
+            +"#define IP_SUN_PACK_PCF\nfloat ipSunPackFiltered(int i,vec3 point,vec3 coord);\nfloat ipSunPackCoverage(int i,vec3 p,float d,float v,bool c);\nvec3 ipSunPackScene(int i,float sky,float direct,vec3 normal,float viewDistance,float localBlock,float emission,out float blockMultiplier);\nfloat ipSunPackDirectionShade(int i,vec3 normal);\n"+resource
+            +"\nfloat ipSunPackCoverage(int i,vec3 p,float d,float v,bool c){float sky=ipSunData(i,p).r;float fallback=pow(sky,8.0);float mixV=c?clamp((ipSunShadowDistance[i]*.9166667-d)/16.0,0.0,1.0):0.0;return mix(fallback,v,mixV); }\n"
+            +"\nfloat ipSunPackFiltered(int i,vec3 p,vec3 c){float r=testFilterRadius;return (ipSunPathTap(i,p,c)+ipSunPathTap(i,p,c+vec3(r,0,0))+ipSunPathTap(i,p,c-vec3(r,0,0))+ipSunPathTap(i,p,c+vec3(0,r,0))+ipSunPathTap(i,p,c-vec3(0,r,0)))*.2;}\n"
             +"\nvec3 ipSunPackScene(int i,float sky,float direct,vec3 normal,float viewDistance,float localBlock,float emission,out float blockMultiplier){blockMultiplier=1.0;return vec3(.1*sky+.7*direct);}\n"
             +"float ipSunPackDirectionShade(int i,vec3 normal){return 1.0;}\n"
             +"void main(){vec3 point=probe;if(mode==2)point+=sweepU*(gl_FragCoord.x/16.0)+sweepV*(gl_FragCoord.y/16.0);if(mode==1)result=vec4(ipSunLightmap(point,probeNormal,vec2(.2,.0)),0,1);else result=vec4(ipSunApply(point,probeNormal,vec3(.3,.2,.1)),1);}");
@@ -47,6 +49,13 @@ class PortalSunShaderGlTest {
         byte[] light=new byte[32*32*4];java.util.Arrays.fill(light,(byte)255);
         glTexImage3D(GL_TEXTURE_2D_ARRAY,0,GL_R8,32,32,4,0,GL_RED,GL_UNSIGNED_BYTE,BufferUtils.createByteBuffer(light.length).put(light).flip());
         glUniform1i(glGetUniformLocation(program,"ipSunAtlas"),0);glUniform1i(glGetUniformLocation(program,"ipSunSourceShadow"),1);
+        depth=glGenTextures();glActiveTexture(GL_TEXTURE2);glBindTexture(GL_TEXTURE_2D,depth);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_COMPARE_MODE,GL_COMPARE_REF_TO_TEXTURE);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_COMPARE_FUNC,GL_LEQUAL);
+        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+        depth(1);
+        for(int i=0;i<4;i++)glUniform1i(glGetUniformLocation(program,"ipSunDepth"+i),2);
         glUniform1i(glGetUniformLocation(program,"ipSunCount"),1);
         // The plane-containing voxel is explicitly observed, matching the padded CPU atlas.
         vec("ipSunOrigin[0]",0,0,0);vec("ipSunPlane[0]",.5f,4,4);vec("ipSunInward[0]",1,0,0);
@@ -94,7 +103,103 @@ class PortalSunShaderGlTest {
         for(int y=0;y<16;y++)for(int x=0;x<16;x++)
             assertEquals(expected,result[(y*16+x)*4],.006,context+" at "+x+","+y);
     }
-    @AfterEach void cleanup(){glDeleteTextures(atlas);glDeleteTextures(shadow);glDeleteVertexArrays(vao);glDeleteProgram(program);}
+    @AfterEach void cleanup(){glDeleteTextures(atlas);glDeleteTextures(shadow);glDeleteTextures(depth);glDeleteVertexArrays(vao);glDeleteProgram(program);}
+    void depth(float value) {
+        float[] values=new float[64*64];java.util.Arrays.fill(values,value);
+        glActiveTexture(GL_TEXTURE2);glBindTexture(GL_TEXTURE_2D,depth);
+        glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,64,64,0,GL_DEPTH_COMPONENT,GL_FLOAT,values);
+    }
+    void sourceDepth(float bias,float filterRadius) {
+        glUniform1i(glGetUniformLocation(program,"ipSunDepthValid[0]"),1);
+        vec("ipSunSourcePlane[0]",0,0,0);vec("ipSunSourceFacing[0]",0,0,1);
+        vec("ipSunSourceU[0]",1,0,0);vec("ipSunSourceV[0]",0,1,0);vec("ipSunSourceLight[0]",0,0,1);
+        var projection=new org.joml.Matrix4f().scaling(1/8f,1/8f,-1/16f);
+        matrix("ipSunSourceProjection[0]",projection);matrix("ipSunSourceInverse[0]",new org.joml.Matrix4f(projection).invert());
+        glUniform1f(glGetUniformLocation(program,"ipSunShadowBias[0]"),bias);
+        glUniform1f(glGetUniformLocation(program,"ipSunShadowDistance[0]"),96);
+        vec("ipSunToSourceX[0]",0,0,-1);vec("ipSunToSourceY[0]",0,1,0);vec("ipSunToSourceZ[0]",1,0,0);
+        glUniform1f(glGetUniformLocation(program,"testFilterRadius"),filterRadius);
+    }
+    void matrix(String name,org.joml.Matrix4f matrix) {
+        glUniformMatrix4fv(glGetUniformLocation(program,name),false,matrix.get(BufferUtils.createFloatBuffer(16)));
+    }
+    @Test void capturedSourceDepthReplacesUnknownCpuFrontierOnlyWhileValid() {
+        sourceDepth(.7333333f,0);
+        byte[] blocked=new byte[32*32*4];glActiveTexture(GL_TEXTURE1);glBindTexture(GL_TEXTURE_2D_ARRAY,shadow);
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY,0,0,0,0,32,32,4,GL_RED,GL_UNSIGNED_BYTE,BufferUtils.createByteBuffer(blocked.length).put(blocked).flip());
+        assertEquals(.8f,pixel(5,4,4)[0],.006);
+        glUniform1i(glGetUniformLocation(program,"ipSunDepthValid[0]"),0);
+        assertEquals(.1f,pixel(5,4,4)[0],.006);
+    }
+    @Test void sourceDepthIsComparedAtApertureNotAtDestinationReceiver() {
+        sourceDepth(.7333333f,0);
+        depth(.49f);assertEquals(.1f,pixel(5,4,4)[0],.006); // source-side caster
+        depth(.51f);assertEquals(.8f,pixel(5,4,4)[0],.006); // source continuation behind the portal
+        assertEquals(.8f,pixel(20,4,4)[0],.006); // receiver depth cannot change that classification
+    }
+    @Test void fullPathFilterSoftensFractionalFrameBoundaryButNotUnknownStart() {
+        sourceDepth(0,.025f);
+        float edge=pixel(5,4,5.95f)[0];assertTrue(edge>.1f && edge<.8f,"frame edge="+edge);
+        assertEquals(.8f,pixel(5,4,4)[0],.006);
+        assertEquals(.1f,pixel(5,4,6.5f)[0],.006);
+        cells[((5*32+4)*32+5)*4+3]=0;upload();
+        assertArrayEquals(new float[]{.3f,.2f,.1f,1},pixel(5,4,5.95f),.006f);
+    }
+    @Test void fullPathFilterSoftensReceivingWallBoundaryAndKeepsSolidInteriorDark() {
+        sourceDepth(0,.04f);
+        for(int y=0;y<32;y++)for(int z=4;z<32;z++)cells[((z*32+y)*32+2)*4+3]=0;
+        upload();
+        float edge=pixel(5,4,3.98f)[0];assertTrue(edge>.1f && edge<.8f,"wall edge="+edge);
+        assertEquals(.1f,pixel(5,4,5)[0],.006);
+        assertEquals(.8f,pixel(5,4,3)[0],.006);
+    }
+    @Test void nativeCoverageFadeUsesTransferredSkyAndStillHonorsReceivingWalls() {
+        sourceDepth(0,0);depth(.49f);
+        // Same source geometry at different native view coverage. No invented opaque map edge.
+        glUniform1f(glGetUniformLocation(program,"ipSunShadowDistance[0]"),8);
+        assertTrue(pixel(5,4,4)[0]>.1f);
+        glUniform1f(glGetUniformLocation(program,"ipSunShadowDistance[0]"),2);
+        assertEquals(.8f,pixel(5,4,4)[0],.006);
+        for(int y=0;y<32;y++)for(int z=0;z<32;z++)cells[((z*32+y)*32+2)*4+3]=0;
+        upload();assertEquals(.1f,pixel(5,4,4)[0],.006);
+    }
+    @Test void sourceMapUvCoverageEdgeUsesSkyFallbackWithoutClampingUnrelatedDepth() {
+        sourceDepth(0,0);depth(.49f);
+        // Shift both forward/inverse projections coherently so the aperture is outside the native map.
+        var projection=new org.joml.Matrix4f().translation(2,0,0).scale(1/8f,1/8f,-1/16f);
+        matrix("ipSunSourceProjection[0]",projection);matrix("ipSunSourceInverse[0]",new org.joml.Matrix4f(projection).invert());
+        assertEquals(.8f,pixel(5,4,4)[0],.006);
+        cells[((4*32+4)*32+2)*4+3]=0;upload();assertEquals(.1f,pixel(5,4,4)[0],.006);
+    }
+    @Test void rigidSourceRotationKeepsDepthAndApertureCoordinatesInTheSameSpace() {
+        sourceDepth(.7333333f,.00098f);
+        for(float angle:new float[]{.2f,.8f,1.7f}) {
+            var rotation=new org.joml.Matrix4f().rotateXYZ(angle,angle*.6f,-angle*.3f);
+            var projection=new org.joml.Matrix4f().scaling(1/8f,1/8f,-1/16f).mul(new org.joml.Matrix4f(rotation).invert());
+            matrix("ipSunSourceProjection[0]",projection);matrix("ipSunSourceInverse[0]",new org.joml.Matrix4f(projection).invert());
+            var u=rotation.transformDirection(new org.joml.Vector3f(1,0,0));
+            var v=rotation.transformDirection(new org.joml.Vector3f(0,1,0));
+            var n=rotation.transformDirection(new org.joml.Vector3f(0,0,1));
+            vec("ipSunSourceU[0]",u.x,u.y,u.z);vec("ipSunSourceV[0]",v.x,v.y,v.z);
+            vec("ipSunSourceFacing[0]",n.x,n.y,n.z);vec("ipSunSourceLight[0]",n.x,n.y,n.z);
+            vec("ipSunToSourceX[0]",-n.x,-n.y,-n.z);vec("ipSunToSourceY[0]",v.x,v.y,v.z);vec("ipSunToSourceZ[0]",u.x,u.y,u.z);
+            depth(1);assertEquals(.8f,pixel(5,4,4)[0],.006);
+            depth(.49f);assertEquals(.1f,pixel(5,4,4)[0],.006);
+            depth(.51f);assertEquals(.8f,pixel(5,4,4)[0],.006);
+        }
+    }
+    @Test void capturedSourceStillBlocksUnknownPortalLayerAcrossAllReceivingFaces() {
+        for(int axis=0;axis<3;axis++)for(int inward:new int[]{-1,1}) {
+            observedFrontLayer(axis,inward,0,0,false);sourceDepth(.7333333f,.00098f);
+            assertSweep(.1f,"captured source unknown layer axis="+axis+" inward="+inward);
+        }
+    }
+    @Test void capturedSourceSoftPathsRemainContinuousAcrossObliquePhases() {
+        for(int axis=0;axis<3;axis++)for(int inward:new int[]{-1,1}) {
+            observedFrontLayer(axis,inward,1,-1,true);sourceDepth(.7333333f,.00098f);
+            assertSweep(.8f,"captured source open axis="+axis+" inward="+inward);
+        }
+    }
     @Test void sunlightOnlyPassesInsideAperture(){
         assertEquals(.8f,pixel(5,4,4)[0],.006);
         assertEquals(.1f,pixel(5,6.001f,4)[0],.006);

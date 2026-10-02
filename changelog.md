@@ -444,3 +444,10 @@ Fix Iris shader-option observation when JCPP replaces its source argument before
 
 - Treat validated portal placeholders as cross-world sunlight openings while retaining their normal light-blocking behavior.
 - Cover actual portal placeholder block states in occupancy regressions.
+
+## 0.5.1-zublastic.47
+
+- Use an owned copy of the completed source Iris shadow map and its matching camera, matrices and sun direction for supported portal sunlight.
+- Filter the entire light path using the supported shader pack's shadow settings; each sample still checks the aperture and receiving walls.
+- Bound source-depth storage and lifetime, preserve native resolution, and retain the strict observed source fallback when no valid snapshot is available.
+- Distinguish active-query and zero-coverage portal image capture failures in bounded diagnostics.

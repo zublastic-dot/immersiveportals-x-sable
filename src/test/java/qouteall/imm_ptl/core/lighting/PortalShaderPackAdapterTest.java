@@ -252,6 +252,13 @@ class PortalShaderPackAdapterTest {
             assertEquals(PortalShaderPackAdapter.ClockMode.WORLD_TIME, PortalShaderPackAdapter.clockMode().orElseThrow());
         }
 
+        @Test void actualPackLowAndUltraShadowKernelsAndSmoothingOptionsCompile() {
+            for(String quality:List.of("0","1","5"))
+                verifyOptions(Map.of("SHADOW_QUALITY",quality,"SHADOW_SMOOTHING","1"));
+        }
+        @Test void actualPackNonTemporalShadowKernelCompiles() {
+            verifyOptions(Map.of("SHADOW_QUALITY","2","TAA_DEFINE","0","SHADOW_SMOOTHING","4"));
+        }
         @Test void fullSodiumTerrainCompilesAndLinks() { verify("gbuffers_terrain"); }
         @Test void fullDhTerrainCompilesAndLinks() { verify("dh_terrain"); }
         @Test void fullBorderFogPassCompilesAndLinks() { verify("deferred1"); }

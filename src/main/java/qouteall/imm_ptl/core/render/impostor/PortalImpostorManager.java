@@ -247,11 +247,17 @@ public final class PortalImpostorManager {
         nextCapture = now + CAPTURE_INTERVAL;
         PortalImpostorGpu.Frame acquired = null;
         try {
-            var image = PortalImpostorGpu.capture(projected.get(), colorSource.getColorTextureId(),
+            var result = PortalImpostorGpu.captureDetailed(projected.get(), colorSource.getColorTextureId(),
                 coverageSource.frameBufferId, stencilReference, colorSource.viewWidth, colorSource.viewHeight,
                 PortalImpostorPolicy.resolution(IPGlobal.portalImpostorResolution));
+            var image = result.frame();
             if (image == null) {
-                captureSkipped(portal, "GPU capture unavailable; source=" + colorSource.viewWidth + "x" + colorSource.viewHeight);
+                captureSkipped(portal, "GPU capture unavailable: " + result.failure()
+                    + "; queryTarget=0x" + Integer.toHexString(result.queryTarget()) + "; queryId=" + result.queryId()
+                    + "; coveredSamples=" + result.coveredSamples() + "; stencilReference=" + stencilReference
+                    + "; coverageFramebuffer=" + coverageSource.frameBufferId
+                    + "; colorTexture=" + colorSource.getColorTextureId()
+                    + "; source=" + colorSource.viewWidth + "x" + colorSource.viewHeight);
                 return;
             }
             if (image.coverageFraction() < .995) {

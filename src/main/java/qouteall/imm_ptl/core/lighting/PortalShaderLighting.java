@@ -105,6 +105,11 @@ public final class PortalShaderLighting {
         return ENTRIES.values().stream().map(e->e.region).filter(Objects::nonNull)
             .filter(r->r.aperture.target==world).limit(LIMIT).toList();
     }
+    /** Actual source identity, without loading a world or requesting a chunk. */
+    public static boolean usesSource(ClientLevel world) {
+        return world!=null && supported() && ENTRIES.values().stream()
+            .anyMatch(e->e.region!=null && e.region.aperture.source==world);
+    }
     public static boolean supported() {
         String pack=IrisInterface.invoker.getShaderpackName();
         return PortalLighting.ENABLED && IrisInterface.invoker.isShaders() && pack!=null

@@ -16,6 +16,16 @@ public final class PortalImpostorGpu {
 
     private PortalImpostorGpu() {}
 
+    public enum CaptureFailure { INVALID_INPUT, ACTIVE_OCCLUSION_QUERY, ZERO_COVERED_SAMPLES }
+
+    /** A failed capture owns no frame; query metadata identifies the untouched caller query. */
+    public record CaptureResult(Frame frame, CaptureFailure failure, int queryTarget, int queryId,
+                                long coveredSamples) {
+        private static CaptureResult rejected(CaptureFailure failure, int target, int query, long samples) {
+            return new CaptureResult(null, failure, target, query, samples);
+        }
+    }
+
     public static final class Frame implements AutoCloseable {
         private int texture;
         private final int size;
@@ -37,13 +47,23 @@ public final class PortalImpostorGpu {
     /** Ref -1 is only for a dedicated destination image, never a shared source-world framebuffer. */
     public static Frame capture(PortalImpostorProjection projection, int colorTexture,
         int coverageFramebuffer, int stencilReference, int sourceWidth, int sourceHeight, int resolution) {
+        return captureDetailed(projection, colorTexture, coverageFramebuffer, stencilReference,
+            sourceWidth, sourceHeight, resolution).frame();
+    }
+
+    public static CaptureResult captureDetailed(PortalImpostorProjection projection, int colorTexture,
+        int coverageFramebuffer, int stencilReference, int sourceWidth, int sourceHeight, int resolution) {
         if (projection == null || !projection.fullyVisible() || colorTexture <= 0
             || sourceWidth <= 0 || sourceHeight <= 0 || (long)sourceWidth * sourceHeight > MAX_MASK_PIXELS
             || resolution < 16 || resolution > 512 || stencilReference < -1 || stencilReference > 255)
-            return null;
+            return CaptureResult.rejected(CaptureFailure.INVALID_INPUT, 0, 0, -1);
         // Do not nest an occlusion query belonging to another renderer/mod.
-        if (glGetQueryi(GL_SAMPLES_PASSED, GL_CURRENT_QUERY) != 0
-            || glGetQueryi(GL_ANY_SAMPLES_PASSED, GL_CURRENT_QUERY) != 0) return null;
+        int activeQuery = glGetQueryi(GL_SAMPLES_PASSED, GL_CURRENT_QUERY);
+        if (activeQuery != 0)
+            return CaptureResult.rejected(CaptureFailure.ACTIVE_OCCLUSION_QUERY, GL_SAMPLES_PASSED, activeQuery, -1);
+        activeQuery = glGetQueryi(GL_ANY_SAMPLES_PASSED, GL_CURRENT_QUERY);
+        if (activeQuery != 0)
+            return CaptureResult.rejected(CaptureFailure.ACTIVE_OCCLUSION_QUERY, GL_ANY_SAMPLES_PASSED, activeQuery, -1);
         int texture = 0, framebuffer = 0, query = 0;
         boolean querying = false;
         try (State ignored = new State()) {
@@ -70,10 +90,11 @@ public final class PortalImpostorGpu {
             glDrawArrays(GL_TRIANGLES, 0, 6);
             glEndQuery(GL_SAMPLES_PASSED); querying = false;
             long samples = glGetQueryObjectui64(query, GL_QUERY_RESULT);
-            if (samples == 0) return null;
+            if (samples == 0)
+                return CaptureResult.rejected(CaptureFailure.ZERO_COVERED_SAMPLES, 0, 0, 0);
             Frame frame = new Frame(texture, resolution, Math.min(1, samples / (double)(resolution * resolution)));
             texture = 0;
-            return frame;
+            return new CaptureResult(frame, null, 0, 0, samples);
         } finally {
             if (querying) glEndQuery(GL_SAMPLES_PASSED);
             if (query != 0) glDeleteQueries(query);

@@ -59,6 +59,10 @@ class PortalImpostorGpuGlTest {
         return PortalImpostorGpu.capture(projection(0, 2, 0), source.texture, source.fbo, ref, 64, 64, 64);
     }
 
+    private PortalImpostorGpu.CaptureResult captureDetailed(int ref) {
+        return PortalImpostorGpu.captureDetailed(projection(0, 2, 0), source.texture, source.fbo, ref, 64, 64, 64);
+    }
+
     @Test void capturesCompletedDestinationAndReprojectsMovingAperture() {
         source.colorRect(32, 0, 32, 64, 0, 1, 0);
         try (var image = capture(1)) {
@@ -126,8 +130,14 @@ class PortalImpostorGpuGlTest {
     }
 
     @Test void emptyCoverageIsRejectedAndDedicatedSourceDoesNotRequireStencil() {
-        assertNull(capture(2));
-        try (var image = capture(-1)) { assertNotNull(image); assertEquals(1, image.coverageFraction()); }
+        var empty = captureDetailed(2);
+        assertNull(empty.frame());
+        assertEquals(PortalImpostorGpu.CaptureFailure.ZERO_COVERED_SAMPLES, empty.failure());
+        assertEquals(0, empty.coveredSamples());
+        var dedicated = captureDetailed(-1);
+        assertNull(dedicated.failure());
+        assertEquals(64 * 64, dedicated.coveredSamples());
+        try (var image = dedicated.frame()) { assertNotNull(image); assertEquals(1, image.coverageFraction()); }
     }
 
     @Test void cachedPlaneObeysCurrentForegroundDepthAndWritesItsOwnDepth() {
@@ -152,7 +162,10 @@ class PortalImpostorGpuGlTest {
     }
 
     @Test void offscreenCaptureAndUnboundedAllocationAreRejected() {
-        assertNull(PortalImpostorGpu.capture(projection(1, 2, 0), source.texture, source.fbo, 1, 64, 64, 64));
+        var offscreen = PortalImpostorGpu.captureDetailed(projection(1, 2, 0), source.texture, source.fbo, 1, 64, 64, 64);
+        assertNull(offscreen.frame());
+        assertEquals(PortalImpostorGpu.CaptureFailure.INVALID_INPUT, offscreen.failure());
+        assertEquals(-1, offscreen.coveredSamples());
         assertNull(PortalImpostorGpu.capture(projection(0, 2, 0), source.texture, source.fbo, 1, 8192, 8192, 64));
         assertNull(PortalImpostorGpu.capture(projection(0, 2, 0), source.texture, source.fbo, 1, 64, 64, 1024));
     }
@@ -163,7 +176,12 @@ class PortalImpostorGpuGlTest {
             try {
                 glBeginQuery(type, query);
                 try {
-                    assertNull(capture(1));
+                    var rejected = captureDetailed(1);
+                    assertNull(rejected.frame());
+                    assertEquals(PortalImpostorGpu.CaptureFailure.ACTIVE_OCCLUSION_QUERY, rejected.failure());
+                    assertEquals(type, rejected.queryTarget());
+                    assertEquals(query, rejected.queryId());
+                    assertEquals(-1, rejected.coveredSamples());
                     assertEquals(query, glGetQueryi(type, GL_CURRENT_QUERY));
                     assertEquals(GL_NO_ERROR, glGetError());
                 } finally { glEndQuery(type); }

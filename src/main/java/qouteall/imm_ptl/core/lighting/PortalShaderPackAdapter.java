@@ -119,8 +119,8 @@ public final class PortalShaderPackAdapter {
             String nativeAo = between(aoSection.substring(aoSection.indexOf("#elif defined NETHER")), "#elif defined NETHER", "#else");
             String noon = declaration(source, "noonFactorRaw") + declaration(source, "noonFactor");
             colours += "\n"; directional += "\n"; moon += "\n"; sourceAo += "\n";
-            String helper = environmentHelper(time, angles, common, colours, directional, moon, tweaks, invNoon2) + aoHelper(sourceAo, noon);
-            String injected = MARKER + "\n#ifdef NETHER\n"
+            String helper = environmentHelper(time, angles, common, colours, directional, moon, tweaks, invNoon2) + aoHelper(sourceAo, noon) + shadowFilterHelper(source);
+            String injected = MARKER + "\n#ifdef NETHER\n#define IP_SUN_PACK_PCF\nfloat ipSunPackFiltered(int region, vec3 point, vec3 coord);\nfloat ipSunPackCoverage(int region, vec3 point, float viewDistance, float visibility, bool covered);\n"
                 + "vec3 ipSunPackScene(int region, float sky, float directVisibility, vec3 worldNormal, float lViewPos, float lightmapXM, float emission, out float blockMultiplier);\n"
                 + "float ipSunPackDirectionShade(int region, vec3 worldNormal);\n"
                 + resource + "\n" + helper + "\n#endif\n";
@@ -144,6 +144,109 @@ public final class PortalShaderPackAdapter {
             report(path, "unavailable: " + rejected.getMessage());
             return input;
         }
+    }
+
+    /** Retain the owner's option-conditioned PCF kernel, but apply each tap to the whole path. */
+    private static String shadowFilterHelper(String source) {
+        String projection=function(source,"vec3 GetShadowPos(vec3 playerPos)");
+        String compact=projection.replaceAll("\\s+", "");
+        if(!compact.contains("floatdistortFactor=distb*shadowMapBias+(1.0-shadowMapBias);")
+            || !compact.contains("shadowPos.xy/=distortFactor;") || !compact.contains("shadowPos.z*=0.2;")
+            || !source.replaceAll("\\s+", "").contains("constfloatshadowMapBias=1.0-25.6/shadowDistance;"))
+            throw new IllegalArgumentException("Source shadow projection changed");
+        String lighting=function(source,"void DoLighting(");
+        String coverage=declaration(lighting,"shadowLength")+declaration(lighting,"shadowSmooth");
+        String skyFallback=conditionalContaining(lighting,"float skyLightShadowMult = pow2(pow2(lightmapY2));").replace("#ifdef OVERWORLD","#if 1");
+        String offset=conditionalContaining(lighting,"float offset = 0.00098;");
+        String samples=conditionalContaining(lighting,"int shadowSamples = 2 + 2 * shadowSampleBooster;");
+        String noise=function(source,"float InterleavedGradientNoiseForShadows()");
+        String distribution=function(source,"vec2 offsetDist(float x, int s)");
+        String taa=function(source,"vec3 SampleTAAFilteredShadow(");
+        String cross=function(source,"vec3 SampleFilteredShadow(");
+        String basic=function(source,"vec3 SampleBasicFilteredShadow(");
+        String offsets=statement(source,"vec2 shadowOffsets[4]");
+        if(!offsets.contains("vec2[4]("))
+            throw new IllegalArgumentException("Shadow filter offsets changed");
+        String get=function(source,"vec3 GetShadow(");
+        if(get.indexOf("float lightmapY2")<0) throw new IllegalArgumentException("Shadow weather section changed");
+        String weather=get.substring(get.indexOf('{')+1,get.indexOf("float lightmapY2"))
+            .replace("#ifdef OVERWORLD","#if 1");
+        String selection=conditionalContaining(get,"vec3 shadow = SampleTAAFilteredShadow(shadowPos, offset, shadowSamples, leaves, colorMult, colorPow);");
+        // This runtime source remains owned by the installed pack. Only calls at
+        // its sampling boundary are redirected; noise/options/rain/TAA are preserved.
+        String functions=noise+distribution+offsets+taa+cross+basic;
+        functions=functions.replace("SampleTAAFilteredShadow(","ipSunPackTaa(int region, vec3 point, ")
+            .replace("SampleFilteredShadow(","ipSunPackCross(int region, vec3 point, ")
+            .replace("SampleBasicFilteredShadow(","ipSunPackBasic(int region, vec3 point, ")
+            .replace("SampleShadow(","ipSunPackTap(region, point, ")
+            .replace("shadow2D(shadowtex0, vec3(offset * shadowOffsets[i] + shadowPos.st, shadowPos.z)).x",
+                "ipSunPathTap(region, point, vec3(offset * shadowOffsets[i] + shadowPos.st, shadowPos.z))")
+            .replace("InterleavedGradientNoiseForShadows","ipSunPackNoise")
+            .replace("offsetDist","ipSunPackOffset").replace("shadowOffsets","ipSunPackOffsets");
+        if(functions.contains("SampleShadow(") || functions.contains("shadow2D("))
+            throw new IllegalArgumentException("Unsupported native shadow sample");
+        selection=selection.replace("SampleTAAFilteredShadow(","ipSunPackTaa(region, point, ")
+            .replace("SampleFilteredShadow(","ipSunPackCross(region, point, ")
+            .replace("SampleBasicFilteredShadow(","ipSunPackBasic(region, point, ");
+        return """
+            float ipSunPackCoverage(int region, vec3 point, float lViewPos, float visibility, bool covered) {
+                float shadowDistance = ipSunShadowDistance[region];
+                float lightmapY2 = pow2(clamp(ipSunData(region, point).r, 0.0, 1.0));
+            """+coverage+"\n"+skyFallback+"\n"+"""
+                float shadowMixer = covered ? clamp(shadowLength / shadowSmooth, 0.0, 1.0) : 0.0;
+                return mix(skyLightShadowMult, visibility, shadowMixer);
+            }
+            #if SHADOW_QUALITY >= 0
+            vec3 ipSunPackTap(int region, vec3 point, vec3 coord, float unusedColor, float unusedPower) {
+                return vec3(ipSunPathTap(region, point, coord));
+            }
+            """+functions+"""
+            #endif
+            float ipSunPackFiltered(int region, vec3 point, vec3 shadowPos) {
+                #if SHADOW_QUALITY >= 0
+                    float rainFactor2 = ipSunSourceRain[region] * ipSunSourceRain[region];
+                    int shadowSampleBooster = 0;
+                    bool leaves = false;
+                    float colorMult = 1.0, colorPow = 1.0;
+            """+offset+"\n"+samples+"\n"+weather+"\n"+selection+"\n"+"""
+                    return shadow.r;
+                #else
+                    return ipSunPathTap(region, point, shadowPos);
+                #endif
+            }
+            """;
+    }
+
+    private static String statement(String source,String prefix) {
+        String result=null;
+        for(int from=0;(from=source.indexOf(prefix,from))>=0;) {
+            int end=source.indexOf(';',from);
+            if(end<0) throw new IllegalArgumentException("Incomplete shadow statement");
+            String next=source.substring(from,end+1);
+            if(result!=null && !result.equals(next)) throw new IllegalArgumentException("Ambiguous shadow statement: "+prefix);
+            result=next;from=end+1;
+        }
+        if(result==null) throw new IllegalArgumentException("Missing shadow statement: "+prefix);
+        return result+"\n";
+    }
+
+    private static String function(String source,String signature) {
+        String result=null;
+        for(int from=0;(from=source.indexOf(signature,from))>=0;) {
+            int opening=source.indexOf('{',from),depth=0,end=-1;
+            if(opening<0) throw new IllegalArgumentException("Missing shadow function body");
+            for(int i=opening;i<source.length();i++) {
+                if(source.charAt(i)=='{') depth++;
+                if(source.charAt(i)=='}' && --depth==0) {end=i+1;break;}
+            }
+            if(end<0) throw new IllegalArgumentException("Incomplete shadow function");
+            String next=source.substring(from,end)+"\n";
+            // Iris' raw include graph may expand the same guarded include more than once.
+            if(result!=null && !result.equals(next)) throw new IllegalArgumentException("Ambiguous shadow function: "+signature);
+            result=next;from=end;
+        }
+        if(result==null) throw new IllegalArgumentException("Shadow function changed: "+signature);
+        return result;
     }
 
     private static String patchFog(String source, String resource, boolean hasLighting) {
