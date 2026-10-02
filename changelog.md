@@ -439,3 +439,8 @@ Fix Iris shader-option observation when JCPP replaces its source argument before
 - Correct portal sunlight ray traversal at the final aperture layer using observed occupancy, retaining solid and unknown block occlusion.
 - Preserve ambient interpolation independently of the additional aperture occupancy.
 - Report bounded portal image capture rejection diagnostics for in-game verification.
+
+## 0.5.1-zublastic.46
+
+- Treat validated portal placeholders as cross-world sunlight openings while retaining their normal light-blocking behavior.
+- Cover actual portal placeholder block states in occupancy regressions.

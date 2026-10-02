@@ -1,13 +1,13 @@
 # Distant portal image cache
 
-Candidate: `0.5.1-zublastic.45`, following installed `.44` source
-`6432bf24897f543162f3d6e662c3393b0f39c9ea`. The owner authorized the image cache as a
-separate distant-portal feature. `.44` passed 478 tests on each DH version and
-hosted CI, but live tests have not demonstrated a captured or displayed image.
-`.45` adds capture-rejection diagnostics and fixes a separately reproduced
-sunlight checkerboard defect. Its full local matrix passed 490 tests on each of
-DH 3.3.2 and 3.3.3, with zero failures, errors or skips. Hosted CI, installation
-and live validation are pending.
+Candidate: `0.5.1-zublastic.46`, following `.45` source
+`f7665d2ea50a6a0ad5f631f86945d469bc1cb444`. The owner authorized the image cache as a
+separate distant-portal feature. `.44` live tests have not demonstrated a captured
+or displayed image. `.45` passed 490 tests on each DH version and hosted CI and
+was installed, but its live sunlight result was rejected: the portal room again
+had no direct sun patch. `.46` corrects the actual portal placeholder block's
+occupancy semantics and passes 491 local tests on each supported DH version.
+Hosted CI, installation and live repair for `.46` remain pending.
 
 ## Behavior
 
@@ -165,7 +165,7 @@ renderer, invalid or partly offscreen aperture projection, unavailable GPU
 capture, or measured usable coverage below 99.5%. These messages diagnose the
 remaining issue; adding them is not a capture fix or proof of successful caching.
 
-The related `.45` sunlight fix packs explicitly observed portal-plane occupancy
+The related `.45` sunlight change packs explicitly observed portal-plane occupancy
 into the finite shader atlas. The old final half-block DDA handling accepted only
 25 of 100 rays in a source-clear reproduction. Known open plane cells now
 participate in traversal; unavailable cells without retained observations and
@@ -182,6 +182,33 @@ Unbound r5.9.3 + Euphoria Patches 1.10.5 programs and actual GPU tests are inclu
 The native payload is unchanged. This source/test evidence does not establish
 live checkerboard repair or successful image-cache admission.
 
+`.45` was installed after exact-head CI run 37015598417 passed, but the owner's
+shader-on screenshot at time 9000 shows a bright direct-sun patch in the ordinary
+replica and none in the portal room. This rejects `.45` as a sunlight repair.
+The live cause is the actual `PortalPlaceholderBlock.getLightBlock` contract:
+it intentionally returns 15 to block vanilla light propagation. `.45` reused that
+value for ray occupancy and classified the portal-plane placeholders as solid.
+The synthetic open-plane regression did not exercise this actual block class.
+
+`.46` recognizes the real portal placeholder only at the valid receiving aperture
+plane with the matching axis, preserving its vanilla opacity of 15. Ordinary
+solids and unrecognized/unobserved cells continue to block the ray. Actual
+block-state regression coverage and the completed full matrix passed 491 tests
+on each of DH 3.3.2 and 3.3.3, with zero failures, errors or skips. Both builds
+produced JAR SHA-256
+`371db6c7d6f3ca7e76cc1198e549f29a0a6fc717bc5bbe5a9cc1c1abb0059c72`.
+The final matrix completed on 2026-10-02 at 14:32:48 UTC. The installed shader-pack
+programs and actual GPU tests passed; the native payload remains unchanged.
+Source promotion, hosted CI, deployment and the live sunlight comparison are
+still pending. Passing this regression does not establish runtime repair.
+
+No automated `.45` gameplay commands or flight ran: attempts stopped before
+mutations because flight was disabled, user activity intervened, or the world
+changed. Separate menu-controller actions are not gameplay verification. The user exited the
+game at 16:24:31 CEST; the agent did not close it. `.45` cache diagnostics observed
+only partly offscreen-aperture rejections during the user's near views. They do
+not explain the earlier clean-view `.44` failure or establish cache activation.
+
 Live acceptance still needs a recorded near/far/near flight, frame alignment while
 the Sable carrier moves, ordinary terrain occlusion, source-entity untracking,
 portal/link/carrier changes, shader/reload/world transitions, and a capture showing
@@ -192,6 +219,6 @@ authorization. Record cache diagnostics (`entries`, `captures`, `draws`,
 
 Canonical checkpoint: zublastic-context
 `history/2026-10-02-portal-impostor.md`. Local evidence root:
-`M:/PortalAudioCompat-20260929/portal-impostor/`. `.44` installation is verified;
-cache behavior, `.45` deployment, performance improvement and completed lighting
-correction are not live-accepted.
+`M:/PortalAudioCompat-20260929/portal-impostor/`. `.44` and `.45` installations are
+verified; `.45` sunlight is rejected. Cache behavior, `.46` repair/deployment and
+performance improvement are not live-accepted.

@@ -4,8 +4,11 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -13,6 +16,7 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
 import qouteall.imm_ptl.core.ClientWorldLoader;
 import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 import qouteall.imm_ptl.core.portal.Portal;
+import qouteall.imm_ptl.core.portal.PortalPlaceholderBlock;
 import qouteall.imm_ptl.core.portal.shape.RectangularPortalShape;
 
 import java.util.*;
@@ -156,7 +160,7 @@ public final class PortalShaderLighting {
             e.snapshot=result.snapshot();
             var oldLayer=e.apertureLayer;
             if(old==null || geometryDirty) e.apertureLayer=observeApertureLayer(a,e.snapshot,
-                p->occupancy(a.target,p),oldLayer);
+                p->occupancy(a.target,p,inward),oldLayer);
             boolean occupancyChanged=!oldLayer.equals(e.apertureLayer);
             float angle=sunAngle(a.source.getTimeOfDay(0));
             var rotation=PortalShaderPackAdapter.sunPathRotationDegrees();
@@ -201,7 +205,7 @@ public final class PortalShaderLighting {
     }
     /**
      * Seeds lie one block inside the portal. Observe the omitted plane layer explicitly:
-     * its transparent portal placeholders are ray occupancy, never ambient-light seeds.
+     * its matching portal placeholders are ray occupancy, never ambient-light seeds.
      * The snapshot's dense one-cell halo supplies the bounded candidate set and dirties
      * this layer on real block/chunk updates, including non-air -> non-air changes.
      */
@@ -252,10 +256,22 @@ public final class PortalShaderLighting {
         }
         return cells;
     }
-    private static Cell occupancy(ClientLevel w,Pos p) {
+    private static Cell occupancy(ClientLevel w,Pos p,Pos inward) {
         BlockPos b=new BlockPos(p.x(),p.y(),p.z());
         if(w.isOutsideBuildHeight(b)||!w.hasChunkAt(b)) return Cell.UNKNOWN;
-        return w.getBlockState(b).getLightBlock(w,b)>=15?Cell.CLOSED:Cell.OPEN;
+        return apertureOccupancy(w.getBlockState(b),w,b,inward);
+    }
+    /** Only called for observed cells in this validated aperture's bounded plane layer. */
+    static Cell apertureOccupancy(BlockState state,BlockGetter world,BlockPos pos,Pos inward) {
+        if(state==null) return Cell.UNKNOWN;
+        if(state.getBlock() instanceof PortalPlaceholderBlock) {
+            // Vanilla opacity stays 15 to block light from the hidden local continuation.
+            // The matching aperture surface instead admits this explicit cross-world ray.
+            if(Math.abs(inward.x())+Math.abs(inward.y())+Math.abs(inward.z())!=1) return Cell.CLOSED;
+            Direction.Axis axis=inward.x()!=0?Direction.Axis.X:inward.y()!=0?Direction.Axis.Y:Direction.Axis.Z;
+            return state.getValue(PortalPlaceholderBlock.AXIS)==axis?Cell.OPEN:Cell.CLOSED;
+        }
+        return state.getLightBlock(world,pos)>=15?Cell.CLOSED:Cell.OPEN;
     }
     private static byte[] sourceShadow(Aperture a,Vec3 sun,PortalSunOcclusion cache) {
         World reader=p->{

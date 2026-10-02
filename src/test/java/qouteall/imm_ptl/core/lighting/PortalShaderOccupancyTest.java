@@ -1,7 +1,14 @@
 package qouteall.imm_ptl.core.lighting;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.EmptyBlockGetter;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import qouteall.imm_ptl.core.portal.PortalBlockTestBootstrap;
+import qouteall.imm_ptl.core.portal.PortalPlaceholderBlock;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static qouteall.imm_ptl.core.lighting.PortalLightField.*;
 
 class PortalShaderOccupancyTest {
+    @BeforeAll static void bootstrap() { PortalBlockTestBootstrap.initialize(); }
     private record Fixture(PortalShaderLighting.Aperture aperture,PortalLightSnapshot.Snapshot snapshot,
                            int axis,Pos inward) {}
 
@@ -46,11 +54,17 @@ class PortalShaderOccupancyTest {
         int i=(((p.z()-min.z())*32+p.y()-min.y())*32+p.x()-min.x())*4;
         return java.util.Arrays.copyOfRange(atlas,i,i+4);
     }
-    @Test void transparentNonAirPlaneIsOccupancyOnlyForAllSixReceivingDirections() {
+    @Test void actualOpaquePortalPlaceholderIsCrossWorldOccupancyOnlyForAllSixReceivingDirections() {
         for(int axis=0;axis<3;axis++) for(int sign:new int[]{-1,1}) {
             Fixture f=room(axis,sign);var reads=new HashSet<Pos>();
+            var placeholder=PortalPlaceholderBlock.instance.defaultBlockState()
+                .setValue(PortalPlaceholderBlock.AXIS,Direction.Axis.values()[axis]);
+            assertEquals(15,placeholder.getLightBlock(EmptyBlockGetter.INSTANCE,BlockPos.ZERO));
+            assertFalse(placeholder.isAir());
             var layer=PortalShaderLighting.observeApertureLayer(f.aperture,f.snapshot,p->{
-                assertEquals(0,p.component(f.axis));assertTrue(reads.add(p));return Cell.OPEN;
+                assertEquals(0,p.component(f.axis));assertTrue(reads.add(p));
+                return PortalShaderLighting.apertureOccupancy(placeholder,EmptyBlockGetter.INSTANCE,
+                    new BlockPos(p.x(),p.y(),p.z()),f.inward);
             },Map.of());
             assertEquals(9,reads.size(),"Only the aperture plane, not its surrounding frame, is read");
             Pos min=PortalShaderLighting.atlasMin(f.snapshot,layer);
@@ -61,7 +75,31 @@ class PortalShaderOccupancyTest {
                 assertArrayEquals(new float[]{value.getValue().sky()/15f,.2f,.75f,1},voxel(packed,min,value.getKey()));
             }
             assertEquals(Cell.CLOSED,f.snapshot.geometry().get(position(axis,0,0,0)).cell(),
-                "Transparent non-air occupancy must not modify ambient topology");
+                "Cross-world ray occupancy must not modify ambient topology");
+            assertEquals(15,placeholder.getLightBlock(EmptyBlockGetter.INSTANCE,BlockPos.ZERO),
+                "The local-world light barrier must remain opaque");
+        }
+    }
+    @Test void actualApertureClassifierKeepsWrongAxisWoolAndUnknownBlocked() {
+        for(int axis=0;axis<3;axis++) for(int sign:new int[]{-1,1}) {
+            Fixture f=room(axis,sign);
+            Pos wrongAxis=position(axis,0,-1,0),wool=position(axis,0,0,0),unknown=position(axis,0,1,0);
+            var placeholder=PortalPlaceholderBlock.instance.defaultBlockState()
+                .setValue(PortalPlaceholderBlock.AXIS,Direction.Axis.values()[(axis+1)%3]);
+            assertEquals(15,placeholder.getLightBlock(EmptyBlockGetter.INSTANCE,BlockPos.ZERO));
+            var layer=PortalShaderLighting.observeApertureLayer(f.aperture,f.snapshot,p->
+                PortalShaderLighting.apertureOccupancy(p.equals(wrongAxis)?placeholder:
+                    p.equals(wool)?Blocks.WHITE_WOOL.defaultBlockState():
+                    p.equals(unknown)?null:Blocks.GLASS.defaultBlockState(),EmptyBlockGetter.INSTANCE,
+                    new BlockPos(p.x(),p.y(),p.z()),f.inward),Map.of());
+            assertEquals(Cell.CLOSED,layer.get(wrongAxis));assertEquals(Cell.CLOSED,layer.get(wool));
+            assertEquals(Cell.UNKNOWN,layer.get(unknown));
+            Pos min=PortalShaderLighting.atlasMin(f.snapshot,layer);
+            float[] packed=PortalShaderLighting.packCells(f.snapshot,min,layer);
+            for(Pos blocked:new Pos[]{wrongAxis,wool,unknown}) assertArrayEquals(new float[4],voxel(packed,min,blocked));
+            assertArrayEquals(new float[]{0,0,0,1},voxel(packed,min,position(axis,0,0,1)));
+            assertEquals(Cell.CLOSED,PortalShaderLighting.apertureOccupancy(placeholder,EmptyBlockGetter.INSTANCE,
+                BlockPos.ZERO,new Pos(1,1,0)),"Unvalidated non-cardinal inward cannot admit a placeholder");
         }
     }
     @Test void opaqueAndNeverObservedPlaneCellsRemainBlocked() {
