@@ -184,6 +184,25 @@ class PortalShaderGpuGlTest {
         assertEquals(GL_TRUE,glGetShaderi(id,GL_COMPILE_STATUS),glGetShaderInfoLog(id));return id;
     }
 
+    @Test void productionBindingSuppliesTheRuntimeTraversalBoundBeforePublishingRegions() {
+        int program=program("""
+            #version 330 core
+            uniform int ipSunCount, ipSunRaySteps;
+            uniform sampler3D ipSunAtlas;
+            out vec4 color;
+            void main(){color=texture(ipSunAtlas,vec3(.5))*float(ipSunCount+ipSunRaySteps);}
+            """);
+        int steps=glGetUniformLocation(program,"ipSunRaySteps"),count=glGetUniformLocation(program,"ipSunCount");
+        try(var atlas=new PortalShaderGpu.Atlas()) {
+            assertTrue(steps>=0);glUniform1i(steps,-1);
+            try(var ignored=PortalShaderGpu.bindAtlas(program,atlas,List.of(region(.125f,255)),
+                ()->assertEquals(0,glGetUniformi(program,count)))) {
+                assertEquals(100,glGetUniformi(program,steps));
+                assertEquals(1,glGetUniformi(program,count));
+            }
+        } finally {glUseProgram(0);glDeleteProgram(program);}
+    }
+
     private static int program(int nativeCount) {
         StringBuilder fragment=new StringBuilder("#version 330 core\nuniform int ipSunCount;uniform sampler3D ipSunAtlas;uniform sampler2DArray ipSunSourceShadow;uniform sampler2D nativeImages[")
             .append(nativeCount).append("];uniform isampler2D nativeInteger;out vec4 color;void main(){color=texture(ipSunAtlas,vec3(.5))*float(ipSunCount)+texture(ipSunSourceShadow,vec3(.5,.5,0))+vec4(texelFetch(nativeInteger,ivec2(0),0));");

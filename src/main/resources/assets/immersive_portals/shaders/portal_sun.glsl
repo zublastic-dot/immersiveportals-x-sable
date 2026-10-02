@@ -1,5 +1,9 @@
 // Original IP/Sable compatibility code. No shader-pack source is distributed here.
 uniform int ipSunCount;
+// A runtime bound keeps native drivers from expanding the DDA inside every PCF
+// tap and native entity/hand shader variant. CPU supplies 100; the hard cap and
+// fail-closed exhaustion are unchanged.
+uniform int ipSunRaySteps;
 uniform int ipSunPortalView;
 uniform sampler3D ipSunAtlas;
 uniform sampler2DArray ipSunSourceShadow;
@@ -90,7 +94,7 @@ float ipSunReceiverPath(int i,vec3 point,vec3 apertureHit) {
     if(abs(ray.x)<0.0000001) next.x=1e20;
     if(abs(ray.y)<0.0000001) next.y=1e20;
     if(abs(ray.z)<0.0000001) next.z=1e20;
-    for(int n=0;n<100;n++) {
+    for(int n=0;n<min(ipSunRaySteps,100);n++) {
         float t=min(next.x,min(next.y,next.z));
         if(ipSunVoxel(i,cell).a<0.5) return 0.0;
         if(t>=distance-0.00001) return 1.0;

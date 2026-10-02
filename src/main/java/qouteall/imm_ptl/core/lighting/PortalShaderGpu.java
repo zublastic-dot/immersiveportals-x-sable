@@ -263,6 +263,7 @@ public final class PortalShaderGpu {
                 }
             }
             uniforms.run();
+            glUniform1i(glGetUniformLocation(program,"ipSunRaySteps"),100);
             // Publish count only after complete uploads and one coherent source capture per region.
             glUniform1i(count,regions.size());
         } catch(RuntimeException | Error failure) {

@@ -16,6 +16,8 @@ class PortalSourceShadowTest {
         assertFalse(input(new Matrix4f(), new Matrix4f().zero()).valid());
         assertFalse(input(new Matrix4f().m00(Float.NaN), new Matrix4f()).valid());
         assertFalse(input(new Matrix4f(), new Matrix4f().perspective(1, 1, 1, 100)).valid());
+        assertEquals("nonorthographic-shadow-projection", input(new Matrix4f(), new Matrix4f().perspective(1, 1, 1, 100)).rejection());
+        assertEquals("noninvertible-shadow-transform", input(new Matrix4f().zero(), new Matrix4f()).rejection());
     }
     @Test void nativeResolutionAndStorageBoundsAreExplicit() {
         assertEquals(64L * 1024 * 1024, PortalSourceShadow.MAX_BYTES);

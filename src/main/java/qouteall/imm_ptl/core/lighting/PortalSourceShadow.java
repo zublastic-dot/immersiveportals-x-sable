@@ -55,11 +55,12 @@ public final class PortalSourceShadow {
                 source.getGameTime(), source.getDayTime()), System.nanoTime());
             if (snapshot == null && !warned) {
                 warned = true;
-                LogUtils.getLogger().warn("[IP shader light] source shadow snapshot unavailable: invalid native depth or bounded storage; retaining strict source fallback");
+                LogUtils.getLogger().warn("[IP shader light] source shadow snapshot unavailable: {}; world={}, texture={}, resolution={}, distance={}, multiplier={}, sunAngle={}; retaining strict source fallback",
+                    STORE.lastRejection(), source.dimension().location(), depthTexture, resolution, shadowDistance, distanceRenderMultiplier, sourceSunAngle);
             } else if (snapshot != null && diagnostics < 8) {
                 diagnostics++;
-                LogUtils.getLogger().info("[IP shader light] source shadow GPU snapshot for {}: {}px, distance {}, generation {}, {} owned bytes",
-                    source.dimension().location(), resolution, shadowDistance, snapshot.generation(), STORE.bytes());
+                LogUtils.getLogger().info("[IP shader light] source shadow GPU snapshot for {}: {}px, distance {}, generation {}, {} owned bytes, {}",
+                    source.dimension().location(), resolution, shadowDistance, snapshot.generation(), STORE.bytes(), snapshot.image.description());
             }
         } catch (RuntimeException failure) {
             // This optional readback path must not interrupt the native source render.
@@ -131,19 +132,22 @@ public final class PortalSourceShadow {
     record Capture(int depthTexture, int resolution, Vec3 camera, Matrix4fc modelView, Matrix4fc projection,
                    float shadowDistance, float distanceRenderMultiplier, float sourceSunAngle,
                    long gameTime, long dayTime) {
-        boolean valid() {
-            if (depthTexture <= 0 || resolution < 1 || resolution > MAX_RESOLUTION || camera == null
-                || !Double.isFinite(camera.x) || !Double.isFinite(camera.y) || !Double.isFinite(camera.z)
-                || modelView == null || projection == null || !modelView.isFinite() || !projection.isFinite()
-                || !Float.isFinite(shadowDistance) || shadowDistance <= 0 || shadowDistance > 8192
-                || !Float.isFinite(distanceRenderMultiplier) || distanceRenderMultiplier < -1 || distanceRenderMultiplier > 64
-                || !Float.isFinite(sourceSunAngle) || sourceSunAngle < 0 || sourceSunAngle > 1) return false;
+        boolean valid() { return rejection() == null; }
+        @Nullable String rejection() {
+            if (depthTexture <= 0) return "invalid-depth-id: " + depthTexture;
+            if (resolution < 1 || resolution > MAX_RESOLUTION) return "resolution-out-of-range: " + resolution;
+            if (camera == null || !Double.isFinite(camera.x) || !Double.isFinite(camera.y) || !Double.isFinite(camera.z)) return "nonfinite-camera";
+            if (modelView == null || projection == null || !modelView.isFinite() || !projection.isFinite()) return "missing-or-nonfinite-matrix";
+            if (!Float.isFinite(shadowDistance) || shadowDistance <= 0 || shadowDistance > 8192) return "invalid-shadow-distance: " + shadowDistance;
+            if (!Float.isFinite(distanceRenderMultiplier) || distanceRenderMultiplier < -1 || distanceRenderMultiplier > 64) return "invalid-distance-multiplier: " + distanceRenderMultiplier;
+            if (!Float.isFinite(sourceSunAngle) || sourceSunAngle < 0 || sourceSunAngle > 1) return "invalid-sun-angle: " + sourceSunAngle;
             // This adapter's inverse radial warp describes an orthographic shadow map only.
             if (Math.abs(projection.m03()) > 1e-6 || Math.abs(projection.m13()) > 1e-6
-                || Math.abs(projection.m23()) > 1e-6 || Math.abs(projection.m33() - 1) > 1e-6) return false;
+                || Math.abs(projection.m23()) > 1e-6 || Math.abs(projection.m33() - 1) > 1e-6) return "nonorthographic-shadow-projection";
             Matrix4f transform = new Matrix4f(projection).mul(modelView);
             return Float.isFinite(transform.determinant()) && transform.determinant() != 0
-                && new Matrix4f(transform).invert().isFinite() && new Matrix4f(modelView).invert().isFinite();
+                && new Matrix4f(transform).invert().isFinite() && new Matrix4f(modelView).invert().isFinite()
+                ? null : "noninvertible-shadow-transform";
         }
     }
 
@@ -160,6 +164,7 @@ public final class PortalSourceShadow {
         private final IdentityHashMap<Object, Entry> entries = new IdentityHashMap<>();
         private final ArrayList<PortalSourceShadowDepth> spare = new ArrayList<>();
         private long sequence, generation, bytes;
+        private String lastRejection;
 
         Store(int capacity, long byteLimit) {
             if (capacity < 1 || capacity > MAX_WORLDS || byteLimit < 4 || byteLimit > MAX_BYTES)
@@ -174,12 +179,17 @@ public final class PortalSourceShadow {
         }
 
         @Nullable Snapshot capture(Object world, Object pipeline, Capture capture, long now) {
-            if (world == null || pipeline == null) return null;
+            lastRejection = null;
+            if (world == null || pipeline == null) return reject("missing-world-or-pipeline");
             Entry current = entries.get(world);
             if (current != null && current.pipeline != pipeline) remove(world);
-            if (capture == null || !capture.valid()) return null;
-            PortalSourceShadowDepth.Spec spec = PortalSourceShadowDepth.inspect(capture.depthTexture, capture.resolution);
-            if (spec == null || spec.bytes() > byteLimit) return null;
+            if (capture == null) return reject("missing-capture");
+            String invalid = capture.rejection();
+            if (invalid != null) return reject(invalid);
+            var inspection = PortalSourceShadowDepth.inspect(capture.depthTexture, capture.resolution);
+            PortalSourceShadowDepth.Spec spec = inspection.spec();
+            if (spec == null) return reject(inspection.rejection());
+            if (spec.bytes() > byteLimit) return reject("native-depth-exceeds-budget: required=" + spec.bytes() + ", limit=" + byteLimit);
             if (!entries.containsKey(world) && entries.size() >= capacity) remove(oldest(null));
             PortalSourceShadowDepth image = null;
             for (int i = 0; i < spare.size(); i++) if (spare.get(i).matches(spec)) { image = spare.remove(i); break; }
@@ -198,13 +208,13 @@ public final class PortalSourceShadow {
                 while (bytes + spec.bytes() > byteLimit || entries.size() + spare.size() >= MAX_WORLDS) {
                     if (!spare.isEmpty()) dispose(spare.removeLast());
                     else if (!entries.isEmpty()) remove(oldest(world));
-                    else return null;
+                    else return reject("replacement-exceeds-budget");
                 }
                 image = PortalSourceShadowDepth.allocate(spec); bytes += image.bytes();
             }
             boolean published = false;
             try {
-                if (!image.copyFrom(capture.depthTexture)) return null;
+                if (!image.copyFrom(capture.depthTexture)) return reject(image.copyRejection());
                 Snapshot result = new Snapshot(image, capture, ++generation, now);
                 Entry previous = entries.remove(world);
                 if (previous != null) spare.add(previous.snapshot.retire());
@@ -225,6 +235,8 @@ public final class PortalSourceShadow {
         void clear() { for (Object world : entries.keySet().toArray()) remove(world); clearSpare(); }
         int size() { return entries.size(); }
         long bytes() { return bytes; }
+        String lastRejection() { return lastRejection; }
+        private @Nullable Snapshot reject(String reason) { lastRejection = reason; return null; }
         private Object oldest(Object preferred) {
             if (preferred != null && entries.containsKey(preferred)) return preferred;
             Object victim = null; long oldest = Long.MAX_VALUE;

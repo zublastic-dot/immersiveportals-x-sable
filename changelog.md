@@ -451,3 +451,9 @@ Fix Iris shader-option observation when JCPP replaces its source argument before
 - Filter the entire light path using the supported shader pack's shadow settings; each sample still checks the aperture and receiving walls.
 - Bound source-depth storage and lifetime, preserve native resolution, and retain the strict observed source fallback when no valid snapshot is available.
 - Distinguish active-query and zero-coverage portal image capture failures in bounded diagnostics.
+
+## 0.5.1-zublastic.48
+
+- Accept Iris native unsized depth textures, preserve their allocation type and precision, and report bounded capture rejection reasons.
+- Keep receiving-ray traversal bounded through a runtime uniform to avoid constant-loop expansion in native entity and hand shader variants.
+- Exercise the real Iris unsized depth allocation and complete native shader linking in GPU regressions.

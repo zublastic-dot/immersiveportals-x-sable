@@ -233,8 +233,40 @@ including ten actual installed-pack GL compilation cases and the production
 GPU tests. Both builds produced JAR SHA-256
 `316942595d01e3b342db1fa161658af826c6b31b85a3718fc1d0ceb9d6af9eac`.
 The final matrix completed at 17:02:42 UTC on 2026-10-02; evidence is in `build47/`
-under the artifact root. Native payload hash remains unchanged. Hosted CI,
-deployment and live acceptance are still pending.
+under the artifact root. Native payload hash remains unchanged. Exact-head CI
+run 37038360794 passed for commit f67bae5cb8add1519f4c512aadd9036c919eaba4.
+Installation at 17:13:51 UTC preserved the other mods and 6547 checked settings.
+The owner then reproduced the bottom-up sunlight loss. A read-only automated
+test timed out during shader linking and submitted no gameplay commands. The
+startup stack was inside Iris ExtendedShader native glLinkProgram; startup
+eventually completed, so this was a long stall rather than a permanent deadlock.
+The game log then reported source shadow capture unavailable.
+
+The `.48` candidate repairs a confirmed capture contract defect: Iris allocates
+DepthBufferFormat.DEPTH as unsized GL_DEPTH_COMPONENT (6402), with
+GL_UNSIGNED_SHORT input. The AMD test driver reports 32 depth bits for that allocation.
+The `.47` inspector accepted only sized depth formats and rejected this valid
+texture. The exact Iris allocation regression fails on the prior implementation.
+The repaired copy preserves the native allocation type and checks equal depth
+precision; copied pixels and GL_NO_ERROR are checked. Eighteen focused snapshot
+tests pass. Capture rejections now report bounded specific reasons. The actual
+game uses NVIDIA; its `.47` rejection did not log the native format. The tested
+contract defect is consistent with that rejection, but NVIDIA capture still
+requires live confirmation.
+
+Receiving-ray traversal still has the same 100-step maximum and fail-closed
+exhaustion, but its loop bound is supplied as a capped runtime uniform to avoid
+driver expansion inside filtering loops. Complete Iris patchVanilla entity,
+hand, block-entity and terrain program linking is added to the installed-pack
+tests. Passing those tests does not establish cold in-game startup performance.
+The completed `.48` matrix passed 530 tests on each of DH 3.3.2 and 3.3.3,
+with zero failures, errors or skips. This includes 15 installed-pack GL cases.
+Both builds produced JAR SHA-256
+`db3ff5748b091e32fb34b7655ae42d7d448c346861a1690730bf1222b40b0c75`,
+with the unchanged native payload. The matrix finished at 18:30:17 UTC on
+2026-10-02; full receipts and XML reports are in `build48/`. These GPU tests
+use the AMD integrated renderer, while Portal Lab uses NVIDIA. Exact-head
+hosted CI, installation and live sunlight verification remain pending.
 
 No automated `.45` gameplay commands or flight ran: attempts stopped before
 mutations because flight was disabled, user activity intervened, or the world
@@ -255,5 +287,6 @@ Canonical checkpoint: zublastic-context
 `history/2026-10-02-portal-impostor.md`. Local evidence root:
 `M:/PortalAudioCompat-20260929/portal-impostor/`. `.44` and `.45` installations are
 verified; `.46` installation is also verified and its sunlight repair remains
-incomplete. Cache behavior, `.47` deployment and sunlight behavior, and
-performance improvement are not live-accepted.
+incomplete. `.47` installation is verified but its sunlight repair is rejected.
+Cache behavior, `.48` deployment and sunlight behavior, and performance
+improvement are not live-accepted.

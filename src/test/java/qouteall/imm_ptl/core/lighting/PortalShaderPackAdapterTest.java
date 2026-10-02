@@ -3,6 +3,8 @@ package qouteall.imm_ptl.core.lighting;
 import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.irisshaders.iris.gl.blending.AlphaTest;
+import net.irisshaders.iris.gl.blending.AlphaTestFunction;
+import net.irisshaders.iris.gl.state.ShaderAttributeInputs;
 import net.irisshaders.iris.helpers.StringPair;
 import net.irisshaders.iris.pipeline.transform.PatchShaderType;
 import net.irisshaders.iris.pipeline.transform.TransformPatcher;
@@ -109,8 +111,11 @@ class PortalShaderPackAdapterTest {
             glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
             window = glfwCreateWindow(8, 8, "Portal shader pack compilation", 0, 0);
             assertNotEquals(0, window);glfwMakeContextCurrent(window);GL.createCapabilities();
+            System.out.println("PORTAL_SHADER_DRIVER " + glGetString(GL_VENDOR) + " | "
+                + glGetString(GL_RENDERER) + " | " + glGetString(GL_VERSION));
             var entries = ImmutableList.<AbsolutePackPath>builder();
-            for (String name : List.of("gbuffers_terrain", "dh_terrain", "deferred1", "composite1", "gbuffers_water"))
+            for (String name : List.of("gbuffers_terrain", "dh_terrain", "deferred1", "composite1", "gbuffers_water",
+                "gbuffers_entities", "gbuffers_hand", "gbuffers_block", "gbuffers_hand_water"))
                 for (String extension : List.of(".vsh", ".fsh"))
                     entries.add(AbsolutePackPath.fromAbsolutePath("/world-1/" + name + extension));
             Path root = Path.of(System.getProperty("ipsable.shaderPack"));
@@ -157,7 +162,16 @@ class PortalShaderPackAdapterTest {
         }
 
         Map<PatchShaderType, String> transformed(String name, boolean patched) {
+            return transformed(name, patched, false);
+        }
+
+        Map<PatchShaderType, String> transformed(String name, boolean patched, boolean nativeProgram) {
             String vertex = source(name, ".vsh", patched), fragment = source(name, ".fsh", patched);
+            if (nativeProgram) return TransformPatcher.patchVanilla(name, vertex, null, null, null, fragment,
+                new AlphaTest(AlphaTestFunction.GREATER, .1f), false, true,
+                new ShaderAttributeInputs(true, true,
+                    name.contains("entities") || name.contains("hand") || name.equals("gbuffers_block"), true, true),
+                new Object2ObjectOpenHashMap<>());
             if (name.equals("dh_terrain")) return TransformPatcher.patchDHTerrain(name, vertex, null, null, null,
                 fragment, new Object2ObjectOpenHashMap<>());
             if (name.equals("deferred1") || name.equals("composite1")) return TransformPatcher.patchComposite(name,
@@ -168,25 +182,60 @@ class PortalShaderPackAdapterTest {
         }
 
         void verify(String name) {
+            verify(name, false);
+        }
+
+        void verify(String name, boolean nativeProgram) {
             // A stock-source compile guards against blaming the adapter for an
             // unsupported fixture option/environment before testing the patch.
             for (boolean patched : new boolean[]{false, true}) {
-                var sources = transformed(name, patched);
+                var sources = transformed(name, patched, nativeProgram);
                 int program = glCreateProgram();
                 try {
                     for (var stage : List.of(PatchShaderType.VERTEX, PatchShaderType.FRAGMENT)) {
                         int shader = glCreateShader(stage == PatchShaderType.VERTEX ? GL_VERTEX_SHADER : GL_FRAGMENT_SHADER);
                         try {
-                            glShaderSource(shader, sources.get(stage));glCompileShader(shader);
-                            assertEquals(GL_TRUE, glGetShaderi(shader, GL_COMPILE_STATUS),
-                                name + " patched=" + patched + " " + stage + "\n" + glGetShaderInfoLog(shader));
+                            glShaderSource(shader, sources.get(stage));
+                            driverCall(name + " native=" + nativeProgram + " patched=" + patched + " " + stage, () -> {
+                                glCompileShader(shader);
+                                assertEquals(GL_TRUE, glGetShaderi(shader, GL_COMPILE_STATUS),
+                                    name + " patched=" + patched + " " + stage + "\n" + glGetShaderInfoLog(shader));
+                            });
                             glAttachShader(program, shader);
                         } finally { glDeleteShader(shader); }
                     }
-                    glLinkProgram(program);
-                    assertEquals(GL_TRUE, glGetProgrami(program, GL_LINK_STATUS), name + "\n" + glGetProgramInfoLog(program));
+                    driverCall(name + " native=" + nativeProgram + " patched=" + patched + " LINK", () -> {
+                        glLinkProgram(program);
+                        assertEquals(GL_TRUE, glGetProgrami(program, GL_LINK_STATUS), name + "\n" + glGetProgramInfoLog(program));
+                    });
                 } finally { glDeleteProgram(program); }
             }
+        }
+
+        /**
+         * glLinkProgram is a synchronous native call: a JUnit interrupt cannot
+         * stop a driver optimizer hang. Abort only this isolated Gradle test
+         * worker after 25s, with the exact program already flushed to its log.
+         * No game process or Gradle daemon is stopped by this watchdog.
+         */
+        void driverCall(String label, Runnable operation) {
+            assertNotNull(System.getProperty("org.gradle.test.worker"), "Driver watchdog requires an isolated Gradle test worker");
+            var done = new java.util.concurrent.atomic.AtomicBoolean();
+            Thread watchdog = Thread.ofPlatform().daemon().name("portal-shader-link-watchdog").unstarted(() -> {
+                try { Thread.sleep(25_000); }
+                catch (InterruptedException completed) { return; }
+                if (!done.get()) {
+                    System.err.println("PORTAL_SHADER_DRIVER_TIMEOUT " + label + " exceeded 25s; terminating test worker only");
+                    System.err.flush();Runtime.getRuntime().halt(124);
+                }
+            });
+            System.out.println("PORTAL_SHADER_DRIVER_START " + label);System.out.flush();
+            long start = System.nanoTime();watchdog.start();
+            try { operation.run(); }
+            finally { done.set(true);watchdog.interrupt(); }
+            long elapsed = (System.nanoTime() - start) / 1_000_000;
+            System.out.println("PORTAL_SHADER_DRIVER_MS " + elapsed + " " + label);System.out.flush();
+            assertTrue(elapsed < 20_000, label + " took " + elapsed + "ms (20s bound)");
         }
 
         @Test void portalFogPrefixRequiresActualApertureCrossingAndNeverAppliesInsideTheWorld() {
@@ -260,6 +309,11 @@ class PortalShaderPackAdapterTest {
             verifyOptions(Map.of("SHADOW_QUALITY","2","TAA_DEFINE","0","SHADOW_SMOOTHING","4"));
         }
         @Test void fullSodiumTerrainCompilesAndLinks() { verify("gbuffers_terrain"); }
+        @Test void fullNativeTerrainCompilesAndLinksWithinDriverBudget() { verify("gbuffers_terrain", true); }
+        @Test void fullNativeEntitiesCompilesAndLinksWithinDriverBudget() { verify("gbuffers_entities", true); }
+        @Test void fullNativeHandCompilesAndLinksWithinDriverBudget() { verify("gbuffers_hand", true); }
+        @Test void fullNativeBlockEntityCompilesAndLinksWithinDriverBudget() { verify("gbuffers_block", true); }
+        @Test void fullNativeHandWaterCompilesAndLinksWithinDriverBudget() { verify("gbuffers_hand_water", true); }
         @Test void fullDhTerrainCompilesAndLinks() { verify("dh_terrain"); }
         @Test void fullBorderFogPassCompilesAndLinks() { verify("deferred1"); }
         @Test void fullNetherStormPassCompilesAndLinks() { verify("composite1"); }

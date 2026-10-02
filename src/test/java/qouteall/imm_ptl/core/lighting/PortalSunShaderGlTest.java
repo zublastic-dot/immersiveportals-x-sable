@@ -57,6 +57,7 @@ class PortalSunShaderGlTest {
         depth(1);
         for(int i=0;i<4;i++)glUniform1i(glGetUniformLocation(program,"ipSunDepth"+i),2);
         glUniform1i(glGetUniformLocation(program,"ipSunCount"),1);
+        glUniform1i(glGetUniformLocation(program,"ipSunRaySteps"),100);
         // The plane-containing voxel is explicitly observed, matching the padded CPU atlas.
         vec("ipSunOrigin[0]",0,0,0);vec("ipSunPlane[0]",.5f,4,4);vec("ipSunInward[0]",1,0,0);
         vec("ipSunAmbientMin[0]",.5f,.5f,.5f);vec("ipSunAmbientMax[0]",31.5f,31.5f,31.5f);
@@ -204,6 +205,16 @@ class PortalSunShaderGlTest {
         assertEquals(.8f,pixel(5,4,4)[0],.006);
         assertEquals(.1f,pixel(5,6.001f,4)[0],.006);
         assertEquals(.1f,pixel(5,4,6)[0],.006);
+    }
+    @Test void missingNegativeOrExhaustedTraversalBudgetFailsClosed(){
+        int steps=glGetUniformLocation(program,"ipSunRaySteps");
+        assertTrue(steps>=0);
+        for(int bound:new int[]{0,-1,1}) {
+            glUniform1i(steps,bound);
+            assertEquals(.1f,pixel(5,4,4)[0],.006,"bound="+bound);
+        }
+        glUniform1i(steps,100);assertEquals(.8f,pixel(5,4,4)[0],.006);
+        glUniform1i(steps,Integer.MAX_VALUE);assertEquals(.8f,pixel(5,4,4)[0],.006);
     }
     @Test void concreteBetweenReceiverAndApertureCastsShadow(){
         for(int y=0;y<32;y++)for(int z=0;z<32;z++)cells[((z*32+y)*32+2)*4+3]=0;

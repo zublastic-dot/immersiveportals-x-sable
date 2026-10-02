@@ -1,6 +1,7 @@
 package qouteall.imm_ptl.core.lighting;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.irisshaders.iris.gl.texture.DepthBufferFormat;
 import net.irisshaders.iris.shadows.ShadowMatrices;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
@@ -81,6 +82,30 @@ class PortalSourceShadowGlTest {
         glBindTexture(GL_TEXTURE_2D, snapshot.texture());
         assertEquals(GL_DEPTH_COMPONENT32F, glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT));
         assertEquals(GL_NONE, glGetTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE));
+    }
+
+    @Test void irisUnsizedDepthContractPreservesNativePrecisionAndCopiesPixels() {
+        int source = glGenTextures(); textures.add(source); glBindTexture(GL_TEXTURE_2D, source);
+        var irisFormat = DepthBufferFormat.DEPTH;
+        assertEquals(GL_DEPTH_COMPONENT, irisFormat.getGlInternalFormat());
+        assertEquals(GL_UNSIGNED_SHORT, irisFormat.getGlFormat());
+        // Match DepthTexture.resize exactly, including Iris's unsigned-short allocation.
+        glTexImage2D(GL_TEXTURE_2D, 0, irisFormat.getGlInternalFormat(), 8, 8, 0,
+            irisFormat.getGlType(), irisFormat.getGlFormat(), (java.nio.ByteBuffer) null);
+        int nativeFormat = glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT);
+        int nativeDepthBits = glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_DEPTH_SIZE);
+        var data = BufferUtils.createFloatBuffer(64);
+        for (int i = 0; i < 64; i++) data.put(.1f + i * .01f);
+        data.flip(); glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 8, 8, GL_DEPTH_COMPONENT, GL_FLOAT, data);
+        float[] expected = contents(source, 8);
+        var store = store(4, 2048);
+        var snapshot = store.capture(new Object(), new Object(), capture(source, 8, 0, 9000), 1);
+        assertNotNull(snapshot, "Iris native internal=" + nativeFormat + ", depthBits=" + nativeDepthBits);
+        glBindTexture(GL_TEXTURE_2D, snapshot.texture());
+        assertEquals(nativeFormat, glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT));
+        assertEquals(nativeDepthBits, glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_DEPTH_SIZE));
+        assertArrayEquals(expected, contents(snapshot.texture(), 8), 1e-7f);
+        assertEquals(GL_NO_ERROR, glGetError(), "An incompatible native-depth blit must not silently succeed");
     }
 
     @Test void copyRestoresHostStateAndIgnoresHostScissorAndUnpackBuffer() {
@@ -194,11 +219,16 @@ class PortalSourceShadowGlTest {
         var existing = store.capture(world, pipeline, capture(source, 8, 0, 9000), 1);
         assertNotNull(existing);
         assertNull(store.capture(world, pipeline, capture(tooLarge, 16, 0, 9000), 2));
+        assertEquals("native-depth-exceeds-budget: required=1024, limit=512", store.lastRejection());
         assertNull(store.capture(world, pipeline, capture(source, 16, 0, 9000), 2));
+        assertEquals("native-size-mismatch: 8x8, expected=16", store.lastRejection());
         int color = glGenTextures(); textures.add(color); glBindTexture(GL_TEXTURE_2D, color);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 8, 8, 0, GL_RGBA, GL_UNSIGNED_BYTE, (java.nio.ByteBuffer) null);
         assertNull(store.capture(world, pipeline, capture(color, 8, 0, 9000), 2));
+        assertTrue(store.lastRejection().startsWith("unsupported-depth-format: internal="));
         assertSame(existing, store.get(world, 0, 9000, 3)); assertEquals(256, store.bytes());
+        assertNotNull(store.capture(world, pipeline, capture(source, 8, 0, 9000), 4));
+        assertNull(store.lastRejection(), "Successful recovery must clear the stale rejection reason");
     }
 
     @Test void sourceSamplerParametersRemainNative() {
