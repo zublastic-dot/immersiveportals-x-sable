@@ -20,6 +20,20 @@ import java.util.function.Supplier;
 
 @Mixin(value = SodiumShader.class, remap = false)
 public class MixinIrisSodiumShader {
+    @Unique private final qouteall.imm_ptl.core.compat.iris_compatibility.PortalShaderBindingSlot ip_sun =
+        new qouteall.imm_ptl.core.compat.iris_compatibility.PortalShaderBindingSlot();
+
+    @Inject(method = "setupState", at = @At("HEAD"))
+    private void ip_beginSun(CallbackInfo ci) { ip_sun.begin(); }
+
+    @Inject(method = "resetState", at = @At("HEAD"))
+    private void ip_closeSun(CallbackInfo ci) { ip_sun.close(); }
+
+    @Inject(method = "setupState", at = @At("RETURN"))
+    private void ip_bindSun(CallbackInfo ci) {
+        ip_sun.bind(qouteall.imm_ptl.core.lighting.PortalShaderGpu::bind);
+    }
+
     @Unique
     private GlUniformFloat4v uIPClippingEquation;
     

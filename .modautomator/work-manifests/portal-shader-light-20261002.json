@@ -1,0 +1,62 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-shader-light-20261002",
+  "lease_id": "portal-shader-light-20261002",
+  "worker_id": "codex-portal-shader-light-20261002",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-shader-light-20261002/portal-shader-light-20261002",
+  "base_commit": "8c09f2d11501985ec82c3e8ecc0d9ec22c9aadf3",
+  "resources": [
+    "artifact:owner-pc:portal-audio-20260929",
+    "desktop:owner-pc:gregtest-portal-lab",
+    "desktop:owner-pc:prism-launcher",
+    "domain:modautomator:compatibility/ip-sable",
+    "domain:modautomator:compatibility/ip-sable-rendering",
+    "domain:modautomator:compatibility/sable-dynamic-lighting",
+    "repo:zublastic-dot/Sable-Dynamic-Lights:.modautomator/work-manifests/portal-shader-light-20261002.json",
+    "repo:zublastic-dot/Sable-Dynamic-Lights:README.md",
+    "repo:zublastic-dot/Sable-Dynamic-Lights:build.gradle",
+    "repo:zublastic-dot/Sable-Dynamic-Lights:gradle.properties",
+    "repo:zublastic-dot/Sable-Dynamic-Lights:src",
+    "repo:zublastic-dot/immersiveportals-x-sable:.modautomator/work-manifests/portal-shader-light-20261002.json",
+    "repo:zublastic-dot/immersiveportals-x-sable:build.gradle",
+    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_PORTAL_SHADER_LIGHT.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/iris_compatibility",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/mixin/distanthorizons",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/compat/mixin/iris",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/lighting",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/resources",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/compat",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/lighting",
+    "repo:zublastic-dot/zublastic-context:.modautomator/work-manifests/portal-shader-light-20261002.json",
+    "repo:zublastic-dot/zublastic-context:history/2026-10-02-portal-shader-light.md",
+    "repo:zublastic-dot/zublastic-ideas:.modautomator/work-manifests/portal-shader-light-20261002.json",
+    "repo:zublastic-dot/zublastic-ideas:CHANGELOG.md",
+    "repo:zublastic-dot/zublastic-ideas:Sable-Dynamic-Lights/README.md",
+    "repo:zublastic-dot/zublastic-ideas:immersiveportals-x-sable/README.md"
+  ],
+  "paths": [
+    "src/main/java/qouteall/imm_ptl/core/lighting",
+    "src/main/java/qouteall/imm_ptl/core/compat/iris_compatibility",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/iris",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/distanthorizons",
+    "src/main/resources",
+    "src/test/java/qouteall/imm_ptl/core/lighting",
+    "src/test/java/qouteall/imm_ptl/core/compat",
+    "build.gradle",
+    "gradle.properties",
+    "changelog.md",
+    "docs/ZUBLASTIC_PORTAL_SHADER_LIGHT.md"
+  ],
+  "value_case": {
+    "category": "observable_capability",
+    "statement": "Transport bounded shader sunlight and ambient through portals, with room/frame occlusion and ScalableLux compatibility.",
+    "acceptance": [
+      "Preserve source direction and radiance within the actual aperture",
+      "Verify destination and source occlusion and crossing consistency",
+      "Validate exact Portal Lab ScalableLux and SableScalableLux stack"
+    ]
+  }
+}

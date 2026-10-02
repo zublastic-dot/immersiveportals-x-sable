@@ -5,6 +5,10 @@ import org.spongepowered.asm.mixin.Mixin;
 
 @Mixin(value = Iris.class, remap = false)
 public class MixinIrisIris {
+    @org.spongepowered.asm.mixin.injection.Inject(method = "destroyEverything", at = @org.spongepowered.asm.mixin.injection.At("HEAD"))
+    private static void ip_clearPortalShaderState(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        qouteall.imm_ptl.core.lighting.PortalShaderPackAdapter.clear();
+    }
     // test
     // only overworld
 //    @Inject(
