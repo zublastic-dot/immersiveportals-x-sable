@@ -133,4 +133,55 @@ class PortalSunOcclusionTest {
         assertEquals(Cell.OPEN,cache.sample(source,p->{fail();return Cell.CLOSED;},a));
         assertThrows(IllegalArgumentException.class,()->cache.mask(source,p->Cell.OPEN,Vec3.ZERO,NORMAL,U,V,1,1,NORMAL,128,33));
     }
+
+    /** Diagnostic reproduction: the .46 live room darkened bottom-first without a physical blocker. */
+    @Test void loggedSunMotionSweepsUnknownChunkFrontierUpAcrossAnOpenAperture() {
+        Object source=new Object();
+        var partial=new PortalSunOcclusion(source,PortalSunOcclusion.DEFAULT_SECTIONS);
+        var complete=new PortalSunOcclusion(source,PortalSunOcclusion.DEFAULT_SECTIONS);
+        var unknownReads=new AtomicInteger();
+        // Player at x107 is in chunk6. A seven-chunk western reach ends at x=-16.
+        // This fixture isolates that edge; every actually observed voxel is empty air.
+        World loadedAir=p->{
+            if(p.x()>=-16) return Cell.OPEN;
+            unknownReads.incrementAndGet();return Cell.UNKNOWN;
+        };
+        Vec3 center=new Vec3(117.192,182.125,218.712),normal=new Vec3(-1,0,0);
+        Vec3 horizontal=new Vec3(0,0,1),vertical=new Vec3(0,1,0);
+        double[] loggedAngles={.3656841,.368,.371,.374,.37751198};
+        int[] expectedLitRows={32,27,17,8,0};
+        for(int i=0;i<loggedAngles.length;i++) {
+            Vec3 sun=PortalShaderLighting.sourceDirection(loggedAngles[i],0);
+            byte[] limited=partial.mask(source,loadedAir,center,normal,horizontal,vertical,18,18,sun,320,32);
+            byte[] full=complete.mask(source,p->Cell.OPEN,center,normal,horizontal,vertical,18,18,sun,320,32);
+            int lit=0;
+            for(int y=0;y<32;y++) for(int x=0;x<32;x++) {
+                assertEquals(255,Byte.toUnsignedInt(full[y*32+x]),"Known clear sky must stay fully lit");
+                int expected=y>=32-expectedLitRows[i]?255:0;
+                assertEquals(expected,Byte.toUnsignedInt(limited[y*32+x]),
+                    "Only upper aperture rows survive the unknown western frontier at angle "+loggedAngles[i]);
+                if(limited[y*32+x]!=0) lit++;
+            }
+            assertEquals(expectedLitRows[i]*32,lit);
+        }
+        assertTrue(unknownReads.get()>0,"No solid blocks exist: missing observations alone caused the shadow");
+        assertEquals(0,partial.evictions(),"This is not eviction or a rolling mask budget");
+        System.out.println("Portal sunlight unknown-frontier reproduction: 1024 -> 864 -> 544 -> 256 -> 0 lit texels; no opaque voxels");
+    }
+
+    @Test void unknownFrontierAndRealWallHaveSameDarkMaskButDifferentObservationLifetimes() {
+        Object source=new Object();var unknown=new PortalSunOcclusion(source,8);var wall=new PortalSunOcclusion(source,8);
+        var unknownReads=new AtomicInteger();var wallReads=new AtomicInteger();
+        Vec3 center=new Vec3(.5,1.5,.5),sun=new Vec3(1,1,0);
+        World missing=p->{if(p.x()==1) {unknownReads.incrementAndGet();return Cell.UNKNOWN;}return Cell.OPEN;};
+        World opaque=p->{if(p.x()==1) {wallReads.incrementAndGet();return Cell.CLOSED;}return Cell.OPEN;};
+        byte[] missingMask=unknown.mask(source,missing,center,NORMAL,U,V,1,1,sun,4,4);
+        byte[] wallMask=wall.mask(source,opaque,center,NORMAL,U,V,1,1,sun,4,4);
+        assertArrayEquals(new byte[16],missingMask);assertArrayEquals(missingMask,wallMask);
+        assertTrue(unknownReads.get()>0);assertTrue(wallReads.get()>0);
+        // New observations recover UNKNOWN automatically; a known wall stays blocking until invalidated.
+        byte[] observed=unknown.mask(source,p->Cell.OPEN,center,NORMAL,U,V,1,1,sun,4,4);
+        for(byte value:observed) assertEquals(255,Byte.toUnsignedInt(value));
+        assertArrayEquals(wallMask,wall.mask(source,p->Cell.OPEN,center,NORMAL,U,V,1,1,sun,4,4));
+    }
 }

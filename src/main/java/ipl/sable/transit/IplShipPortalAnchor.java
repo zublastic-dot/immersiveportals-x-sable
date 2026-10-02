@@ -208,6 +208,20 @@ public final class IplShipPortalAnchor {
     }
 
     /**
+     * Identity of the fixed local attachment, independent of the carrier's moving world pose.
+     * Server-thread read only: no world/entity lookup, loading, or anchor-state mutation.
+     */
+    public static String attachmentFingerprint(UUID primary) {
+        Anchor anchor = primary == null ? null : ANCHORS.get(primary);
+        if (anchor == null) return null;
+        DQuaternion q = anchor.localOrient();
+        return anchor.shipId() + ":" + anchor.portalDim().location() + ":"
+            + Double.toHexString(anchor.plotPos().x) + ":" + Double.toHexString(anchor.plotPos().y) + ":"
+            + Double.toHexString(anchor.plotPos().z) + ":" + Double.toHexString(q.x) + ":"
+            + Double.toHexString(q.y) + ":" + Double.toHexString(q.z) + ":" + Double.toHexString(q.w);
+    }
+
+    /**
      * A ship must NEVER traverse (or straddle) its OWN anchored portal: the
      * carrier's forward motion constantly "crosses" the deck aperture, and a
      * self-transit would teleport the ship through a portal riding on itself.

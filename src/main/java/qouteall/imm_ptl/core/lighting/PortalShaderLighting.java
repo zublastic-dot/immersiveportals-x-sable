@@ -4,8 +4,11 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -13,6 +16,7 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
 import qouteall.imm_ptl.core.ClientWorldLoader;
 import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 import qouteall.imm_ptl.core.portal.Portal;
+import qouteall.imm_ptl.core.portal.PortalPlaceholderBlock;
 import qouteall.imm_ptl.core.portal.shape.RectangularPortalShape;
 
 import java.util.*;
@@ -28,12 +32,19 @@ public final class PortalShaderLighting {
                            Vec3 toSourceX, Vec3 toSourceY, Vec3 toSourceZ,
                            UnaryOperator<Vec3> toTargetDirection, Map<Pos,Pos> seeds) {}
     public record Region(Aperture aperture, Pos min, float[] cells, byte[] sourceShadow,
-                         Vec3 direction, float sourceSunAngle, long revision) {}
+                         Vec3 direction, float sourceSunAngle, long revision,
+                         Pos ambientMin, Pos ambientMax) {
+        public Region(Aperture aperture, Pos min, float[] cells, byte[] sourceShadow,
+                      Vec3 direction, float sourceSunAngle, long revision) {
+            this(aperture,min,cells,sourceShadow,direction,sourceSunAngle,revision,min,min.add(EDGE-1,EDGE-1,EDGE-1));
+        }
+    }
     private record Key(ClientLevel level, Vec3 center, Vec3 inward, Vec3 u, Vec3 v, double width, double height,
                        ClientLevel source,Vec3 sourceCenter,Vec3 sourceNormal,Vec3 sourceU,Vec3 sourceV) {}
     private static final class Entry {
         PortalLightSnapshot.Snapshot snapshot;
         Region region;
+        Map<Pos,Cell> apertureLayer=Map.of();
         boolean dirty=true, shadowDirty=true;
         Vec3 shadowDirection=Vec3.ZERO;
         int shadowTick=-100, retry;
@@ -94,6 +105,11 @@ public final class PortalShaderLighting {
         return ENTRIES.values().stream().map(e->e.region).filter(Objects::nonNull)
             .filter(r->r.aperture.target==world).limit(LIMIT).toList();
     }
+    /** Actual source identity, without loading a world or requesting a chunk. */
+    public static boolean usesSource(ClientLevel world) {
+        return world!=null && supported() && ENTRIES.values().stream()
+            .anyMatch(e->e.region!=null && e.region.aperture.source==world);
+    }
     public static boolean supported() {
         String pack=IrisInterface.invoker.getShaderpackName();
         return PortalLighting.ENABLED && IrisInterface.invoker.isShaders() && pack!=null
@@ -142,10 +158,15 @@ public final class PortalShaderLighting {
             if(e.snapshot==null && tick<e.retry) continue;
             var old=e.snapshot;
             Pos inward=new Pos((int)Math.round(a.inward.x),(int)Math.round(a.inward.y),(int)Math.round(a.inward.z));
-            var result=PortalLightSnapshot.update(p->sample(a.target,p,false,lightSamples),p->sample(a.source,p,true,lightSamples),a.seeds,inward,old,e.dirty);
+            boolean geometryDirty=e.dirty;
+            var result=PortalLightSnapshot.update(p->sample(a.target,p,false,lightSamples),p->sample(a.source,p,true,lightSamples),a.seeds,inward,old,geometryDirty);
             e.dirty=false;
             if(!result.field().available()) { e.snapshot=null;e.region=null;e.retry=tick+10;continue; }
             e.snapshot=result.snapshot();
+            var oldLayer=e.apertureLayer;
+            if(old==null || geometryDirty) e.apertureLayer=observeApertureLayer(a,e.snapshot,
+                p->occupancy(a.target,p,inward),oldLayer);
+            boolean occupancyChanged=!oldLayer.equals(e.apertureLayer);
             float angle=sunAngle(a.source.getTimeOfDay(0));
             var rotation=PortalShaderPackAdapter.sunPathRotationDegrees();
             var clock=PortalShaderPackAdapter.clockMode();
@@ -166,26 +187,96 @@ public final class PortalShaderLighting {
             }
             boolean geometryChanged=old==null || old.topology()!=e.snapshot.topology();
             boolean valuesChanged=old==null || old.field()!=e.snapshot.field();
-            if(e.region==null || geometryChanged || valuesChanged || shadowChanged) {
-                Pos min=e.snapshot.field().cells().keySet().stream().reduce(new Pos(Integer.MAX_VALUE,Integer.MAX_VALUE,Integer.MAX_VALUE),
-                    (m,p)->new Pos(Math.min(m.x(),p.x()),Math.min(m.y(),p.y()),Math.min(m.z(),p.z())));
-                float[] cells=e.region!=null && !geometryChanged && !valuesChanged?e.region.cells:packCells(e.snapshot,min);
-                e.region=new Region(a,min,cells,shadow,a.toTargetDirection.apply(sun),angle,++revision);
+            if(e.region==null || geometryChanged || valuesChanged || occupancyChanged || shadowChanged) {
+                Bounds ambient=bounds(e.snapshot.field().cells().keySet());
+                Pos min=atlasMin(e.snapshot,e.apertureLayer);
+                float[] cells=e.region!=null && !geometryChanged && !valuesChanged && !occupancyChanged
+                    ?e.region.cells:packCells(e.snapshot,min,e.apertureLayer);
+                e.region=new Region(a,min,cells,shadow,a.toTargetDirection.apply(sun),angle,++revision,ambient.min,ambient.max);
                 if(old==null) LogUtils.getLogger().info("[IP shader light] admitted {} receiving cells in {} from {}; sunlight parameters {}",
                     e.snapshot.field().cells().size(),a.target.dimension().location(),a.source.dimension().location(),rotation.isPresent()?"observed":"pending source shader");
             }
         }
     }
-    static float[] packCells(PortalLightSnapshot.Snapshot snapshot,Pos min) {
+    private record Bounds(Pos min,Pos max) {}
+    private static Bounds bounds(Collection<Pos> positions) {
+        Pos min=new Pos(Integer.MAX_VALUE,Integer.MAX_VALUE,Integer.MAX_VALUE);
+        Pos max=new Pos(Integer.MIN_VALUE,Integer.MIN_VALUE,Integer.MIN_VALUE);
+        for(Pos p:positions) {
+            min=new Pos(Math.min(min.x(),p.x()),Math.min(min.y(),p.y()),Math.min(min.z(),p.z()));
+            max=new Pos(Math.max(max.x(),p.x()),Math.max(max.y(),p.y()),Math.max(max.z(),p.z()));
+        }
+        return new Bounds(min,max);
+    }
+    /**
+     * Seeds lie one block inside the portal. Observe the omitted plane layer explicitly:
+     * its matching portal placeholders are ray occupancy, never ambient-light seeds.
+     * The snapshot's dense one-cell halo supplies the bounded candidate set and dirties
+     * this layer on real block/chunk updates, including non-air -> non-air changes.
+     */
+    static Map<Pos,Cell> observeApertureLayer(Aperture a,PortalLightSnapshot.Snapshot snapshot,
+                                           World reader,Map<Pos,Cell> previous) {
+        Pos inward=snapshot.inward();int axis=inward.x()!=0?0:inward.y()!=0?1:2;
+        int plane=snapshot.aperture().keySet().iterator().next().component(axis)-inward.component(axis);
+        Bounds ambient=bounds(snapshot.field().cells().keySet());
+        var observed=new HashMap<Pos,Cell>();
+        for(Pos p:snapshot.geometry().keySet()) {
+            if(p.component(axis)!=plane) continue;
+            boolean outside=false;
+            for(int d=0;d<3;d++) if(d!=axis && (p.component(d)<ambient.min.component(d)
+                || p.component(d)>ambient.max.component(d))) outside=true;
+            if(outside) continue;
+            Vec3 offset=new Vec3(p.x()+.5,p.y()+.5,p.z()+.5).subtract(a.center);
+            double uRadius=(Math.abs(a.u.x)+Math.abs(a.u.y)+Math.abs(a.u.z))*.5;
+            double vRadius=(Math.abs(a.v.x)+Math.abs(a.v.y)+Math.abs(a.v.z))*.5;
+            if(Math.abs(offset.dot(a.u))>=a.width*.5+uRadius
+                || Math.abs(offset.dot(a.v))>=a.height*.5+vRadius) continue;
+            Cell cell=reader.cell(p);
+            if(cell==null || cell==Cell.UNKNOWN) cell=previous.getOrDefault(p,Cell.UNKNOWN);
+            observed.put(p,cell);
+        }
+        return Map.copyOf(observed);
+    }
+    static Pos atlasMin(PortalLightSnapshot.Snapshot snapshot,Map<Pos,Cell> apertureLayer) {
+        Pos a=bounds(snapshot.field().cells().keySet()).min;
+        if(apertureLayer.isEmpty()) return a;
+        Pos b=bounds(apertureLayer.keySet()).min;
+        return new Pos(Math.min(a.x(),b.x()),Math.min(a.y(),b.y()),Math.min(a.z(),b.z()));
+    }
+    private static int cellIndex(Pos p,Pos min) {
+        int x=p.x()-min.x(),y=p.y()-min.y(),z=p.z()-min.z();
+        if(x<0||y<0||z<0||x>=EDGE||y>=EDGE||z>=EDGE) throw new IllegalArgumentException("Unbounded shader field");
+        return ((z*EDGE+y)*EDGE+x)*4;
+    }
+    static float[] packCells(PortalLightSnapshot.Snapshot snapshot,Pos min,Map<Pos,Cell> apertureLayer) {
         float[] cells=new float[EDGE*EDGE*EDGE*4];
+        for(var cell:apertureLayer.entrySet()) {
+            int i=cellIndex(cell.getKey(),min);
+            if(cell.getValue()==Cell.OPEN) cells[i+3]=1;
+        }
         for(var cell:snapshot.field().cells().entrySet()) {
-            Pos p=cell.getKey();int x=p.x()-min.x(),y=p.y()-min.y(),z=p.z()-min.z();
-            if(x<0||y<0||z<0||x>=EDGE||y>=EDGE||z>=EDGE) throw new IllegalArgumentException("Unbounded shader field");
-            int i=((z*EDGE+y)*EDGE+x)*4;
+            Pos p=cell.getKey();int i=cellIndex(p,min);
             cells[i]=cell.getValue().sky()/15f;cells[i+1]=cell.getValue().block()/15f;
             cells[i+2]=snapshot.field().replacement().get(p);cells[i+3]=1;
         }
         return cells;
+    }
+    private static Cell occupancy(ClientLevel w,Pos p,Pos inward) {
+        BlockPos b=new BlockPos(p.x(),p.y(),p.z());
+        if(w.isOutsideBuildHeight(b)||!w.hasChunkAt(b)) return Cell.UNKNOWN;
+        return apertureOccupancy(w.getBlockState(b),w,b,inward);
+    }
+    /** Only called for observed cells in this validated aperture's bounded plane layer. */
+    static Cell apertureOccupancy(BlockState state,BlockGetter world,BlockPos pos,Pos inward) {
+        if(state==null) return Cell.UNKNOWN;
+        if(state.getBlock() instanceof PortalPlaceholderBlock) {
+            // Vanilla opacity stays 15 to block light from the hidden local continuation.
+            // The matching aperture surface instead admits this explicit cross-world ray.
+            if(Math.abs(inward.x())+Math.abs(inward.y())+Math.abs(inward.z())!=1) return Cell.CLOSED;
+            Direction.Axis axis=inward.x()!=0?Direction.Axis.X:inward.y()!=0?Direction.Axis.Y:Direction.Axis.Z;
+            return state.getValue(PortalPlaceholderBlock.AXIS)==axis?Cell.OPEN:Cell.CLOSED;
+        }
+        return state.getLightBlock(world,pos)>=15?Cell.CLOSED:Cell.OPEN;
     }
     private static byte[] sourceShadow(Aperture a,Vec3 sun,PortalSunOcclusion cache) {
         World reader=p->{

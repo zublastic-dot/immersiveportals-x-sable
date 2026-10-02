@@ -1,9 +1,29 @@
 // Original IP/Sable compatibility code. No shader-pack source is distributed here.
 uniform int ipSunCount;
+// A runtime bound keeps native drivers from expanding the DDA inside every PCF
+// tap and native entity/hand shader variant. CPU supplies 100; the hard cap and
+// fail-closed exhaustion are unchanged.
+uniform int ipSunRaySteps;
 uniform int ipSunPortalView;
 uniform sampler3D ipSunAtlas;
 uniform sampler2DArray ipSunSourceShadow;
+uniform sampler2DShadow ipSunDepth0;
+uniform sampler2DShadow ipSunDepth1;
+uniform sampler2DShadow ipSunDepth2;
+uniform sampler2DShadow ipSunDepth3;
+uniform int ipSunDepthValid[4];
+uniform mat4 ipSunSourceProjection[4];
+uniform mat4 ipSunSourceInverse[4];
+uniform vec3 ipSunSourcePlane[4];
+uniform vec3 ipSunSourceFacing[4];
+uniform vec3 ipSunSourceU[4];
+uniform vec3 ipSunSourceV[4];
+uniform vec3 ipSunSourceLight[4];
+uniform float ipSunShadowBias[4];
+uniform float ipSunShadowDistance[4];
 uniform vec3 ipSunOrigin[4];
+uniform vec3 ipSunAmbientMin[4];
+uniform vec3 ipSunAmbientMax[4];
 uniform vec3 ipSunPlane[4];
 uniform vec3 ipSunInward[4];
 uniform vec3 ipSunU[4];
@@ -30,9 +50,13 @@ vec4 ipSunVoxel(int i,ivec3 p) {
 }
 vec4 ipSunData(int i,vec3 point) {
     vec3 local=point-ipSunOrigin[i];
+    vec3 center=floor(local)+0.5;
+    // The observed portal-plane layer carries occlusion only, not ambient light.
+    // Keep the original field's normalized edge interpolation independent of it.
+    if(any(lessThan(center,ipSunAmbientMin[i])) || any(greaterThan(center,ipSunAmbientMax[i]))) return vec4(0.0);
     // An opaque or unobserved voxel cannot borrow ambient from its neighbor.
     if(ipSunVoxel(i,ivec3(floor(local))).a<0.5) return vec4(0.0);
-    vec3 coord=clamp(local,vec3(0.5),vec3(31.5));
+    vec3 coord=clamp(local,ipSunAmbientMin[i],ipSunAmbientMax[i]);
     vec4 value=texture(ipSunAtlas,vec3(coord.xy/32.0,(coord.z+float(i)*32.0)/128.0));
     if(value.a<0.0001) return vec4(0.0);
     return vec4(value.rgb/value.a,1.0);
@@ -53,20 +77,13 @@ vec2 ipSunLightmap(vec3 point,vec3 normal,vec2 original) {
     }
     return result;
 }
-// Exact aperture intersection, followed by bounded voxel DDA on the receiving side.
-// At the final cell intersecting the portal plane, its placeholder belongs to the
-// opening. Earlier opaque/unknown cells and rays outside the finite field stop light.
-float ipSunVisibility(int i,vec3 point) {
-    vec3 ray=ipSunDirection[i];
-    float denom=dot(ray,ipSunInward[i]);
-    float side=dot(point-ipSunPlane[i],ipSunInward[i]);
-    if(denom>=-0.000001 || side<=0.0) return 0.0;
-    float distance=-side/denom;
-    vec3 hit=point+ray*distance-ipSunPlane[i];
-    vec2 uv=vec2(dot(hit,ipSunU[i]),dot(hit,ipSunV[i]));
-    if(any(greaterThanEqual(abs(uv),ipSunHalfSize[i]))) return 0.0;
-    float source=texture(ipSunSourceShadow,vec3(uv/(2.0*ipSunHalfSize[i])+0.5,float(i))).r;
-    if(source<=0.0) return 0.0;
+// Every filter tap traverses the same original receiving point to its own aperture hit.
+// Unknown/opaque start cells and the entire receiving segment remain strict.
+float ipSunReceiverPath(int i,vec3 point,vec3 apertureHit) {
+    vec3 displacement=apertureHit-point;
+    float distance=length(displacement);
+    if(distance<0.000001) return 0.0;
+    vec3 ray=displacement/distance;
     vec3 local=point-ipSunOrigin[i];
     ivec3 cell=ivec3(floor(local));
     ivec3 stepV=ivec3(sign(ray));
@@ -77,15 +94,10 @@ float ipSunVisibility(int i,vec3 point) {
     if(abs(ray.x)<0.0000001) next.x=1e20;
     if(abs(ray.y)<0.0000001) next.y=1e20;
     if(abs(ray.z)<0.0000001) next.z=1e20;
-    for(int n=0;n<100;n++) {
+    for(int n=0;n<min(ipSunRaySteps,100);n++) {
         float t=min(next.x,min(next.y,next.z));
-        if(ipSunVoxel(i,cell).a<0.5) {
-            // Only the final portal-plane cell is exempt, never a wall in the grid.
-            if(ipSunInGrid(cell) || t<distance-0.00001) return 0.0;
-            vec3 center=ipSunOrigin[i]+vec3(cell)+0.5;
-            if(abs(dot(center-ipSunPlane[i],ipSunInward[i]))>0.50001) return 0.0;
-        }
-        if(t>=distance-0.00001) return source;
+        if(ipSunVoxel(i,cell).a<0.5) return 0.0;
+        if(t>=distance-0.00001) return 1.0;
         // Supercover: check every voxel touched at a simultaneous edge/corner.
         bvec3 tied=lessThanEqual(next,vec3(t+0.000001));
         if(tied.x && ipSunVoxel(i,cell+ivec3(stepV.x,0,0)).a<0.5 && ipSunInGrid(cell+ivec3(stepV.x,0,0))) return 0.0;
@@ -101,6 +113,79 @@ float ipSunVisibility(int i,vec3 point) {
         if(tied.z) { cell.z+=stepV.z;next.z+=delta.z; }
     }
     return 0.0;
+}
+// The source pack distorts its shadow projection before writing depth. These are
+// the supported adapter's reversible projection equations, not a world-space ray cap.
+vec3 ipSunProject(int i,vec3 sourcePoint) {
+    vec4 clip=ipSunSourceProjection[i]*vec4(sourcePoint,1.0);
+    vec3 q=clip.xyz/clip.w;
+    q.xy/=length(q.xy)*ipSunShadowBias[i]+1.0-ipSunShadowBias[i];
+    q.z*=0.2;
+    return q*0.5+0.5;
+}
+float ipSunDepthCompare(int i,vec3 coord) {
+    // Constant sampler indices work on GL 3.3 drivers. Units may alias one source snapshot.
+    if(i==0) return texture(ipSunDepth0,coord);
+    if(i==1) return texture(ipSunDepth1,coord);
+    if(i==2) return texture(ipSunDepth2,coord);
+    return texture(ipSunDepth3,coord);
+}
+#ifndef IP_SUN_PACK_PCF
+float ipSunPackCoverage(int i,vec3 point,float viewDistance,float visibility,bool covered) { return covered?visibility:0.0; }
+#endif
+float ipSunPathTap(int i,vec3 point,vec3 sampleCoord) {
+
+    vec3 raw=sampleCoord*2.0-1.0;
+    float denominator=1.0-ipSunShadowBias[i]*length(raw.xy);
+    if(denominator<=0.000001) return 0.0;
+    raw.xy*= (1.0-ipSunShadowBias[i])/denominator;
+    raw.z/=0.2;
+    vec4 unprojected=ipSunSourceInverse[i]*vec4(raw,1.0);
+    if(abs(unprojected.w)<0.000001) return 0.0;
+    vec3 sourcePoint=unprojected.xyz/unprojected.w;
+    float incidence=dot(ipSunSourceLight[i],ipSunSourceFacing[i]);
+    if(incidence<=0.000001) return 0.0;
+    sourcePoint-=ipSunSourceLight[i]*dot(sourcePoint-ipSunSourcePlane[i],ipSunSourceFacing[i])/incidence;
+    vec3 relative=sourcePoint-ipSunSourcePlane[i];
+    vec2 uv=vec2(dot(relative,ipSunSourceU[i]),dot(relative,ipSunSourceV[i]));
+    if(any(greaterThanEqual(abs(uv),ipSunHalfSize[i]))) return 0.0;
+    vec3 hit=ipSunPlane[i]+ipSunU[i]*uv.x+ipSunV[i]*uv.y;
+    if(ipSunReceiverPath(i,point,hit)<0.5) return 0.0;
+    vec3 depthCoord=ipSunProject(i,sourcePoint);
+    bool covered=all(greaterThan(depthCoord,vec3(0.0))) && all(lessThan(depthCoord,vec3(1.0)));
+    vec3 sourceReceiver=sourcePoint+ipSunSourceNormal(i,point-hit);
+    // Compare at the aperture, never at the destination receiver: source continuation
+    // behind the opening must not cast a fictitious shadow into the other world.
+    float visibility=covered?ipSunDepthCompare(i,vec3(depthCoord.xy,depthCoord.z-0.000005)):0.0;
+    return ipSunPackCoverage(i,point,length(sourceReceiver),visibility,covered);
+}
+#ifndef IP_SUN_PACK_PCF
+float ipSunPackFiltered(int i,vec3 point,vec3 coord) { return ipSunPathTap(i,point,coord); }
+#endif
+float ipSunVisibility(int i,vec3 point) {
+    vec3 ray=ipSunDirection[i];
+    float denom=dot(ray,ipSunInward[i]);
+    float side=dot(point-ipSunPlane[i],ipSunInward[i]);
+    if(denom>=-0.000001 || side<=0.0) return 0.0;
+    if(ipSunVoxel(i,ivec3(floor(point-ipSunOrigin[i]))).a<0.5) return 0.0;
+    vec3 hit=point+ray*(-side/denom);
+    vec3 relative=hit-ipSunPlane[i];
+    vec2 uv=vec2(dot(relative,ipSunU[i]),dot(relative,ipSunV[i]));
+    if(ipSunDepthValid[i]!=0) {
+        vec3 sourceHit=ipSunSourcePlane[i]+ipSunSourceU[i]*uv.x+ipSunSourceV[i]*uv.y;
+        vec3 coord=ipSunProject(i,sourceHit);
+        if(any(lessThanEqual(coord,vec3(0.0))) || any(greaterThanEqual(coord,vec3(1.0)))) {
+            // Native map coverage is finite; it is not an opaque wall at its boundary.
+            if(any(greaterThanEqual(abs(uv),ipSunHalfSize[i])) || ipSunReceiverPath(i,point,hit)<0.5) return 0.0;
+            vec3 sourceReceiver=sourceHit+ipSunSourceNormal(i,point-hit);
+            return ipSunPackCoverage(i,point,length(sourceReceiver),0.0,false);
+        }
+        return ipSunPackFiltered(i,point,coord);
+    }
+    // No valid captured source pass: retain the strict, observed CPU source mask.
+    if(any(greaterThanEqual(abs(uv),ipSunHalfSize[i]))) return 0.0;
+    float source=texture(ipSunSourceShadow,vec3(uv/(2.0*ipSunHalfSize[i])+0.5,float(i))).r;
+    return source<=0.0?0.0:source*ipSunReceiverPath(i,point,hit);
 }
 vec3 ipSunApply(vec3 point,vec3 normal,vec3 original,inout vec3 blockLighting,float lightmapXM,float emission) {
     vec3 incoming=vec3(0.0);

@@ -28,6 +28,7 @@ public final class EuphoriaPortalPipelines {
 
     public static void clear() {
         PACKS.clear();
+        qouteall.imm_ptl.core.render.impostor.PortalImpostorManager.invalidate();
     }
 
     public static void prepare(NamespacedId dimension) {

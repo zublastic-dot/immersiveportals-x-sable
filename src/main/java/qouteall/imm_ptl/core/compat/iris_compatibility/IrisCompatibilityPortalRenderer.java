@@ -15,6 +15,7 @@ import qouteall.imm_ptl.core.render.MyRenderHelper;
 import qouteall.imm_ptl.core.render.SecondaryFrameBuffer;
 import qouteall.imm_ptl.core.render.ViewAreaRenderer;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
+import qouteall.imm_ptl.core.render.impostor.PortalImpostorManager;
 import qouteall.imm_ptl.core.render.context_management.WorldRenderInfo;
 import qouteall.imm_ptl.core.render.renderer.PortalRenderer;
 
@@ -96,9 +97,12 @@ public class IrisCompatibilityPortalRenderer extends PortalRenderer {
         
         PortalRendering.pushPortalLayer(portal);
         
+        Matrix4f sourceProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
         renderPortalContent(portal);
         
         PortalRendering.popPortalLayer();
+        PortalImpostorManager.capture(portal, modelView, sourceProjection,
+            client.getMainRenderTarget(), client.getMainRenderTarget(), -1);
         
         CHelper.enableDepthClamp();
         
@@ -189,6 +193,8 @@ public class IrisCompatibilityPortalRenderer extends PortalRenderer {
         CHelper.checkGlError();
         
         renderPortals(passingModelView);
+        PortalImpostorManager.renderCached(passingModelView, RenderSystem.getProjectionMatrix(),
+            deferredBuffer.fb, -1);
         
         RenderTarget mainFrameBuffer = client.getMainRenderTarget();
         mainFrameBuffer.bindWrite(true);

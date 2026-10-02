@@ -184,6 +184,25 @@ class PortalShaderGpuGlTest {
         assertEquals(GL_TRUE,glGetShaderi(id,GL_COMPILE_STATUS),glGetShaderInfoLog(id));return id;
     }
 
+    @Test void productionBindingSuppliesTheRuntimeTraversalBoundBeforePublishingRegions() {
+        int program=program("""
+            #version 330 core
+            uniform int ipSunCount, ipSunRaySteps;
+            uniform sampler3D ipSunAtlas;
+            out vec4 color;
+            void main(){color=texture(ipSunAtlas,vec3(.5))*float(ipSunCount+ipSunRaySteps);}
+            """);
+        int steps=glGetUniformLocation(program,"ipSunRaySteps"),count=glGetUniformLocation(program,"ipSunCount");
+        try(var atlas=new PortalShaderGpu.Atlas()) {
+            assertTrue(steps>=0);glUniform1i(steps,-1);
+            try(var ignored=PortalShaderGpu.bindAtlas(program,atlas,List.of(region(.125f,255)),
+                ()->assertEquals(0,glGetUniformi(program,count)))) {
+                assertEquals(100,glGetUniformi(program,steps));
+                assertEquals(1,glGetUniformi(program,count));
+            }
+        } finally {glUseProgram(0);glDeleteProgram(program);}
+    }
+
     private static int program(int nativeCount) {
         StringBuilder fragment=new StringBuilder("#version 330 core\nuniform int ipSunCount;uniform sampler3D ipSunAtlas;uniform sampler2DArray ipSunSourceShadow;uniform sampler2D nativeImages[")
             .append(nativeCount).append("];uniform isampler2D nativeInteger;out vec4 color;void main(){color=texture(ipSunAtlas,vec3(.5))*float(ipSunCount)+texture(ipSunSourceShadow,vec3(.5,.5,0))+vec4(texelFetch(nativeInteger,ivec2(0),0));");
@@ -326,6 +345,60 @@ class PortalShaderGpuGlTest {
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER,0);glDeleteBuffers(pbo);
             glBindSampler(unitA,0);glBindSampler(unitB,0);glDeleteSamplers(samplerA);glDeleteSamplers(samplerB);
             glDeleteTextures(old3d);glDeleteTextures(oldArray);glUseProgram(0);glDeleteProgram(program);
+        }
+    }
+
+    @Test void fourRegionsDeduplicateOneOwnedDepthAndRestoreSourceTextureAndSampler() {
+        int program=program("""
+            #version 330 core
+            uniform int ipSunCount;
+            uniform sampler3D ipSunAtlas;
+            uniform sampler2DArray ipSunSourceShadow;
+            uniform sampler2DShadow ipSunDepth0,ipSunDepth1,ipSunDepth2,ipSunDepth3;
+            uniform int ipSunDepthValid[4];
+            out vec4 color;
+            void main(){color=texture(ipSunAtlas,vec3(.5))+texture(ipSunSourceShadow,vec3(.5,.5,0));
+                color+=vec4(texture(ipSunDepth0,vec3(.5))*float(ipSunDepthValid[0])+
+                    texture(ipSunDepth1,vec3(.5))*float(ipSunDepthValid[1])+
+                    texture(ipSunDepth2,vec3(.5))*float(ipSunDepthValid[2])+
+                    texture(ipSunDepth3,vec3(.5))*float(ipSunDepthValid[3]));color*=float(ipSunCount);}
+            """);
+        int nativeDepth=glGenTextures(),previous=glGenTextures(),previousSampler=glGenSamplers();
+        var store=new PortalSourceShadow.Store(4,64L*1024*1024);
+        int unit=glGetInteger(GL_MAX_TEXTURE_IMAGE_UNITS)-3;
+        try(var atlas=new PortalShaderGpu.Atlas()) {
+            glActiveTexture(GL_TEXTURE3);glBindTexture(GL_TEXTURE_2D,nativeDepth);
+            glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,1,1,0,GL_DEPTH_COMPONENT,GL_FLOAT,new float[]{1});
+            var identity=new org.joml.Matrix4f();
+            var captured=store.capture(new Object(),new Object(),new PortalSourceShadow.Capture(nativeDepth,1,Vec3.ZERO,
+                identity,identity,96,1,.3f,100,100),1000);
+            assertNotNull(captured);
+            glActiveTexture(GL_TEXTURE0+unit);glBindTexture(GL_TEXTURE_2D,previous);glBindSampler(unit,previousSampler);
+            glActiveTexture(GL_TEXTURE3);
+            var regions=java.util.Collections.nCopies(4,region(.125f,255));
+            var captures=java.util.Collections.nCopies(4,captured);
+            try(var ignored=PortalShaderGpu.bindAtlas(program,atlas,regions,captures,()->{})) {
+                for(int i=0;i<4;i++) {
+                    assertEquals(unit,glGetUniformi(program,glGetUniformLocation(program,"ipSunDepth"+i)));
+                    assertEquals(1,glGetUniformi(program,glGetUniformLocation(program,"ipSunDepthValid["+i+"]")));
+                }
+                glActiveTexture(GL_TEXTURE0+unit);
+                assertEquals(captured.texture(),glGetInteger(GL_TEXTURE_BINDING_2D));
+                assertEquals(atlas.depthSampler,glGetInteger(GL_SAMPLER_BINDING));
+                assertEquals(GL_COMPARE_REF_TO_TEXTURE,glGetSamplerParameteri(atlas.depthSampler,GL_TEXTURE_COMPARE_MODE));
+                assertEquals(GL_LINEAR,glGetSamplerParameteri(atlas.depthSampler,GL_TEXTURE_MIN_FILTER));
+                assertEquals(GL_NONE,glGetTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_COMPARE_MODE));
+                glActiveTexture(GL_TEXTURE3);
+            }
+            assertEquals(GL_TEXTURE3,glGetInteger(GL_ACTIVE_TEXTURE));glActiveTexture(GL_TEXTURE0+unit);
+            assertEquals(previous,glGetInteger(GL_TEXTURE_BINDING_2D));assertEquals(previousSampler,glGetInteger(GL_SAMPLER_BINDING));
+            glActiveTexture(GL_TEXTURE3);
+            assertThrows(IllegalStateException.class,()->PortalShaderGpu.bindAtlas(program,atlas,regions,captures,()->{throw new IllegalStateException("metadata");}));
+            assertEquals(0,glGetUniformi(program,glGetUniformLocation(program,"ipSunCount")));
+            glActiveTexture(GL_TEXTURE0+unit);assertEquals(previous,glGetInteger(GL_TEXTURE_BINDING_2D));assertEquals(previousSampler,glGetInteger(GL_SAMPLER_BINDING));
+        } finally {
+            store.clear();glBindSampler(unit,0);glDeleteSamplers(previousSampler);glDeleteTextures(previous);glDeleteTextures(nativeDepth);
+            glUseProgram(0);glDeleteProgram(program);
         }
     }
 

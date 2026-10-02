@@ -426,3 +426,41 @@ and arbitrary shader-pack lighting are not claimed.
 ## 0.5.1-zublastic.43
 
 Fix Iris shader-option observation when JCPP replaces its source argument before returning. Retain the original dimension header while observing the preprocessed output; exclude End lighting settings. Shader lighting still requires live acceptance.
+
+
+## 0.5.1-zublastic.44
+
+- Cache bounded portal-local destination images and draw them at distant static or Sable-carried apertures after live rendering stops.
+- Add authoritative metadata leases, depth/stencil occlusion, cutoff hysteresis and a completed-live-view re-entry blend.
+- Preserve the .43 shader-light observer repair; cached pictures do not simulate new sunlight or destination activity.
+
+## 0.5.1-zublastic.45
+
+- Correct portal sunlight ray traversal at the final aperture layer using observed occupancy, retaining solid and unknown block occlusion.
+- Preserve ambient interpolation independently of the additional aperture occupancy.
+- Report bounded portal image capture rejection diagnostics for in-game verification.
+
+## 0.5.1-zublastic.46
+
+- Treat validated portal placeholders as cross-world sunlight openings while retaining their normal light-blocking behavior.
+- Cover actual portal placeholder block states in occupancy regressions.
+
+## 0.5.1-zublastic.47
+
+- Use an owned copy of the completed source Iris shadow map and its matching camera, matrices and sun direction for supported portal sunlight.
+- Filter the entire light path using the supported shader pack's shadow settings; each sample still checks the aperture and receiving walls.
+- Bound source-depth storage and lifetime, preserve native resolution, and retain the strict observed source fallback when no valid snapshot is available.
+- Distinguish active-query and zero-coverage portal image capture failures in bounded diagnostics.
+
+## 0.5.1-zublastic.48
+
+- Accept Iris native unsized depth textures, preserve their allocation type and precision, and report bounded capture rejection reasons.
+- Keep receiving-ray traversal bounded through a runtime uniform to avoid constant-loop expansion in native entity and hand shader variants.
+- Exercise the real Iris unsized depth allocation and complete native shader linking in GPU regressions.
+
+
+## 0.5.1-zublastic.49
+
+- Refresh source shader shadows for nearby receiving rooms independently of whether the portal is visible, using a bounded offscreen native pass.
+- Restore graphics/world state on auxiliary completion or failure and keep discarded color work out of DH main-view history.
+- Preserve source freshness, memory limits and strict fallback; add bounded producer/consumer diagnostics. Live continuity and performance verification remain pending.

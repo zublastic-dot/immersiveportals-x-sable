@@ -41,6 +41,21 @@ public class IPConfig implements ConfigData {
     @ConfigEntry.Category("client")
     public boolean reducedPortalRendering = false;
     @ConfigEntry.Category("client")
+    @ConfigEntry.Gui.Tooltip
+    public boolean portalImpostors = true;
+    @ConfigEntry.Category("client")
+    @ConfigEntry.BoundedDiscrete(min = 16, max = 512)
+    @ConfigEntry.Gui.Tooltip
+    public int portalImpostorLiveDistance = 128;
+    @ConfigEntry.Category("client")
+    @ConfigEntry.BoundedDiscrete(min = 64, max = 2048)
+    @ConfigEntry.Gui.Tooltip
+    public int portalImpostorMaxDistance = 2048;
+    @ConfigEntry.Category("client")
+    @ConfigEntry.BoundedDiscrete(min = 64, max = 512)
+    @ConfigEntry.Gui.Tooltip
+    public int portalImpostorResolution = 256;
+    @ConfigEntry.Category("client")
     public boolean netherPortalOverlay = false;
     @ConfigEntry.Category("client")
     @ConfigEntry.Gui.Tooltip
@@ -186,6 +201,10 @@ public class IPConfig implements ConfigData {
         IPGlobal.netherPortalMode = netherPortalMode;
         IPGlobal.endPortalMode = endPortalMode;
         IPGlobal.reducedPortalRendering = reducedPortalRendering;
+        IPGlobal.portalImpostors = portalImpostors;
+        IPGlobal.portalImpostorLiveDistance = Mth.clamp(portalImpostorLiveDistance, 16, 512);
+        IPGlobal.portalImpostorMaxDistance = Mth.clamp(portalImpostorMaxDistance, 64, 2048);
+        IPGlobal.portalImpostorResolution = Mth.clamp(portalImpostorResolution, 64, 512);
         IPGlobal.offsetOcclusionQuery = visibilityPrediction;
         IPGlobal.netherPortalOverlay = netherPortalOverlay;
         IPGlobal.scaleLimit = scaleLimit;

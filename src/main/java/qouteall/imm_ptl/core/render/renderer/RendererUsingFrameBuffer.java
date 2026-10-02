@@ -17,6 +17,7 @@ import qouteall.imm_ptl.core.render.QueryManager;
 import qouteall.imm_ptl.core.render.SecondaryFrameBuffer;
 import qouteall.imm_ptl.core.render.ViewAreaRenderer;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
+import qouteall.imm_ptl.core.render.impostor.PortalImpostorManager;
 
 import java.util.List;
 
@@ -83,12 +84,15 @@ public class RendererUsingFrameBuffer extends PortalRenderer {
         );
         GL11.glDisable(GL11.GL_STENCIL_TEST);
         
+        Matrix4f sourceProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
         renderPortalContent(portal);
         
         ((IEMinecraftClient) client).ip_setFrameBuffer(oldFrameBuffer);
         oldFrameBuffer.bindWrite(true);
         
         PortalRendering.popPortalLayer();
+        PortalImpostorManager.capture(portal, modelView, sourceProjection,
+            secondaryFrameBuffer.fb, secondaryFrameBuffer.fb, -1);
         
         CHelper.enableDepthClamp();
         renderSecondBufferIntoMainBuffer(portal, modelView);
@@ -138,5 +142,7 @@ public class RendererUsingFrameBuffer extends PortalRenderer {
         for (Portal portal : portalsToRender) {
             doRenderPortal(portal, modelView);
         }
+        PortalImpostorManager.renderCached(modelView, RenderSystem.getProjectionMatrix(),
+            client.getMainRenderTarget(), -1);
     }
 }

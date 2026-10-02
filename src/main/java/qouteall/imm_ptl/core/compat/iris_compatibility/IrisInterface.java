@@ -82,6 +82,7 @@ public class IrisInterface {
 
         @Override
         public void reloadPipelines() {
+            qouteall.imm_ptl.core.render.impostor.PortalImpostorManager.invalidate();
             Iris.getPipelineManager().destroyPipeline();
         }
 

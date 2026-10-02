@@ -60,6 +60,8 @@ public final class IplClientShipPortalAnchor {
 
     /** Portal UUID → anchor. Client thread only. */
     private static final Map<UUID, ClientAnchor> ANCHORS = new HashMap<>();
+    /** Last known flipped face for detached impostors only; never used by the live portal driver. */
+    private static final Map<UUID, UUID> IMPOSTOR_FLIPPED_ALIASES = new HashMap<>();
 
     private static boolean registered = false;
 
@@ -68,6 +70,8 @@ public final class IplClientShipPortalAnchor {
     private static void ensureRegistered() {
         if (registered) return;
         registered = true;
+        qouteall.imm_ptl.core.render.impostor.PortalImpostorMetadata.setClientAnchorLookup(
+            IplClientShipPortalAnchor::getImpostorAnchorId);
         // World teardown: drop all client anchor state. Without this, stale anchors
         // survive disconnect and the per-frame driver runs against a torn-down
         // ClientWorldLoader — getClientWorlds() Validate.isTrue crashed the render
@@ -75,6 +79,7 @@ public final class IplClientShipPortalAnchor {
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
             de.nick1st.imm_ptl.events.ClientCleanupEvent.class, e -> {
                 ANCHORS.clear();
+                IMPOSTOR_FLIPPED_ALIASES.clear();
                 PORTAL_CACHE.clear();
             });
         // ORDERING IS THE WELD: IP's ClientPortalAnimationManagement.update() runs at
@@ -87,6 +92,56 @@ public final class IplClientShipPortalAnchor {
         // the welded pose too).
         qouteall.imm_ptl.core.portal.animation.ClientPortalAnimationManagement
             .clientAnimationUpdateSignal.connect(IplClientShipPortalAnchor::driveAll);
+    }
+
+    public enum Status { STATIC, UNRESOLVED, RESOLVED }
+
+    /** Immutable render pose, including a local-attachment fingerprint stable during rigid motion. */
+    public record ImpostorPose(Status status, UUID carrierId, Vec3 origin, Vec3 axisW, Vec3 axisH,
+                               String attachmentFingerprint) {}
+
+    /** Primary anchor UUID for this aperture or its flipped face. No entity lookup or world creation. */
+    public static UUID getImpostorAnchorId(UUID portalId) {
+        if (portalId == null) return null;
+        if (ANCHORS.containsKey(portalId)) return portalId;
+        for (var entry : ANCHORS.entrySet()) {
+            if (portalId.equals(entry.getValue().flippedId())
+                || portalId.equals(IMPOSTOR_FLIPPED_ALIASES.get(entry.getKey()))) return entry.getKey();
+        }
+        return null;
+    }
+
+    /**
+     * Resolve an aperture after its Portal entity is untracked, using the same interpolated carrier
+     * pose as live geometry. This is read-only and never uses PORTAL_CACHE or loads another world.
+     */
+    public static ImpostorPose resolveImpostorPose(UUID portalId, ResourceKey<Level> expectedParent) {
+        UUID primary = getImpostorAnchorId(portalId);
+        if (primary == null) return new ImpostorPose(Status.STATIC, null, null, null, null, "");
+        ClientAnchor anchor = ANCHORS.get(primary);
+        boolean flipped = !primary.equals(portalId);
+        String fingerprint = attachmentFingerprint(primary, anchor, flipped);
+        ImpostorPose unresolved = new ImpostorPose(Status.UNRESOLVED, anchor.shipId(), null, null, null, fingerprint);
+        if (!ClientWorldLoader.getIsInitialized() || net.minecraft.client.Minecraft.getInstance().level == null) return unresolved;
+        ClientSubLevel ship = findShip(anchor.shipId());
+        if (ship == null || ship.isRemoved()) return unresolved;
+        Level parent = ipl.sable.dim.IplDimAgnostic.getParentLevel(ship);
+        if (parent == null || !parent.dimension().equals(expectedParent)) return unresolved;
+        Pose3dc pose = ship.renderPose();
+        Vec3 origin = pose.transformPosition(new Vec3(anchor.plotPos().x, anchor.plotPos().y, anchor.plotPos().z));
+        DQuaternion rotation = DQuaternion.fromMcQuaternion(new Quaterniond(pose.orientation()))
+            .hamiltonProduct(anchor.localOrient());
+        Vec3 axisW = rotation.rotate(new Vec3(flipped ? -1 : 1, 0, 0));
+        Vec3 axisH = rotation.rotate(new Vec3(0, 1, 0));
+        return new ImpostorPose(Status.RESOLVED, anchor.shipId(), origin, axisW, axisH, fingerprint);
+    }
+
+    private static String attachmentFingerprint(UUID primary, ClientAnchor anchor, boolean flipped) {
+        DQuaternion q = anchor.localOrient();
+        return primary + ":" + anchor.shipId() + ":" + flipped + ":"
+            + Double.toHexString(anchor.plotPos().x) + ":" + Double.toHexString(anchor.plotPos().y) + ":"
+            + Double.toHexString(anchor.plotPos().z) + ":" + Double.toHexString(q.x) + ":"
+            + Double.toHexString(q.y) + ":" + Double.toHexString(q.z) + ":" + Double.toHexString(q.w);
     }
 
     private static void driveAll() {
@@ -220,8 +275,14 @@ public final class IplClientShipPortalAnchor {
                 if (parseUuid(flippedUuid) != null) PORTAL_CACHE.remove(parseUuid(flippedUuid));
                 if (parseUuid(reverseUuid) != null) PORTAL_CACHE.remove(parseUuid(reverseUuid));
                 if (parseUuid(parallelUuid) != null) PORTAL_CACHE.remove(parseUuid(parallelUuid));
-                ANCHORS.put(UUID.fromString(portalUuid), new ClientAnchor(
-                    parseUuid(flippedUuid),
+                UUID primary = UUID.fromString(portalUuid);
+                // The server's periodic anchor sync lacks cluster IDs while the source entity is
+                // unloaded. Keep a detached-render alias without changing the live driver's state.
+                // Authoritative impostor leases separately invalidate deleted/relinked faces.
+                UUID flipped = parseUuid(flippedUuid);
+                if (flipped != null) IMPOSTOR_FLIPPED_ALIASES.put(primary, flipped);
+                ANCHORS.put(primary, new ClientAnchor(
+                    flipped,
                     parseUuid(reverseUuid),
                     parseUuid(parallelUuid),
                     UUID.fromString(shipUuid),
@@ -239,7 +300,9 @@ public final class IplClientShipPortalAnchor {
 
         public static void clear(String portalUuid) {
             try {
-                ANCHORS.remove(UUID.fromString(portalUuid));
+                UUID id = UUID.fromString(portalUuid);
+                ANCHORS.remove(id);
+                IMPOSTOR_FLIPPED_ALIASES.remove(id);
             } catch (Throwable ignored) {
             }
         }
