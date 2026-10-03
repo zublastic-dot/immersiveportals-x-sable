@@ -70,3 +70,10 @@ cross-dimension command teleport replaces client worlds and correctly stops stal
 SPA refreshes retain the native sound's streaming, class and loop metadata and are marked as
 updates. The context is captured on the client thread and published without resolving live
 sound metadata on the audio executor; a refresh must not create another playback-start event.
+
+`imm_ptl_client_debug portal_sound_record_start` opts into a bounded SPA HIGH diagnostic
+capture (60 seconds or SPA's 64 MiB limit). It refuses an existing recording or held recorder
+key, temporarily uses HOLD mode without saving configuration, and restores its owned input
+state on stop, expiry, world/connection change or cleanup. Use `portal_sound_record_stop`
+under the same command root to end it early. HIGH captures individual acoustic evaluations;
+SPA's default IDLE archive only provides aggregate counters and cannot validate a blocker.

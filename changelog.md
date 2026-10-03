@@ -1,5 +1,6 @@
 # 0.5.1-zublastic.51
 
+- Add an explicit bounded SPA HIGH recorder command for per-sound portal acoustic verification, with runtime-only input changes and automatic restoration.
 - Preserve native stream/class/loop metadata when refreshing Sound Physics Aeronautics portal acoustics. Refreshes now use update semantics instead of synthetic playback starts, preserving continuity policy and accurate start counters.
 - Add installed-SPA context and lifetime regression checks. Clarify piston acoustic tests and physical portal crossing versus world-replacing command teleports.
 
