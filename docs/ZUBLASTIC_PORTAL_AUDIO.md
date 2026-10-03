@@ -57,8 +57,12 @@ physical wave travel delay and portal Doppler are not newly simulated here.
 position and SPA capture/evaluation state. Compare these with SPA's flight recorder and actual
 output audio; a route log alone does not prove audible output or correct filtering.
 
-Use an actual source-world note-block event for acoustic tests, and a jukebox for continuity:
+Use an actual source-world piston event (BLOCKS category) for acoustic tests, and a jukebox for continuity:
 open aperture, source-side blocker, listener-side blocker, look away, cross both directions,
 stop source, remove link and unload/reload. Restore all fixture blocks and player state.
 Direct `/playsound` to a player is not proof of source-world provenance. Create train movement,
 belts and other physical transport are separate work from this audio path.
+
+Vanilla note blocks use RECORDS too, so they do not test SPA acoustic processing when that
+category is disabled. Cross the portal physically when checking stream continuity: a vanilla
+cross-dimension command teleport replaces client worlds and correctly stops stale-world voices.
