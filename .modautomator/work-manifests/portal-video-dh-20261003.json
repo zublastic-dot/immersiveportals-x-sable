@@ -23,8 +23,7 @@
     "build.gradle",
     "gradle.properties",
     "changelog.md",
-    "docs/ZUBLASTIC_DH_PORTAL_COVERAGE.md",
-    ".modautomator/work-manifests/portal-video-dh-20261003.json"
+    "docs/ZUBLASTIC_DH_PORTAL_COVERAGE.md"
   ],
   "value_case": {
     "category": "observable_capability",
