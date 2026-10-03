@@ -32,7 +32,8 @@
     "src/main/java/qouteall/imm_ptl/core/mixin/client/render",
     "src/test/java/qouteall/imm_ptl/core/sunlight",
     "src/test/java/qouteall/imm_ptl/core/lighting",
-    "docs/ZUBLASTIC_SHARED_SUNLIGHT.md"
+    "docs/ZUBLASTIC_SHARED_SUNLIGHT.md",
+    "src/main/java/qouteall/imm_ptl/core/compat/IPCompatMixinPlugin.java"
   ],
   "value_case": {
     "category": "observable_capability",

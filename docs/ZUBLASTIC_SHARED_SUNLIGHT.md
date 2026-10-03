@@ -1,8 +1,12 @@
 # Experimental shared sunlight profile and gameplay (.54 candidate)
 
-Status: implementation in progress. The source described here has not yet passed
-its complete build or live verification. Test, deployment and acceptance receipts
-belong in the canonical 2026-10-03 portal video/DH history.
+Status: full local build/test matrix passed; runtime verification pending.
+Build head `4116395a7adb7304648fe3194ceb40712827082b` passed 651 tests on each
+of DH 3.3.2 and 3.3.3, with zero failures/errors/skips, including 17 tests using
+the actual supported pack. Both release artifacts have SHA-256
+`68d710edefa3c650ad20fff30090b40b92c9f364353f06b6e01c325fe810f2a2`.
+This build evidence is not installation or live acceptance. The canonical
+2026-10-03 portal video/DH history records deployment and acceptance separately.
 
 This is an optional experimental per-world setting of the fork, disabled by
 default. An operator must explicitly opt in. Disabling it restores the existing
@@ -59,13 +63,16 @@ out again.
 
 One profile is stored per world save in the Overworld's SavedData
 `data/imm_ptl_sunlight.dat`, with a schema and versioned revision. It is not a
-machine-global preference or an individual player's option. Login, dimension
+machine-global preference or an individual player's option. Login, respawn, dimension
 change and operator profile changes send the server profile to clients. Invalid
 or incomplete saved data leaves this feature disabled and logs the problem.
 A client request does not bypass the server's validation or become authoritative
 until the server accepts it.
 
 Client state is scoped to the server connection and rejects stale revisions.
+Same-connection world replacement or respawn retains the policy; a genuine
+connection change clears it, including when a new server sends its disabled
+profile before the cleanup tick.
 A profile change queues a native Iris reload when the supported pack is active
 and no loading overlay is present. Ordinary Iris reloads clear compilation
 evidence but retain the received policy. Disconnect clears that policy and
@@ -74,22 +81,26 @@ pack file is written for the override. A submitted update or queued reload is
 not the same as a ready, successfully adapted shader.
 
 The supported rendering target for this candidate is
-`ComplementaryUnbound_r5.9.3 + EuphoriaPatches_1.10.5` (directory or ZIP).
+`ComplementaryUnbound_r5.9.3 + EuphoriaPatches_1.10.5` (directory or ZIP), with
+verified Iris `1.8.14-beta.1+mc1.21.1`. Other Iris versions do not activate this
+adapter or its native celestial/shadow hooks.
 The adapter applies the shared rotation/clock in memory to supported Overworld
 and Nether lighting programs. It requires the expected source anchors, adapts
 the portal helper's source clock too, and reports failed adaptation instead of
 claiming a partially adapted pack is ready. Receiving Nether sunlight remains
 limited to the existing portal aperture lighting path. End programs, unknown
 packs and changed signatures do not gain automatic compatibility. There is no
-universal shader support promise.
+universal shader support promise. The actual-pack tests cover its procedural
+sky path. There is no separate angle override for vanilla/textured sun quads,
+so their visual position is not covered by that agreement claim.
 
 With shaders off, server gameplay still uses the enabled shared profile; no
 matching shader-rendered sun or shadow is claimed for the native renderer.
 Unsupported shader packs retain their own visuals while server gameplay follows
 the world profile. Client diagnostics distinguish `shaders_off_server_gameplay_only`,
-`unsupported_shader_pack`, `adapter_failed`, `reload_pending`,
+`unsupported_iris_version`, `unsupported_shader_pack`, `adapter_failed`, `reload_pending`,
 `shared_shader_profile_active` and `native_shader_profile`. These are candidate
-contracts from source, still requiring build and live acceptance.
+contracts backed by the local build/tests, still requiring live acceptance.
 
 ## Server mob exposure
 
@@ -113,11 +124,15 @@ is the portal entity's visibility setting, not an on-screen/frustum requirement.
 It does not trace a chain of portals or import sunlight from arbitrary dimensions.
 
 Geometry checks read only already-loaded chunks. Each exposure query allows at
-most 4096 cell reads and 32 nearby portal candidates; all queries share a cap of
+most 4096 cell reads and 32 potential nearby portal candidates, counted before
+eligibility filtering; all queries share a cap of
 131072 cell reads per server tick. Unknown/unloaded geometry and exhausted
 budgets cannot invent a clear sunlight path. The reader caches chunks only for
 the current query, so a removed or placed blocker is not hidden by a long-lived
-exposure cache. The calculation does not request chunk loading or rebuild meshes.
+exposure cache. The calculation does not request chunk loading or rebuild meshes. A retained
+client shadow cache can therefore show sunlight while missing server chunks
+cause gameplay exposure to be withheld. The server does not trust stale client
+observations or load unknown geometry to manufacture exposure.
 
 The current voxel approximation treats light-blocking values of at least 15 as
 opaque. It does not promise exact cutout/partial-shape shadows, shader penumbra,
