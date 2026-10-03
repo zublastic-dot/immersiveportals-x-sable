@@ -1,3 +1,8 @@
+# 0.5.1-zublastic.51
+
+- Preserve native stream/class/loop metadata when refreshing Sound Physics Aeronautics portal acoustics. Refreshes now use update semantics instead of synthetic playback starts, preserving continuity policy and accurate start counters.
+- Add installed-SPA context and lifetime regression checks. Clarify piston acoustic tests and physical portal crossing versus world-replacing command teleports.
+
 # 0.5.1-zublastic.50
 
 - Retain positional sound ownership and original playback channels across a portal crossing, including existing jukebox streams and moving Sable sounds. Route panning and native distance attenuation through one rectangular, unit-scale portal; preserve native stop and unload behavior.

@@ -66,3 +66,7 @@ belts and other physical transport are separate work from this audio path.
 Vanilla note blocks use RECORDS too, so they do not test SPA acoustic processing when that
 category is disabled. Cross the portal physically when checking stream continuity: a vanilla
 cross-dimension command teleport replaces client worlds and correctly stops stale-world voices.
+
+SPA refreshes retain the native sound's streaming, class and loop metadata and are marked as
+updates. The context is captured on the client thread and published without resolving live
+sound metadata on the audio executor; a refresh must not create another playback-start event.

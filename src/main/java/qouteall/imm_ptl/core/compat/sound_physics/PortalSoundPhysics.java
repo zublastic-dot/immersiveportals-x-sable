@@ -2,6 +2,7 @@ package qouteall.imm_ptl.core.compat.sound_physics;
 
 import com.mojang.blaze3d.audio.Channel;
 import com.mojang.logging.LogUtils;
+import net.minecraft.client.resources.sounds.Sound;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundSource;
@@ -22,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class PortalSoundPhysics {
     private static final Map<SoundInstance, Prepared> PREPARED = Collections.synchronizedMap(new IdentityHashMap<>());
     private static final Map<Integer, Update> UPDATES = new ConcurrentHashMap<>();
+    private static final RefreshContexts CONTEXTS = new RefreshContexts();
     private static final ThreadLocal<Prepared> EVALUATION = new ThreadLocal<>();
     private static volatile Api api;
     private static volatile boolean attempted;
@@ -38,7 +40,17 @@ public final class PortalSoundPhysics {
 
     /** Owner-thread capture, before any sound-executor submission. */
     public static void prepare(SoundInstance sound, PortalSoundManager.Route route) {
-        if (api() == null) return;
+        Api methods = api();
+        if (methods == null) return;
+        try {
+            // SPA's six-argument overload invents a start context. A refresh must
+            // retain the actual stream/class/loop semantics without reusing that
+            // thread's last unrelated sound or counting another playback start.
+            if (CONTEXTS.capture(sound, methods.contexts()) == null) return;
+        } catch (ReflectiveOperationException | LinkageError failure) {
+            warn(failure);
+            return;
+        }
         if (!route.throughPortal() || !route.reachable()) {
             PREPARED.remove(sound);
             return;
@@ -59,6 +71,8 @@ public final class PortalSoundPhysics {
     public static void update(Channel channel, SoundInstance sound, PortalSoundManager.Route route) {
         Api methods = api();
         if (methods == null || !(channel instanceof IEPortalSoundChannel accessor)) return;
+        Object context = CONTEXTS.get(sound);
+        if (context == null) return; // never resolve a live SoundInstance on the audio executor
         int id = accessor.portal$getSourceId();
         Update previous = UPDATES.get(id);
         if (!route.reachable()) { UPDATES.remove(id); return; }
@@ -72,7 +86,7 @@ public final class PortalSoundPhysics {
         UPDATES.put(id, new Update(sound, route.throughPortal(), route.epoch(), scene, now));
         try {
             Vec3 pos = route.throughPortal() ? route.virtualSourcePosition() : route.sourcePosition();
-            methods.process.invoke(null, id, pos.x, pos.y, pos.z, sound.getSource(), sound.getLocation());
+            methods.process.invoke(null, id, pos.x, pos.y, pos.z, sound.getSource(), sound.getLocation(), false, context);
         } catch (ReflectiveOperationException | LinkageError failure) {
             warn(failure);
         } finally {
@@ -114,10 +128,11 @@ public final class PortalSoundPhysics {
         }
         PortalAcousticSnapshot.retain(worlds);
         UPDATES.entrySet().removeIf(entry -> !sounds.contains(entry.getValue().sound()));
+        CONTEXTS.retain(sounds);
     }
 
     public static void clear() {
-        PREPARED.clear(); UPDATES.clear(); EVALUATION.remove(); PortalAcousticSnapshot.clear();
+        PREPARED.clear(); UPDATES.clear(); CONTEXTS.clear(); EVALUATION.remove(); PortalAcousticSnapshot.clear();
         evaluations.set(0); pending.set(0);
     }
 
@@ -134,8 +149,9 @@ public final class PortalSoundPhysics {
                 Class.forName("com.sonicether.soundphysics.acoustic.AcousticScenes", false, PortalSoundPhysics.class.getClassLoader());
                 Class<?> type = Class.forName("com.sonicether.soundphysics.SoundPhysics", true, PortalSoundPhysics.class.getClassLoader());
                 if (!linked) throw new IllegalStateException("SPA present but portal acoustic mixins were not linked");
+                ContextApi contexts = ContextApi.load(PortalSoundPhysics.class.getClassLoader());
                 api = new Api(type.getMethod("processSound", int.class, double.class, double.class, double.class,
-                    SoundSource.class, ResourceLocation.class));
+                    SoundSource.class, ResourceLocation.class, boolean.class, contexts.context().getReturnType()), contexts);
             } catch (ClassNotFoundException ignored) {
                 // SPA is optional; vanilla and native Sable audio do not acquire a hard dependency.
             } catch (ReflectiveOperationException | LinkageError | IllegalStateException failure) { warn(failure); }
@@ -143,7 +159,49 @@ public final class PortalSoundPhysics {
             return api;
         }
     }
-    private record Api(Method process) {}
+    private record Api(Method process, ContextApi contexts) {}
+
+    /** Optional installed-provider contract, resolved once; no Minecraft/world access. */
+    record ContextApi(Method resolve, Method context) {
+        static ContextApi load(ClassLoader loader) throws ReflectiveOperationException {
+            Class<?> resolver = Class.forName("com.sonicether.soundphysics.SoundInstanceResolver", false, loader);
+            Class<?> resolved = Class.forName("com.sonicether.soundphysics.SoundInstanceResolver$ResolvedSound", false, loader);
+            Class<?> context = Class.forName("com.sonicether.soundphysics.SoundPhysicsSoundPolicy$SoundContext", false, loader);
+            return new ContextApi(resolver.getMethod("resolve", SoundInstance.class),
+                context.getMethod("fromResolved", resolved, SoundInstance.class, SoundSource.class, boolean.class, boolean.class));
+        }
+
+        Object capture(SoundInstance sound, Sound selected) throws ReflectiveOperationException {
+            return context.invoke(null, resolve.invoke(null, sound), sound, sound.getSource(),
+                selected != null && selected.shouldStream(), false);
+        }
+    }
+
+    /** Identity lifetime matches native playback; immutable values are published to audio consumers. */
+    static final class RefreshContexts {
+        private record Captured(Sound selected, Object context) {}
+        private final Map<SoundInstance, Captured> entries = Collections.synchronizedMap(new IdentityHashMap<>());
+
+        Object capture(SoundInstance sound, ContextApi api) throws ReflectiveOperationException {
+            Sound selected = sound.getSound();
+            Captured old = entries.get(sound);
+            if (old != null && old.selected() == selected) return old.context();
+            if (old == null && entries.size() >= PortalSoundManager.MAX_SOURCES) return null;
+            entries.remove(sound); // a failed replacement must not publish stale semantics
+            Object context = api.capture(sound, selected);
+            entries.put(sound, new Captured(selected, context));
+            return context;
+        }
+
+        Object get(SoundInstance sound) {
+            Captured value = entries.get(sound);
+            return value == null ? null : value.context();
+        }
+        void retain(Collection<SoundInstance> sounds) {
+            synchronized (entries) { entries.keySet().removeIf(sound -> !sounds.contains(sound)); }
+        }
+        void clear() { entries.clear(); }
+    }
     private static synchronized void warn(Throwable failure) {
         if (warned) return;
         warned = true;
