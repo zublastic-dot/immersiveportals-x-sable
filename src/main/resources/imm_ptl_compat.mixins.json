@@ -49,6 +49,8 @@
     "iris.MixinIrisPortalShaderIncludes",
     "iris.MixinIrisPortalSunGeometry",
     "iris.MixinIrisPortalShaderPreprocessor",
+    "iris.MixinIrisSharedSunShadow",
+    "iris.MixinIrisSharedSunCelestial",
     "iris.MixinIrisPortalSunExtendedShader",
     "iris.MixinIrisPortalSunLodProgram",
     "iris.MixinIrisPortalSunGenericProgram",

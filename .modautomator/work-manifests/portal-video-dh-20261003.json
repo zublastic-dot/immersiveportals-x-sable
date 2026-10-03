@@ -23,7 +23,16 @@
     "build.gradle",
     "gradle.properties",
     "changelog.md",
-    "docs/ZUBLASTIC_DH_PORTAL_COVERAGE.md"
+    "docs/ZUBLASTIC_DH_PORTAL_COVERAGE.md",
+    "src/main/java/qouteall/imm_ptl/core/sunlight",
+    "src/main/java/qouteall/imm_ptl/core/lighting",
+    "src/main/java/qouteall/imm_ptl/core/IPModMain.java",
+    "src/main/java/qouteall/imm_ptl/core/IPModMainClient.java",
+    "src/main/java/qouteall/imm_ptl/core/mixin/common/miscellaneous/MixinMobSunlight.java",
+    "src/main/java/qouteall/imm_ptl/core/mixin/client/render",
+    "src/test/java/qouteall/imm_ptl/core/sunlight",
+    "src/test/java/qouteall/imm_ptl/core/lighting",
+    "docs/ZUBLASTIC_SHARED_SUNLIGHT.md"
   ],
   "value_case": {
     "category": "observable_capability",
@@ -31,7 +40,8 @@
     "acceptance": [
       "Typed video settings support observed exact changes and restoration, including shaders and native menu navigation.",
       "Portal terrain no longer exposes a vanilla-to-DH hole when remote full-detail radius is smaller than the main view.",
-      "Main view, portal sunlight and audio remain intact; live shader-on/off and settings restoration evidence is recorded separately from build and CI."
+      "Main view, portal sunlight and audio remain intact; live shader-on/off and settings restoration evidence is recorded separately from build and CI.",
+      "Server-owned sun trajectory synchronizes supported rendering and ordinary/portal mob exposure, independent of shader toggles."
     ]
   }
 }

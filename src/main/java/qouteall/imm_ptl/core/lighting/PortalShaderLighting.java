@@ -170,8 +170,10 @@ public final class PortalShaderLighting {
             float angle=sunAngle(a.source.getTimeOfDay(0));
             var rotation=PortalShaderPackAdapter.sunPathRotationDegrees();
             var clock=PortalShaderPackAdapter.clockMode();
-            Vec3 sun=rotation.isPresent() && clock.isPresent()
-                ?sourceDirection(angle,a.source.getDayTime(),rotation.getAsDouble(),clock.get()):Vec3.ZERO;
+            Vec3 sun=qouteall.imm_ptl.core.sunlight.SunlightClient.effectiveShaderProfile()
+                .map(profile -> profile.sample(a.source.getDayTime()).shadowDirection()).orElseGet(() ->
+                rotation.isPresent() && clock.isPresent()
+                ?sourceDirection(angle,a.source.getDayTime(),rotation.getAsDouble(),clock.get()):Vec3.ZERO);
             boolean shadowChanged=e.region==null || e.shadowDirty ||
                 (tick-e.shadowTick>=5 && sun.distanceToSqr(e.shadowDirection)>1e-8);
             byte[] shadow=e.region==null?new byte[SHADOW_EDGE*SHADOW_EDGE]:e.region.sourceShadow;

@@ -1,3 +1,10 @@
+# 0.5.1-zublastic.54
+
+- Add experimental shared sunlight as an optional per-world server setting, disabled by default. Operators may publish the supported shader profile or set its sun path/clock explicitly; ordinary and one-hop portal mob exposure use that server profile even without shaders. Existing helmet, wetness and fire-immunity rules remain in place.
+- Temporarily adapt the verified Complementary/Euphoria shader and Iris sun/shadow direction in memory while the experiment is enabled. Synchronize on login, respawn, dimension change and profile changes; restore native rendering when disabled or disconnected. Unknown shader packs retain their native rendering and report unsupported status.
+- Keep exposure bounded to loaded geometry, with per-query and per-tick limits and conservative unknown results. Do not alter stored light, spawning rules, arbitrary shader files or client preferences.
+- Include the .53 DH depth-projection repair, now visually verified at the reported portal gap with correction-on/off and shader-on/off captures.
+
 # 0.5.1-zublastic.53
 
 - Correct the .52 live regression that hid distant shader terrain behind fog. Preserve DH's native shader render distance and near plane so Iris' separately cached depth reconstruction stays consistent; apply readiness coverage only to the dedicated alpha fade.

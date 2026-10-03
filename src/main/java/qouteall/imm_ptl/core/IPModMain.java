@@ -86,6 +86,7 @@ public class IPModMain {
         WorldInfoSender.init();
         
         GlobalPortalStorage.init();
+        qouteall.imm_ptl.core.sunlight.SunlightServer.init();
         
         EntitySync.init();
         qouteall.imm_ptl.core.render.impostor.PortalImpostorSync.initServer();

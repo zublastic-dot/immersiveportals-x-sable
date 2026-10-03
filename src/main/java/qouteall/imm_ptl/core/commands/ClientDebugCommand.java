@@ -93,6 +93,16 @@ public class ClientDebugCommand {
                     ))
                 )
             );
+        builder = builder.then(Commands.literal("sunlight_profile")
+            .executes(context -> {
+                String report = qouteall.imm_ptl.core.sunlight.SunlightClient.diagnostics();
+                Helper.log("[IP shared sunlight] " + report);
+                context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+            })
+            .then(Commands.literal("publish").executes(context -> {
+                String result = qouteall.imm_ptl.core.sunlight.SunlightClient.publishObserved();
+                context.getSource().sendSuccess(() -> Component.literal(result), false); return 1;
+            })));
         builder = builder.then(Commands
             .literal("portal_sound")
             .executes(context -> {

@@ -9,6 +9,7 @@
     "common.MixinDedicatedServer",
     "common.MixinLevel",
     "common.MixinLivingEntity",
+    "common.miscellaneous.MixinMobSunlight",
     "common.MixinMinecraftServer",
     "common.MixinServerChunkCache",
     "common.MixinServerLevel",

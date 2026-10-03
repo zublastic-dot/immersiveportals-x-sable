@@ -87,7 +87,9 @@ class PortalShaderPackAdapterTest {
         IncludeProcessor includes;
         IncludeGraph graph;
         Map<String, String> settings;
-        final List<StringPair> defines = List.of(new StringPair("IS_IRIS", ""),
+        String dimension = "/world-1/";
+        qouteall.imm_ptl.core.sunlight.SunlightProfile sharedProfile;
+        final List<StringPair> defines = new java.util.ArrayList<>(List.of(new StringPair("IS_IRIS", ""),
             new StringPair("MC_VERSION", "12101"), new StringPair("IRIS_VERSION", "10814"),
             new StringPair("MC_OS_WINDOWS", ""), new StringPair("DISTANT_HORIZONS", ""), new StringPair("MC_GL_VERSION", "460"),
             new StringPair("MC_GLSL_VERSION", "460"),
@@ -98,10 +100,11 @@ class PortalShaderPackAdapterTest {
             new StringPair("DH_BLOCK_SNOW", "8"), new StringPair("DH_BLOCK_SAND", "9"),
             new StringPair("DH_BLOCK_TERRACOTTA", "10"), new StringPair("DH_BLOCK_NETHER_STONE", "11"),
             new StringPair("DH_BLOCK_WATER", "12"), new StringPair("DH_BLOCK_GRASS", "13"),
-            new StringPair("DH_BLOCK_AIR", "14"), new StringPair("DH_BLOCK_ILLUMINATED", "15"));
+            new StringPair("DH_BLOCK_AIR", "14"), new StringPair("DH_BLOCK_ILLUMINATED", "15")));
 
         @BeforeAll void setup() throws Exception {
             net.neoforged.fml.loading.LoadingModList.of(List.of(), List.of(), List.of(), List.of(), Map.of());
+            net.irisshaders.iris.gl.shader.StandardMacros.getRenderStages().forEach((k,v) -> defines.add(new StringPair(k,v)));
             var configField = net.irisshaders.iris.Iris.class.getDeclaredField("irisConfig");
             configField.setAccessible(true);
             configField.set(null, new net.irisshaders.iris.config.IrisConfig(Path.of("unused-test-iris.properties"), Path.of("unused-test-exclusions.json")));
@@ -118,6 +121,9 @@ class PortalShaderPackAdapterTest {
                 "gbuffers_entities", "gbuffers_hand", "gbuffers_block", "gbuffers_hand_water"))
                 for (String extension : List.of(".vsh", ".fsh"))
                     entries.add(AbsolutePackPath.fromAbsolutePath("/world-1/" + name + extension));
+            for (String name : List.of("gbuffers_terrain", "dh_terrain", "gbuffers_skybasic", "shadow"))
+                for (String extension : List.of(".vsh", ".fsh"))
+                    entries.add(AbsolutePackPath.fromAbsolutePath("/world0/" + name + extension));
             Path root = Path.of(System.getProperty("ipsable.shaderPack"));
             graph = new IncludeGraph(root, entries.build(), false);
             assertTrue(graph.getFailures().isEmpty(), graph.getFailures().toString());
@@ -136,16 +142,21 @@ class PortalShaderPackAdapterTest {
         }
 
         String source(String name, String extension, boolean patched) {
-            String path = "/world-1/" + name + extension;
+            String path = dimension + name + extension;
             var original = includes.getIncludedFile(AbsolutePackPath.fromAbsolutePath(path));
             assertNotNull(original, path);
             List<String> result = patched ? PortalShaderPackAdapter.patch(PACK, path, original) : original;
-            if (patched && extension.equals(".fsh")) {
+            if (patched && extension.equals(".fsh") && dimension.equals("/world-1/")) {
                 assertNotSame(original, result, path + " did not admit the exact installed pack");
                 assertEquals(result, PortalShaderPackAdapter.patch(PACK, path, result), "idempotence");
                 assertSame(original, includes.getIncludedFile(AbsolutePackPath.fromAbsolutePath(path)), "cache changed");
             }
             String expanded = String.join("\n", result) + "\n";
+            if (sharedProfile != null) {
+                String adapted = qouteall.imm_ptl.core.sunlight.SunlightShaderAdapter.patch(PACK, expanded, sharedProfile);
+                assertNotSame(expanded, adapted, "shared profile did not adapt " + path);
+                expanded = adapted;
+            }
             // JCPP can recover after an unbalanced directive; reject that before
             // its recovery could silently drop a helper or change option scope.
             int depth = 0;
@@ -156,7 +167,7 @@ class PortalShaderPackAdapterTest {
             }
             assertEquals(0, depth, path + " unbalanced directives");
             String preprocessed = JcppProcessor.glslPreprocessSource(expanded, defines);
-            if (patched && extension.equals(".fsh")) assertTrue(preprocessed.contains("ipSunCount"), path);
+            if (patched && extension.equals(".fsh") && dimension.equals("/world-1/")) assertTrue(preprocessed.contains("ipSunCount"), path);
             PortalShaderPackAdapter.observePreprocessed(PACK, preprocessed);
             return preprocessed;
         }
@@ -318,5 +329,26 @@ class PortalShaderPackAdapterTest {
         @Test void fullBorderFogPassCompilesAndLinks() { verify("deferred1"); }
         @Test void fullNetherStormPassCompilesAndLinks() { verify("composite1"); }
         @Test void fullWaterPassCompilesAndLinks() { verify("gbuffers_water"); }
+
+        void verifyShared(qouteall.imm_ptl.core.sunlight.SunlightProfile.Clock clock) {
+            sharedProfile = new qouteall.imm_ptl.core.sunlight.SunlightProfile(true, 27.5, clock);
+            try {
+                dimension = "/world0/";
+                verify("gbuffers_terrain");
+                verify("dh_terrain");
+                verify("gbuffers_skybasic", true);
+                verify("shadow", true);
+                dimension = "/world-1/";
+                verify("gbuffers_terrain");
+                assertEquals(27.5, PortalShaderPackAdapter.sunPathRotationDegrees().orElseThrow());
+                assertEquals(clock.name(), PortalShaderPackAdapter.clockMode().orElseThrow().name());
+            } finally { dimension = "/world-1/"; sharedProfile = null; }
+        }
+        @Test void sharedWorldTimeCompilesInstalledSkyShadowTerrainDhAndPortalPrograms() {
+            verifyShared(qouteall.imm_ptl.core.sunlight.SunlightProfile.Clock.WORLD_TIME);
+        }
+        @Test void sharedSunAngleCompilesInstalledSkyShadowTerrainDhAndPortalPrograms() {
+            verifyShared(qouteall.imm_ptl.core.sunlight.SunlightProfile.Clock.SUN_ANGLE);
+        }
     }
 }

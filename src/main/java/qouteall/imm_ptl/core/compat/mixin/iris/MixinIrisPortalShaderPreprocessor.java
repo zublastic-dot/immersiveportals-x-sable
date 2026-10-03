@@ -7,6 +7,7 @@ import net.irisshaders.iris.helpers.StringPair;
 import net.irisshaders.iris.shaderpack.preprocessor.JcppProcessor;
 import org.spongepowered.asm.mixin.Mixin;
 import qouteall.imm_ptl.core.lighting.PortalShaderPackAdapter;
+import qouteall.imm_ptl.core.sunlight.SunlightClient;
 
 @Mixin(value = JcppProcessor.class, remap = false)
 public class MixinIrisPortalShaderPreprocessor {
@@ -22,8 +23,13 @@ public class MixinIrisPortalShaderPreprocessor {
         // the source Overworld's direction when an End pipeline is compiled later.
         String header = source.substring(0, Math.min(512, source.length()));
         if (!header.contains("#define OVERWORLD") && !header.contains("#define NETHER")) return preprocessed;
-        PortalShaderPackAdapter.observePreprocessed(
-            Iris.getIrisConfig().getShaderPackName().orElse(""), preprocessed);
+        String pack = Iris.getIrisConfig().getShaderPackName().orElse("");
+        // Observe local settings before adapting; never publish an inherited
+        // server profile as if it were the owner's option selection.
+        SunlightClient.observeOwner(pack, preprocessed);
+        String adapted = SunlightClient.adapt(pack, source);
+        if (adapted != source) preprocessed = original.call(adapted, defines);
+        PortalShaderPackAdapter.observePreprocessed(pack, preprocessed);
         return preprocessed;
     }
 }

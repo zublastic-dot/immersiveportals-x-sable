@@ -61,7 +61,8 @@ public final class PortalShaderPackAdapter {
         double value = Double.parseDouble(matcher.group(1));
         if (Double.isFinite(value) && Math.abs(value) <= 360 && !matcher.find()) {
             String compact = source.replaceAll("\\s+", "");
-            ClockMode observed = compact.contains("floattimeAngle=worldTimeSmooth/24000.0;") ? ClockMode.WORLD_TIME
+            ClockMode observed = (compact.contains("floattimeAngle=worldTimeSmooth/24000.0;")
+                || compact.contains("floattimeAngle=float(worldTime)/24000.0;")) ? ClockMode.WORLD_TIME
                 : compact.contains("floattAmin=fract(sunAngle-0.033333333);") ? ClockMode.SUN_ANGLE : null;
             if (observed != null) { clockMode = observed; sunPathRotation = value; }
         }
@@ -329,6 +330,7 @@ public final class PortalShaderPackAdapter {
         return """
             float ipSunPackTime(int region) {
                 float sunAngle = ipSunSourceSunAngle[region];
+                int worldTime = ipSunSourceWorldTime[region];
                 float worldTimeSmooth = float(ipSunSourceWorldTime[region]);
             """ + time + "\nreturn timeAngle;\n}\n" + """
             void ipSunPackEnvironment(int region, out vec3 direct, out vec3 ambient, out float directFade, out float noon) {
