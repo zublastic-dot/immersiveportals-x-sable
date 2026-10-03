@@ -113,6 +113,23 @@ public class ClientDebugCommand {
             context.getSource().sendSuccess(() -> Component.literal(result.message()), false);
             return result.success() ? 1 : 0;
         }));
+        builder = builder.then(Commands.literal("dh_portal_coverage")
+            .executes(context -> {
+                String report = qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalShaderCoverage.diagnostics();
+                Helper.log("[IP DH coverage] " + report);
+                context.getSource().sendSuccess(() -> Component.literal(report), false);return 1;
+            })
+            .then(Commands.literal("enable").executes(context -> {
+                qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalShaderCoverage.enable();
+                context.getSource().sendSuccess(() -> Component.literal("Portal DH coverage correction enabled"), false);return 1;
+            }))
+            .then(Commands.literal("disable").then(Commands.argument("seconds", IntegerArgumentType.integer(1, 60))
+                .executes(context -> {
+                    int seconds = IntegerArgumentType.getInteger(context, "seconds");
+                    qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalShaderCoverage.disableForSeconds(seconds);
+                    context.getSource().sendSuccess(() -> Component.literal("Portal DH shader coverage correction disabled for "
+                        + seconds + " seconds; it will restore automatically"), false);return 1;
+                }))));
         builder = builder.then(Commands
             .literal("list_portals")
             .executes(context -> {

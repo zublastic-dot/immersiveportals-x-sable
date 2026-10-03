@@ -1,0 +1,38 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-video-dh-20261003",
+  "lease_id": "portal-video-dh-20261003",
+  "worker_id": "codex-portal-video-dh-20261003",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-video-dh-20261003/portal-video-dh-20261003",
+  "base_commit": "afda53828a0dc75c073e7abb1368e54c0c8bc8d4",
+  "resources": [
+    "domain:modautomator:compatibility/ip-sable"
+  ],
+  "paths": [
+    "src/main/java/qouteall/imm_ptl/core/compat/dh_compatibility",
+    "src/main/java/qouteall/imm_ptl/core/compat/iris_compatibility",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/dh",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/iris",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/sodium",
+    "src/main/java/qouteall/imm_ptl/core/compat/sodium_compatibility",
+    "src/main/java/qouteall/imm_ptl/core/commands",
+    "src/main/java/qouteall/imm_ptl/core/lighting/PortalShaderPackAdapter.java",
+    "src/main/resources",
+    "src/test/java/qouteall/imm_ptl/core/compat",
+    "build.gradle",
+    "gradle.properties",
+    "changelog.md",
+    "docs/ZUBLASTIC_DH_PORTAL_COVERAGE.md",
+    ".modautomator/work-manifests/portal-video-dh-20261003.json"
+  ],
+  "value_case": {
+    "category": "observable_capability",
+    "statement": "Control native video settings through the client bridge and align portal shader DH transition to actual destination terrain coverage.",
+    "acceptance": [
+      "Typed video settings support observed exact changes and restoration, including shaders and native menu navigation.",
+      "Portal terrain no longer exposes a vanilla-to-DH hole when remote full-detail radius is smaller than the main view.",
+      "Main view, portal sunlight and audio remain intact; live shader-on/off and settings restoration evidence is recorded separately from build and CI."
+    ]
+  }
+}

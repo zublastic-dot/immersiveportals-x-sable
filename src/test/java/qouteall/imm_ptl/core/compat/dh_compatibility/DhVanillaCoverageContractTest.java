@@ -20,7 +20,7 @@ class DhVanillaCoverageContractTest {
     @Test void coverageUsesNonCreatingChunkLookupAndKeepsShaderAndPortalGuards() throws Exception {
         var node=read("qouteall/imm_ptl/core/compat/dh_compatibility/DhPortalRendering");
         boolean chunks=false,shader=false,portal=false,empty=false;
-        for(var m:node.methods) if(m.name.equals("vanillaCoverageDistance")||m.name.startsWith("lambda$vanillaCoverageDistance")) {
+        for(var m:node.methods) if(m.name.equals("vanillaCoverageDistance")||m.name.equals("coverageBlocks")||m.name.startsWith("lambda$coverageBlocks")) {
             for(var i:m.instructions) {
                 if(i instanceof MethodInsnNode c) {
                     assertNotEquals("hasChunk",c.name,"ClientLevel.hasChunk can return true for absent chunks");

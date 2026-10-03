@@ -1,3 +1,9 @@
+# 0.5.1-zublastic.52
+
+- Align the supported Complementary/Euphoria DH terrain and water fade with destination chunks whose meshes are ready, preventing a gap when portal loading is shorter than the main view. Keep fog, camera projection and sunlight uniforms unchanged.
+- Scope coverage to first-layer portal views, restore the original fade for main/shadow/nested draws, and preserve unsupported shader programs. Add bounded runtime coverage diagnostics and a temporary A/B switch.
+- Add measured-footprint, scope, Sodium/Iris ABI and actual installed shader/driver regressions. Live acceptance remains separate from build validation; see `docs/ZUBLASTIC_DH_PORTAL_COVERAGE.md`.
+
 # 0.5.1-zublastic.51
 
 - Add an explicit bounded SPA HIGH recorder command for per-sound portal acoustic verification, with runtime-only input changes and automatic restoration.

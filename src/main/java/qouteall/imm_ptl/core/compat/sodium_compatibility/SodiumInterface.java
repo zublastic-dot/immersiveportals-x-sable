@@ -23,6 +23,9 @@ public class SodiumInterface {
         public boolean isSodiumPresent() {
             return false;
         }
+
+        /** Non-Sodium renderers retain the existing loaded-chunk coverage policy. */
+        public boolean isChunkMeshReady(net.minecraft.world.level.chunk.LevelChunk chunk) { return true; }
         
         public Object createNewContext(int renderDistance, org.joml.Vector3d initialCameraPos) {
             return null;
@@ -54,6 +57,21 @@ public class SodiumInterface {
     public static class OnSodiumPresent extends Invoker {
         @Override
         public boolean isSodiumPresent() {
+            return true;
+        }
+
+        @Override
+        public boolean isChunkMeshReady(net.minecraft.world.level.chunk.LevelChunk chunk) {
+            var renderer = ((LevelRendererExtension)Minecraft.getInstance().levelRenderer).sodium$getWorldRenderer();
+            var manager = ((IESodiumWorldRenderer)renderer).ip_getRenderSectionManager();
+            if (manager == null) return false;
+            var sections = chunk.getSections();
+            for (int index = 0; index < sections.length; index++) {
+                // Empty sections need no mesh. Visibility is deliberately not consulted:
+                // a camera turn must not change which terrain is treated as available.
+                if (!sections[index].hasOnlyAir() && !manager.isSectionBuilt(
+                    chunk.getPos().x, chunk.getMinSection() + index, chunk.getPos().z)) return false;
+            }
             return true;
         }
         
