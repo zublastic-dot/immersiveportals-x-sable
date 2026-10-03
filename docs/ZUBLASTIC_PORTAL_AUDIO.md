@@ -7,6 +7,14 @@ jukebox when the listener crosses a portal.
 
 ## Current boundary
 
+This first milestone covers ordinary positional sounds and native jukebox playback. SPA's
+managed propagated loops, sonic booms, managed long-range emitters and recognized native
+propeller/thruster/train partners retain their native playback ownership. Their independently
+scheduled OpenAL gain and position writes are not yet portal-aware; this release does not
+claim portal transport for those voices. Classification uses SPA's own marker interfaces,
+resolved emitter metadata and exact sound policies, once per retained sound identity. Sable
+delegates are unwrapped for ownership only. No extra live-world query runs on the audio thread.
+
 Transport selects the shortest direct or single rectangular, unit-scale portal route among
 loaded endpoint worlds, bounded to 128 nearby portals and a 256-block path. A route passes
 through the aperture. OpenAL receives its bearing and full source-to-entry plus exit-to-listener

@@ -27,7 +27,6 @@ public abstract class MixinSoundEngine_PortalSound {
     @Shadow @Final private Map<SoundInstance, ChannelAccess.ChannelHandle> instanceToChannel;
     @Shadow @Final private Map<SoundInstance, Integer> queuedSounds;
     @Shadow @Final private List<TickableSoundInstance> queuedTickableSounds;
-    @Shadow private float calculateVolume(SoundInstance sound) { throw new AssertionError(); }
 
     @Inject(method = "play", at = @At("HEAD"), cancellable = true)
     private void portal$admitDirectEngineCall(SoundInstance sound, CallbackInfo ci) {
@@ -62,14 +61,14 @@ public abstract class MixinSoundEngine_PortalSound {
     }
     @Inject(method = "play", at = @At("RETURN"))
     private void portal$presentStartedSound(SoundInstance sound, CallbackInfo ci) {
-        PortalSoundManager.afterPlay(sound, instanceToChannel, listener.getTransform().position(), this::calculateVolume);
+        PortalSoundManager.afterPlay(sound, instanceToChannel, listener.getTransform().position());
     }
     @Inject(method = "tickNonPaused", at = @At("TAIL"))
     private void portal$updateStaticAndMovingSources(CallbackInfo ci) {
         Set<SoundInstance> queued = Collections.newSetFromMap(new IdentityHashMap<>());
         queued.addAll(queuedSounds.keySet());
         queued.addAll(queuedTickableSounds);
-        PortalSoundManager.tick(instanceToChannel, queued, listener.getTransform().position(), this::calculateVolume);
+        PortalSoundManager.tick(instanceToChannel, queued, listener.getTransform().position());
     }
     @Inject(method = "stopAll", at = @At("RETURN"))
     private void portal$clearOwnership(CallbackInfo ci) { PortalSoundManager.clear(); }

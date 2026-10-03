@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import qouteall.imm_ptl.core.ClientWorldLoader;
 import qouteall.imm_ptl.core.compat.sound_physics.PortalSoundPhysics;
+import qouteall.imm_ptl.core.compat.sound_physics.PortalNativeSoundPolicy;
 import qouteall.imm_ptl.core.IPGlobal;
 import qouteall.imm_ptl.core.network.PacketRedirectionClient;
 import qouteall.imm_ptl.core.mixin.client.sound.IEPortalSoundChannel;
@@ -23,7 +24,6 @@ import qouteall.imm_ptl.core.portal.shape.RectangularPortalShape;
 import qouteall.imm_ptl.core.portal.global_portals.GlobalPortalStorage;
 
 import java.util.*;
-import java.util.function.ToDoubleFunction;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -65,10 +65,12 @@ public final class PortalSoundManager {
     public static void associateChannel(SoundInstance sound, Channel channel) {
         if (channel instanceof IEPortalSoundChannel accessor) {
             int source = accessor.portal$getSourceId();
-            if (route(sound) != null && (nativeSources.containsKey(source) || nativeSources.size() < MAX_SOURCES)) {
+            Route route = route(sound);
+            if (route != null && (nativeSources.containsKey(source) || nativeSources.size() < MAX_SOURCES)) {
                 nativeSources.put(source, sound);
             }
             else nativeSources.remove(source);
+            if (channel instanceof PortalSoundChannelState state) state.portal$setMuted(route != null && !route.reachable());
         }
     }
     public static void forgetChannel(int sourceId) { nativeSources.remove(sourceId); }
@@ -163,20 +165,19 @@ public final class PortalSoundManager {
     }
 
     public static void afterPlay(SoundInstance sound, Map<SoundInstance, ChannelAccess.ChannelHandle> channels,
-                                 Vec3 listener, ToDoubleFunction<SoundInstance> nativeVolume) {
+                                 Vec3 listener) {
         if (!IPGlobal.enableCrossPortalSound) return;
         ChannelAccess.ChannelHandle handle = channels.get(sound);
         if (handle == null) return;
         bind(sound);
-        Runnable update = apply(sound, handle, listener, nativeVolume, Minecraft.getInstance());
+        Runnable update = apply(sound, handle, listener, Minecraft.getInstance());
         publish();
         if (update != null) update.run();
     }
 
     /** Called after native ticks: wrappers have already updated their emitter position. */
     public static void tick(Map<SoundInstance, ChannelAccess.ChannelHandle> channels,
-                            Set<SoundInstance> queued, Vec3 listener,
-                            ToDoubleFunction<SoundInstance> nativeVolume) {
+                            Set<SoundInstance> queued, Vec3 listener) {
         Minecraft mc = Minecraft.getInstance();
         if (!mc.isSameThread()) return;
         ensureSession(mc);
@@ -198,12 +199,13 @@ public final class PortalSoundManager {
                 working.remove(sound);
                 continue;
             }
-            Runnable update = apply(sound, item.getValue(), listener, nativeVolume, mc);
+            Runnable update = apply(sound, item.getValue(), listener, mc);
             if (update != null) updates.add(update);
         }
         OWNERS.prune(retained::contains, loaded::contains, tick);
         working.keySet().removeIf(sound -> !retained.contains(sound) || OWNERS.owner(sound) == null);
         PortalSoundPhysics.retain(working.keySet());
+        PortalNativeSoundPolicy.retain(retained);
         publish();
         // Audio jobs may run immediately. Publish every matching route/geometry
         // epoch before any job consults sourceId -> sound -> immutable route.
@@ -211,15 +213,17 @@ public final class PortalSoundManager {
     }
 
     @Nullable private static Runnable apply(SoundInstance sound, ChannelAccess.ChannelHandle handle, Vec3 listener,
-                              ToDoubleFunction<SoundInstance> volume, Minecraft mc) {
+                                           Minecraft mc) {
         Route previous = working.get(sound);
         Route next = IPGlobal.enableCrossPortalSound ? calculate(sound, listener, mc) : null;
         if (next == null) {
             if (previous != null && (previous.throughPortal() || !previous.reachable())) {
                 Vec3 original = position(sound);
-                float gain = (float) volume.applyAsDouble(sound);
                 working.remove(sound);
-                return () -> handle.execute(channel -> { channel.setSelfPosition(original); channel.setVolume(gain); });
+                return () -> handle.execute(channel -> {
+                    if (channel instanceof PortalSoundChannelState state) state.portal$setMuted(false);
+                    channel.setSelfPosition(original);
+                });
             }
             working.remove(sound);
             return null;
@@ -230,7 +234,6 @@ public final class PortalSoundManager {
         boolean changedPresentation = next.throughPortal() || !next.reachable()
             || previous != null && (previous.throughPortal() || !previous.reachable());
         if (!changedPresentation) return null; // ordinary native/Sable audio stays native
-        float gain = next.reachable() ? (float) volume.applyAsDouble(sound) : 0;
         Vec3 position = next.presentationPosition();
         Route route = next;
         if (diagnosticCount < 16 && (previous == null || previous.reachable() != next.reachable()
@@ -241,13 +244,14 @@ public final class PortalSoundManager {
                 next.throughPortal(), next.reachable(), next.totalDistance(), next.epoch());
         }
         return () -> handle.execute(channel -> {
+            if (channel instanceof PortalSoundChannelState state) state.portal$setMuted(!route.reachable());
             channel.setSelfPosition(position);
-            channel.setVolume(gain);
             PortalSoundPhysics.update(channel, sound, route);
         });
     }
 
     @Nullable private static Route calculate(SoundInstance sound, Vec3 listener, Minecraft mc) {
+        if (!eligible(sound)) return null;
         updateEntityWorld(sound);
         var owner = OWNERS.owner(sound);
         if (owner == null || mc.player == null || !(mc.player.level() instanceof ClientLevel listenerWorld)
@@ -334,7 +338,8 @@ public final class PortalSoundManager {
 
     static boolean eligible(SoundInstance sound) {
         return sound != null && !sound.isRelative() && sound.getAttenuation() == SoundInstance.Attenuation.LINEAR
-            && sound.getSource() != SoundSource.MUSIC;
+            && sound.getSource() != SoundSource.MUSIC
+            && !PortalNativeSoundPolicy.keepsNativeOwnership(sound, SableBridge.PRESENT ? SableSources.underlying(sound) : sound);
     }
 
     private static void updateEntityWorld(SoundInstance sound) {
@@ -358,6 +363,7 @@ public final class PortalSoundManager {
     public static void clear() {
         OWNERS.clear(); working.clear(); published = Collections.emptyMap(); nativeSources.clear(); portalCache.clear();
         PortalSoundPhysics.clear();
+        PortalNativeSoundPolicy.clear();
         tick = 0; epoch++; diagnosticCount = 0; connection = null;
     }
 

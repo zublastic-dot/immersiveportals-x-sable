@@ -46,6 +46,7 @@ class PortalSoundNativeContractTest {
         method(channel, "destroy", "()V");
         method(channel, "setSelfPosition", "(Lnet/minecraft/world/phys/Vec3;)V");
         method(channel, "setVolume", "(F)V");
+        assertEquals(1, calls(method(channel, "setVolume", "(F)V"), "org/lwjgl/openal/AL10", "alSourcef", "(IIF)V"));
     }
 
     @Test void entityAndDelayedNativeProducersAreCovered() throws IOException {
