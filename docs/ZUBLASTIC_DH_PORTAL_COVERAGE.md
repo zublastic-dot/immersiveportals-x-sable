@@ -4,8 +4,9 @@ The owner reported an empty band between full-detail Nether terrain and Distant
 Horizons terrain when looking through an Overworld portal. In the .51 live
 reproduction, the destination loader had radius two (25 chunks), while the
 shader's `far` uniform still represented the main view's seven chunks (112
-blocks). The virtual camera was only about 30.2 blocks from the closest loaded
-edge. Complementary's DH alpha fade started at 44.8 and ended at 67.2 blocks.
+blocks). Complementary's DH alpha fade started at 44.8 and ended at 67.2 blocks,
+independently of the shorter remote coverage. The tests include a representative
+30.2-block coverage fixture; that value is not a measured live camera distance.
 That mismatch leaves real space where neither renderer supplies terrain.
 
 ## Change
