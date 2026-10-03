@@ -1,3 +1,15 @@
+# 0.5.1-zublastic.51
+
+- Add an explicit bounded SPA HIGH recorder command for per-sound portal acoustic verification, with runtime-only input changes and automatic restoration.
+- Preserve native stream/class/loop metadata when refreshing Sound Physics Aeronautics portal acoustics. Refreshes now use update semantics instead of synthetic playback starts, preserving continuity policy and accurate start counters.
+- Add installed-SPA context and lifetime regression checks. Clarify piston acoustic tests and physical portal crossing versus world-replacing command teleports.
+
+# 0.5.1-zublastic.50
+
+- Retain positional sound ownership and original playback channels across a portal crossing, including existing jukebox streams and moving Sable sounds. Route panning and native distance attenuation through one rectangular, unit-scale portal; preserve native stop and unload behavior.
+- Add optional Sound Physics Aeronautics integration using bounded immutable geometry from both worlds. Acoustic rays cross the actual aperture, with source material and Sable coordinate provenance retained. Ordinary local SPA providers remain unchanged. Incomplete, Create contraption and straddling snapshots are explicit limitations.
+- Add bounded `imm_ptl_client_debug portal_sound` route and acoustic diagnostics. Remote biome ambience generation and physical Create train/belt transport remain separate work.
+
 # 0.5.1-zublastic.37
 
 - Restore hosted Sable structures after client world cleanup by requesting an authenticated viewer tracking replay. Normal visibility checks resend the complete structure; other players and rendering settings remain unaffected.

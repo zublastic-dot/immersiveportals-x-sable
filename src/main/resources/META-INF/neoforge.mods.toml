@@ -78,6 +78,9 @@ config="imm_ptl.mixins.json"
 config="imm_ptl_compat.mixins.json"
 
 [[mixins]]
+config="imm_ptl_sound_physics.mixins.json"
+
+[[mixins]]
 config="imm_ptl_fabric.mixins.json"
 
 [[mixins]]
