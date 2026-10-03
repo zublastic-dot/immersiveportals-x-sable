@@ -1,3 +1,9 @@
+# 0.5.1-zublastic.50
+
+- Retain positional sound ownership and original playback channels across a portal crossing, including existing jukebox streams and moving Sable sounds. Route panning and native distance attenuation through one rectangular, unit-scale portal; preserve native stop and unload behavior.
+- Add optional Sound Physics Aeronautics integration using bounded immutable geometry from both worlds. Acoustic rays cross the actual aperture, with source material and Sable coordinate provenance retained. Ordinary local SPA providers remain unchanged. Incomplete, Create contraption and straddling snapshots are explicit limitations.
+- Add bounded `imm_ptl_client_debug portal_sound` route and acoustic diagnostics. Remote biome ambience generation and physical Create train/belt transport remain separate work.
+
 # 0.5.1-zublastic.37
 
 - Restore hosted Sable structures after client world cleanup by requesting an authenticated viewer tracking replay. Normal visibility checks resend the complete structure; other players and rendering settings remain unaffected.

@@ -1,0 +1,42 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-sound-20261003",
+  "lease_id": "portal-sound-20261003",
+  "worker_id": "codex-portal-sound-20261003",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-sound-20261003/portal-sound-20261003",
+  "base_commit": "eea142448351027f91221ee2ca707ff5343350ee",
+  "resources": [
+    "domain:modautomator:compatibility/ip-sable",
+    "domain:modautomator:compatibility/ip-sable-audio"
+  ],
+  "paths": [
+    "src/main/java/qouteall/imm_ptl/core/teleportation",
+    "src/main/java/qouteall/imm_ptl/core/mixin/client/sound",
+    "src/main/java/qouteall/imm_ptl/core/mixin/client/multiworld_awareness",
+    "src/main/java/qouteall/imm_ptl/core/compat/sound_physics",
+    "src/main/java/qouteall/imm_ptl/core/compat/mixin/sound_physics",
+    "src/main/java/qouteall/imm_ptl/core/IPModMainClient.java",
+    "src/main/java/qouteall/imm_ptl/core/ClientWorldLoader.java",
+    "src/main/java/qouteall/imm_ptl/core/IPGlobal.java",
+    "src/main/java/qouteall/imm_ptl/core/commands",
+    "src/main/java/qouteall/imm_ptl/core/platform_specific/IPConfig.java",
+    "src/main/resources",
+    "src/test/java/qouteall/imm_ptl/core/teleportation",
+    "src/test/java/qouteall/imm_ptl/core/compat",
+    "build.gradle",
+    "gradle.properties",
+    "changelog.md",
+    "docs/ZUBLASTIC_PORTAL_AUDIO.md"
+  ],
+  "value_case": {
+    "category": "observable_capability",
+    "statement": "Make sounds cross IP/Sable portals with persistent source ownership and compatible Sound Physics Aeronautics processing, so a jukebox or moving sound does not abruptly disappear or duplicate when the listener crosses.",
+    "acceptance": [
+      "A controlled positional sound is heard/routed through the actual portal path in either dimension, with path-distance attenuation and portal direction; no route produces no remote leak.",
+      "An already-playing positional sound retains playback lifecycle while a listener crosses; source stop/removal and portal closure clean up without orphan or duplicate voices.",
+      "Sound Physics Aeronautics remains installed and its source/occlusion processing uses verified portal-aware geometry rather than silently sampling unrelated dimension coordinates.",
+      "Bounded runtime/audio diagnostics distinguish admitted routes, active voices and applied acoustic state; unit/integration and live results remain separately reported."
+    ]
+  }
+}

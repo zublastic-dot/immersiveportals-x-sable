@@ -94,6 +94,16 @@ public class ClientDebugCommand {
                 )
             );
         builder = builder.then(Commands
+            .literal("portal_sound")
+            .executes(context -> {
+                String report = qouteall.imm_ptl.core.teleportation.PortalSoundManager.diagnostics()
+                    + "\n" + qouteall.imm_ptl.core.compat.sound_physics.PortalSoundPhysics.diagnostics();
+                Helper.log("[IP sound diagnostic] " + report);
+                context.getSource().sendSuccess(() -> Component.literal(report), false);
+                return 1;
+            })
+        );
+        builder = builder.then(Commands
             .literal("list_portals")
             .executes(context -> {
                 RemoteCallables.doListPortals();

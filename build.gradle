@@ -231,6 +231,7 @@ mixin {
     configs.add("q_misc_util.mixins.json")
     configs.add("imm_ptl.mixins.json")
     configs.add("imm_ptl_compat.mixins.json")
+    configs.add("imm_ptl_sound_physics.mixins.json")
     configs.add("imm_ptl_fabric.mixins.json")
 }
 
