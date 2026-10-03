@@ -25,26 +25,22 @@ public final class DhPortalShaderPackAdapter {
     private DhPortalShaderPackAdapter() {}
     public static Map<String,String> status() { return Map.copyOf(STATUS); }
     public static void clear() { STATUS.clear(); }
-    public static boolean admitted(String pack, String dimension) {
-        if (!PortalShaderPackAdapter.supports(pack)) return false;
-        String folder = switch(dimension) {
-            case "minecraft:overworld" -> "/world0/";
-            case "minecraft:the_nether" -> "/world-1/";
-            case "minecraft:the_end" -> "/world1/";
-            default -> null;
-        };
-        if (folder == null) return false;
-        return adapted(folder + "dh_terrain.fsh") && adapted(folder + "dh_water.fsh");
+    public static boolean admitted(String pack) {
+        // Iris chooses the program directory, including custom dimension mappings.
+        // The live program's uniform is the final admission check in bind(): an
+        // unadapted terrain/water program never queries or consumes the coverage.
+        return PortalShaderPackAdapter.supports(pack) && STATUS.containsValue("adapted");
     }
-    private static boolean adapted(String path) {
-        String state = STATUS.get(path);
-        // Root programs are a fallback only when there is no dimension-specific program.
-        if (state == null) state = STATUS.get(path.substring(path.lastIndexOf('/')));
-        return "adapted".equals(state);
+    private static boolean terrainProgramPath(String path) {
+        if (path == null || path.length() > 1024
+            || !path.matches("/(?:[A-Za-z0-9_.-]+/)*dh_(?:terrain|water)\\.fsh")) return false;
+        for (String segment : path.split("/"))
+            if (segment.equals(".") || segment.equals("..")) return false;
+        return true;
     }
     public static List<String> patch(String pack, String path, List<String> original) {
         if (!PortalShaderPackAdapter.supports(pack)
-            || !path.matches("/(?:world-1/|world0/|world1/)?dh_(?:terrain|water)\\.fsh")) return original;
+            || !terrainProgramPath(path)) return original;
         String source = String.join("\n", original);
         if (source.contains(MARKER)) return original;
         if (source.length() > 8 * 1024 * 1024) return original;

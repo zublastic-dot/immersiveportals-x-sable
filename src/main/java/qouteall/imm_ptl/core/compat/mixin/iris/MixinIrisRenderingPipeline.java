@@ -43,6 +43,11 @@ public class MixinIrisRenderingPipeline implements IEIrisNewWorldRenderingPipeli
     }
 
     @Override
+    public boolean ip_getIsRenderingWorld() {
+        return isRenderingWorld;
+    }
+
+    @Override
     public void ip_setIsRenderingWorld(boolean cond) {
         isRenderingWorld = cond;
     }

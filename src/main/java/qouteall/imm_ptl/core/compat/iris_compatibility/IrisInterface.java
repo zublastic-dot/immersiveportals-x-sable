@@ -34,6 +34,8 @@ public class IrisInterface {
 
         public void reloadPipelines() {}
 
+        public String pipelineDiagnostics() { return "Iris pipeline scope: Iris absent"; }
+
         @Nullable
         public String getShaderpackName() {
             return null;
@@ -79,6 +81,9 @@ public class IrisInterface {
                 return null;
             });
         }
+
+        @Override
+        public String pipelineDiagnostics() { return IrisPortalPipelineScope.diagnostics(); }
 
         @Override
         public void reloadPipelines() {

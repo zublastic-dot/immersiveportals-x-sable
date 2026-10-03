@@ -93,6 +93,11 @@ public class ClientDebugCommand {
                     ))
                 )
             );
+        builder = builder.then(Commands.literal("iris_pipeline_scope").executes(context -> {
+            String report = qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface.invoker.pipelineDiagnostics();
+            Helper.log("[IP Iris pipeline] " + report);
+            context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+        }));
         builder = builder.then(Commands.literal("sunlight_profile")
             .executes(context -> {
                 String report = qouteall.imm_ptl.core.sunlight.SunlightClient.diagnostics();

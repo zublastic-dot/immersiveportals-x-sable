@@ -1,3 +1,10 @@
+## 0.5.1-zublastic.55
+
+- Restore Iris's active dimension pipeline, captured camera/fog state, and rendering phase after every nested world render, including exceptional exits. This addresses destination render state leaking into later outer-world DH draws.
+- Admit validated DH terrain/water programs by the active shader pipeline, including custom dimension folders, instead of a whitelist of vanilla dimension names. Unsupported packs and changed shader signatures remain unmodified.
+- Add bounded Iris pipeline restoration diagnostics and native pipeline/GL regression tests. In-game verification in both portal viewing directions is required separately.
+- Shared server/gameplay sunlight remains optional, experimental, and disabled by default.
+
 # 0.5.1-zublastic.54
 
 - Add experimental shared sunlight as an optional per-world server setting, disabled by default. Operators may publish the supported shader profile or set its sun path/clock explicitly; ordinary and one-hop portal mob exposure use that server profile even without shaders. Existing helmet, wetness and fire-immunity rules remain in place.

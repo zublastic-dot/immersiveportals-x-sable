@@ -67,8 +67,7 @@ public final class DhPortalRendering {
         if (!DhPortalShaderCoverage.eligible(PortalRendering.getPortalLayer(),
             PortalSourceRefreshPolicy.isRendering(), IrisInterface.invoker.isRenderingShadowMap())) return false;
         var level = net.minecraft.client.Minecraft.getInstance().level;
-        return level != null && DhPortalShaderPackAdapter.admitted(IrisInterface.invoker.getShaderpackName(),
-            level.dimension().location().toString());
+        return level != null && DhPortalShaderPackAdapter.admitted(IrisInterface.invoker.getShaderpackName());
     }
 
     private static double shaderCoverageBlocks() {

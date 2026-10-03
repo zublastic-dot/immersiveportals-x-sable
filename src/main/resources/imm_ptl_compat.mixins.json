@@ -46,6 +46,7 @@
     "dh.MixinDhSsaoApply",
     "real_camera.MixinRealCameraCore",
     "iris.MixinIrisPortalEyeBrightness",
+    "iris.MixinIrisWorldRender",
     "iris.MixinIrisPortalShaderIncludes",
     "iris.MixinIrisPortalSunGeometry",
     "iris.MixinIrisPortalShaderPreprocessor",

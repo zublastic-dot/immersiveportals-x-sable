@@ -67,6 +67,23 @@ class DhPortalShaderGlTest {
         glUniform1f(glGetUniformLocation(program,"distanceToCamera"),distance);glDrawArrays(GL_TRIANGLES,0,3);
         float[] rgba=new float[4];glReadPixels(0,0,1,1,GL_RGBA,GL_FLOAT,rgba);return rgba[0];
     }
+    @Test void anUnadaptedLiveProgramNeverQueriesCoverageEvenWhenAnotherDimensionWasAdapted() {
+        String vertex="#version 330 core\nvoid main(){gl_Position=vec4(0,0,0,1);}";
+        String fragment="#version 330 core\nout vec4 result;\nvoid main(){result=vec4(1);}";
+        int program=link("unadapted dimension",Map.of(PatchShaderType.VERTEX,vertex,PatchShaderType.FRAGMENT,fragment));
+        try {
+            DhPortalShaderPackAdapter.patch(DhPortalShaderPackAdapterTest.PACK,"/custom_dimension/dh_terrain.fsh",
+                List.of("#version 330 compatibility","// Complementary Shaders by EminGT","void main() {",
+                    DhPortalShaderPackAdapter.ANCHOR,"}"));
+            assertTrue(DhPortalShaderPackAdapter.admitted(DhPortalShaderPackAdapterTest.PACK));
+            glUseProgram(program);
+            assertEquals(-1,glGetUniformLocation(program,DhPortalShaderCoverage.UNIFORM));
+            try(var portal=DhPortalShaderCoverage.enter(()->{fail("Unadapted programs must not scan any world");return 0;})) {
+                DhPortalShaderCoverage.bind();
+            }
+            assertEquals(GL_NO_ERROR,glGetError());
+        } finally { glUseProgram(0);glDeleteProgram(program); }
+    }
     @Test @EnabledIfSystemProperty(named="ipsable.shaderPack",matches=".+")
     void installedTerrainAndWaterComposeWithSunlightThroughActualIrisCompiler() throws Exception {
         net.neoforged.fml.loading.LoadingModList.of(List.of(),List.of(),List.of(),List.of(),Map.of());

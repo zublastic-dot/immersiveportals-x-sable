@@ -42,7 +42,8 @@
       "Typed video settings support observed exact changes and restoration, including shaders and native menu navigation.",
       "Portal terrain no longer exposes a vanilla-to-DH hole when remote full-detail radius is smaller than the main view.",
       "Main view, portal sunlight and audio remain intact; live shader-on/off and settings restoration evidence is recorded separately from build and CI.",
-      "Server-owned sun trajectory synchronizes supported rendering and ordinary/portal mob exposure, independent of shader toggles."
+      "Optional experimental server-owned sun trajectory is disabled by default and synchronizes supported rendering and ordinary/portal mob exposure when enabled, independent of shader toggles.",
+      "Nested Iris/DH state restores the actual parent dimension, including custom keys; reverse-view visual acceptance is recorded independently."
     ]
   }
 }

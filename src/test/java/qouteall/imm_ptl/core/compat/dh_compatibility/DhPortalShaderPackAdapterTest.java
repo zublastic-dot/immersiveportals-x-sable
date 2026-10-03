@@ -13,7 +13,7 @@ class DhPortalShaderPackAdapterTest {
         DhPortalShaderPackAdapter.ANCHOR,"}"); }
 
     @Test void supportsTerrainAndWaterInEachDimensionWithoutSunlight() {
-        for(String dimension:List.of("", "world-1/", "world0/", "world1/")) {
+        for(String dimension:List.of("", "world-1/", "world0/", "world1/", "world42/", "modded_vault/", "dimensions/my_mod/highlands/")) {
             for(String program:List.of("dh_terrain.fsh","dh_water.fsh")) {
                 var original=source();String path="/"+dimension+program;
                 var result=DhPortalShaderPackAdapter.patch(PACK,path,original);
@@ -37,16 +37,23 @@ class DhPortalShaderPackAdapterTest {
         assertSame(changed,DhPortalShaderPackAdapter.patch(PACK,"/world-1/dh_terrain.fsh",changed));
         assertEquals(6,original.size(),"Original cached includes remain untouched");
     }
-    @Test void shaderCoverageRequiresBothProgramsInTheActiveDimensionAndReloadRevokesAdmission() {
-        assertFalse(DhPortalShaderPackAdapter.admitted(PACK,"minecraft:the_nether"));
-        DhPortalShaderPackAdapter.patch(PACK,"/world-1/dh_terrain.fsh",source());
-        assertFalse(DhPortalShaderPackAdapter.admitted(PACK,"minecraft:the_nether"));
-        DhPortalShaderPackAdapter.patch(PACK,"/world-1/dh_water.fsh",source());
-        assertTrue(DhPortalShaderPackAdapter.admitted(PACK,"minecraft:the_nether"));
-        assertFalse(DhPortalShaderPackAdapter.admitted("another","minecraft:the_nether"));
-        assertFalse(DhPortalShaderPackAdapter.admitted(PACK,"minecraft:overworld"));
-        assertFalse(DhPortalShaderPackAdapter.admitted(PACK,"mod:custom_dimension"));
+    @Test void coverageAdmissionFollowsCompiledProgramsRatherThanDimensionNamesAndReloadRevokesIt() {
+        assertFalse(DhPortalShaderPackAdapter.admitted(PACK));
+        DhPortalShaderPackAdapter.patch(PACK,"/dimensions/my_mod/highlands/dh_terrain.fsh",source());
+        assertTrue(DhPortalShaderPackAdapter.admitted(PACK),"An adapted terrain program must not depend on an unrelated water program");
+        assertFalse(DhPortalShaderPackAdapter.admitted("another"));
+        var changed=source().stream().map(s->s.replace("far * 0.4","far * 0.3")).toList();
+        assertSame(changed,DhPortalShaderPackAdapter.patch(PACK,"/dimensions/my_mod/highlands/dh_water.fsh",changed));
+        assertTrue(DhPortalShaderPackAdapter.admitted(PACK),"Only the live adapted program has the coverage uniform");
         DhPortalShaderPackAdapter.clear();
-        assertFalse(DhPortalShaderPackAdapter.admitted(PACK,"minecraft:the_nether"));
+        assertFalse(DhPortalShaderPackAdapter.admitted(PACK));
+    }
+    @Test void onlyBoundedAbsoluteDhFragmentPathsAreAdapted() {
+        var original=source();
+        for(String path:List.of("dh_terrain.fsh","//dh_terrain.fsh","/../dh_terrain.fsh",
+            "/dimensions/./dh_water.fsh","/dimensions/../dh_water.fsh","/dimension\\dh_terrain.fsh",
+            "/dh_terrain.fsh/extra","/"+"a".repeat(1024)+"/dh_terrain.fsh"))
+            assertSame(original,DhPortalShaderPackAdapter.patch(PACK,path,original),path);
+        assertFalse(DhPortalShaderPackAdapter.admitted(PACK));
     }
 }

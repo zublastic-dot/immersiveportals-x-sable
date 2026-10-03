@@ -55,8 +55,10 @@ distance whenever shaders are active and keeps only the dedicated alpha change.
 It also restores the pre-.52 loaded-only no-shader coverage policy. Live .53
 acceptance is required separately; these changes do not establish it by themselves.
 
-The shader correction applies only to first-layer portal views of the three
-built-in dimensions with both terrain and water programs successfully adapted.
+The shader correction applies only to first-layer portal views using a validated
+adapted terrain or water program. Admission follows Iris's selected shader
+folder, including custom dimension folders; it does not whitelist dimension IDs.
+Uniform lookup rejects unadapted programs before any coverage scan.
 Main views, nested portals, source-shadow refreshes, shadow-map passes, unknown
 packs and changed/ambiguous signatures retain their original shader behavior.
 The upload explicitly restores an inactive value on main draws; it is independent
@@ -72,7 +74,7 @@ imm_ptl_client_debug dh_portal_coverage disable 30
 imm_ptl_client_debug dh_portal_coverage enable
 ```
 
-Disable accepts 1–60 seconds, automatically restores, and never writes a config
+Disable accepts 1â€“60 seconds, automatically restores, and never writes a config
 file. It disables only the new shader-path alpha fade;
 the existing no-shader coverage path stays active. Diagnostics remain sampled
 while disabled and report dimension, camera, requested chunks, main `far`, ready
@@ -93,7 +95,8 @@ below the view may reduce coverage to zero, causing extra depth-tested LOD
 overlap. No promise is made that all 25 loaded chunks count as ready. Live
 diagnostics distinguish missing from unfinished data. Fine-detail absence within
 DH's own minimum near clip, missing DH cache data, arbitrary shader packs, nested
-portals and custom dimensions remain outside this correction's guarantees.
+portals remain outside this correction's guarantees. The dimension-independent
+adapter does not establish live acceptance for every modded dimension or pack.
 
 Tests cover a representative offset footprint, interior missing/unbuilt data, bounded
 scanning, scope restoration, finite A/B restoration, adapter identity/failure
@@ -102,3 +105,25 @@ through Iris include expansion, preprocessing, transformation and GL compilation
 The licensed shader source is only read from an explicitly supplied local path;
 it is not copied into this repository. The optional installed Sodium JAR contract
 uses `ip.portal.test.sodiumJar` and reads the nested mod in memory.
+
+## .55 Nested Iris pipeline ownership
+
+Minecraft's outer world and LevelRenderer pipeline were restored after portal
+rendering while Iris's global PipelineManager could remain on the destination.
+DH queries that global manager for its shaders and render targets. This can route
+outer-world geometry through the destination pipeline. The .54 reverse-view
+report is a live failure; build results and the earlier opposite-view A/B do not
+make that report accepted.
+
+A scope around each nested world render now restores the exact parent pipeline
+using Iris's actual dimension key, then restores captured matrices, fog, time,
+and rendering phase. This also covers same-dimension nesting and exceptional
+exits, without hard-coded Overworld/Nether categories. Before capturing, the
+scope normalizes the manager to the actual outer world to handle the first
+auxiliary render after a dimension crossing.
+
+`imm_ptl_client_debug iris_pipeline_scope` reports active/max nesting depth,
+restored pipeline mismatches, failures, and bounded last dimension/identities.
+Native ABI, actual scope execution, and GL target-routing tests cover the state
+contract. Shared DH depth texture handling is unchanged; both viewing directions
+need live visual verification before declaring this rendering failure repaired.
