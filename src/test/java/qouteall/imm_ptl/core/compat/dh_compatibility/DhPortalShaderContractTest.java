@@ -61,4 +61,20 @@ class DhPortalShaderContractTest {
             if(instruction instanceof MethodInsnNode call) assertFalse(call.name.contains("Framebuffer")||call.name.contains("Clear"));
         }
     }
+    @Test void irisDrawAndDepthReconstructionHaveDifferentUpdateScopes() throws Exception {
+        var matrices=node("net/irisshaders/iris/uniforms/MatrixUniforms");
+        var dhMatrices=matrices.methods.stream().filter(m->m.name.equals("addDHMatrix")).findFirst().orElseThrow();
+        int perFrame=0;
+        for(var instruction:dhMatrices.instructions) if(instruction instanceof FieldInsnNode field
+            &&field.name.equals("PER_FRAME")) perFrame++;
+        assertTrue(perFrame>=2,"Iris caches the DH projection and inverse once per frame");
+        var event=node("net/irisshaders/iris/compat/dh/LodRendererEvents$13");
+        int nearReads=0,perspectives=0;
+        for(var method:event.methods) for(var instruction:method.instructions) {
+            if(instruction instanceof FieldInsnNode field && field.name.equals("nearClipPlane")) nearReads++;
+            if(instruction instanceof MethodInsnNode call && call.name.equals("setPerspective")) perspectives++;
+        }
+        assertTrue(nearReads>=2&&perspectives>=2,
+            "Opaque and translucent DH draws rebuild projection from their own event near plane");
+    }
 }

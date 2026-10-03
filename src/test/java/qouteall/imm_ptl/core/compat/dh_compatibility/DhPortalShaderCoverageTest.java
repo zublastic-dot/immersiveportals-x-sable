@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class DhPortalShaderCoverageTest {
     @AfterEach void restore() { DhPortalShaderCoverage.enable(); }
 
-    @Test void actualOffsetRemoteLoaderLeavesNoHoleAtItsNearestEdge() {
+    @Test void representativeOffsetRemoteLoaderLeavesNoHoleAtItsNearestEdge() {
         double ready = DhVanillaCoverage.blocks(7, 17.8, 28.9,
             (x,z)->x>=-2 && x<=2 && z>=-1 && z<=3);
         assertEquals(30.2, ready, 1e-8);
@@ -30,6 +30,8 @@ class DhPortalShaderCoverageTest {
         assertTrue(count.get()<=65*65);
         assertEquals(67.2,DhPortalShaderCoverage.fadeEnd(112,112),1e-8);
         assertEquals(67.2,DhPortalShaderCoverage.fadeEnd(112,-1),1e-8);
+        assertEquals(64,DhVanillaCoverage.radius(64,8,8,(x,z)->true),
+            "The shader scan bound must not change the established no-shader radius");
     }
     @Test void mainNestedAndShadowPassesAreExplicitlyInactive() {
         assertTrue(DhPortalShaderCoverage.eligible(1,false,false));

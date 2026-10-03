@@ -1,3 +1,8 @@
+# 0.5.1-zublastic.53
+
+- Correct the .52 live regression that hid distant shader terrain behind fog. Preserve DH's native shader render distance and near plane so Iris' separately cached depth reconstruction stays consistent; apply readiness coverage only to the dedicated alpha fade.
+- Restore the pre-.52 loaded-only coverage policy without shaders. Add actual Iris update-scope and depth reconstruction regressions; the conservative shader mesh-readiness overlap still requires live verification.
+
 # 0.5.1-zublastic.52
 
 - Align the supported Complementary/Euphoria DH terrain and water fade with destination chunks whose meshes are ready, preventing a gap when portal loading is shorter than the main view. Keep fog, camera projection and sunlight uniforms unchanged.

@@ -43,11 +43,24 @@ public final class DhPortalRendering {
 
     public static int vanillaCoverageDistance(int requested) {
         Pass pass = PASS.current();
-        if (pass == null || !PortalRendering.isRendering() || PortalSourceRefreshPolicy.isRendering()) return requested;
-        if (IrisInterface.invoker.isShaders() && (!shaderCoverageEligible() || !DhPortalShaderCoverage.enabled())) return requested;
-        // DH's native near clip still expects positive whole chunks. The shader
-        // receives the precise distance separately; no Iris far uniform is changed.
-        return Math.max(1, Math.min(requested, (int)Math.floor(coverageBlocks(pass, requested) / 16)));
+        if (pass == null || !PortalRendering.isRendering() || IrisInterface.invoker.isShaders()) return requested;
+        // Iris reconstructs DH depth with a separately cached per-frame projection.
+        // Changing DH's native distance only inside this pass changes its near plane
+        // while that reconstruction retains the old one, turning terrain into fog.
+        // Preserve the established loaded-only no-shader policy; shader coverage is
+        // carried exclusively by our independent alpha-fade uniform below.
+        if (pass.coverageDistance == null) {
+            var mc = net.minecraft.client.Minecraft.getInstance();
+            var level = mc.level;
+            var camera = mc.gameRenderer.getMainCamera().getPosition();
+            pass.coverageDistance = level == null ? requested : DhVanillaCoverage.radius(
+                requested, camera.x, camera.z, (x, z) -> {
+                    var chunk = level.getChunkSource().getChunk(x, z,
+                        net.minecraft.world.level.chunk.status.ChunkStatus.FULL, false);
+                    return chunk != null && !(chunk instanceof net.minecraft.world.level.chunk.EmptyLevelChunk);
+                });
+        }
+        return pass.coverageDistance;
     }
 
     private static boolean shaderCoverageEligible() {
@@ -215,6 +228,7 @@ public final class DhPortalRendering {
         private Vector4f geometryClipPlane;
         private boolean oblique;
         private RenderParams params;
+        private Integer coverageDistance;
         private Double coverageBlocks;
         private int coverageRequested;
 

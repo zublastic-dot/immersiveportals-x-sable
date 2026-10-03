@@ -7,14 +7,17 @@ public final class DhVanillaCoverage {
 
     public static int radius(int requested, double x, double z, Loaded loaded) {
         if (requested <= 1 || !Double.isFinite(x) || !Double.isFinite(z)) return requested;
-        return Math.max(1, Math.min(requested, (int)Math.floor(blocks(requested, x, z, loaded) / 16)));
+        return Math.max(1, Math.min(requested, (int)Math.floor(distance(requested, x, z, loaded) / 16)));
     }
 
     /** Exact horizontal distance; zero is meaningful when the camera chunk is not ready. */
     public static double blocks(int requested, double x, double z, Loaded loaded) {
         if (requested <= 0 || !Double.isFinite(x) || !Double.isFinite(z)) return 0;
         // A conservative upper bound keeps even scaled portals' render-thread work finite.
-        int scanRadius = Math.min(requested, 32);
+        return distance(Math.min(requested, 32), x, z, loaded);
+    }
+
+    private static double distance(int scanRadius, double x, double z, Loaded loaded) {
         int cx = (int)Math.floor(x / 16), cz = (int)Math.floor(z / 16);
         double limit = scanRadius * 16.0;
         double nearestSquared = limit * limit;

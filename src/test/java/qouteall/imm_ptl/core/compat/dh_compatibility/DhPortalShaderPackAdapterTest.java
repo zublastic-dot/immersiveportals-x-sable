@@ -37,7 +37,7 @@ class DhPortalShaderPackAdapterTest {
         assertSame(changed,DhPortalShaderPackAdapter.patch(PACK,"/world-1/dh_terrain.fsh",changed));
         assertEquals(6,original.size(),"Original cached includes remain untouched");
     }
-    @Test void nativeCutoffRequiresBothProgramsInTheActiveDimensionAndReloadRevokesAdmission() {
+    @Test void shaderCoverageRequiresBothProgramsInTheActiveDimensionAndReloadRevokesAdmission() {
         assertFalse(DhPortalShaderPackAdapter.admitted(PACK,"minecraft:the_nether"));
         DhPortalShaderPackAdapter.patch(PACK,"/world-1/dh_terrain.fsh",source());
         assertFalse(DhPortalShaderPackAdapter.admitted(PACK,"minecraft:the_nether"));
