@@ -84,8 +84,8 @@ public abstract class IplHostedWorldFrameRouterMixin extends Level {
         ServerLevel parent = IplWorldFrameContext.current();
         if (parent == null || parent == self) return null;
 
-        long now = System.currentTimeMillis();
-        if (now - ipl$lastRouteLogMs > 2000) {
+        long now = ipl.sable.render.IplDiagnostics.verbose() ? System.currentTimeMillis() : 0;
+        if (ipl.sable.render.IplDiagnostics.verbose() && now - ipl$lastRouteLogMs > 2000) {
             ipl$lastRouteLogMs = now;
             org.slf4j.LoggerFactory.getLogger("ipl-hosted-gather").info(
                 "[IPL-WFR] routing world-frame access ({}, {}) -> {}",

@@ -53,6 +53,7 @@ public final class PortalShaderLighting {
         Entry(ClientLevel source) { sourceGeometry=new PortalSunOcclusion(source,PortalSunOcclusion.DEFAULT_SECTIONS); }
     }
     private static final Map<Key,Entry> ENTRIES=new LinkedHashMap<>();
+    private static final PortalLightCacheTrace CACHE_TRACE=new PortalLightCacheTrace(LIMIT);
     private static int tick;
     private static long revision;
     private static boolean initialized;
@@ -121,6 +122,7 @@ public final class PortalShaderLighting {
         if(mc.isPaused() || !ClientWorldLoader.getIsInitialized()) return;
         List<ClientLevel> worlds=new ArrayList<>(ClientWorldLoader.getClientWorlds());
         PortalShaderGpu.retain(worlds);
+        boolean trace=qouteall.imm_ptl.core.compat.dh_compatibility.DhRenderTrace.active();
         Map<Key,Aperture> apertures=new LinkedHashMap<>();
         List<Portal> portals=new ArrayList<>();
         for(var world:worlds) for(var entity:world.entitiesForRendering())
@@ -149,7 +151,10 @@ public final class PortalShaderLighting {
                 PortalLighting.apertureSamples(p.getWidth(),p.getHeight(),p.getNormal(),p::getPointInPlane,p::transformPoint,dest));
             Key key=new Key(a.target,a.center,a.inward,a.u,a.v,a.width,a.height,
                 a.source,a.sourceCenter,a.sourceNormal,a.sourceU,a.sourceV);
-            if(apertures.size()<LIMIT) apertures.putIfAbsent(key,a);
+            if(apertures.size()<LIMIT) {
+                if(trace && !apertures.containsKey(key)) traceKey(p.getUUID(),a,inward,!ENTRIES.containsKey(key));
+                apertures.putIfAbsent(key,a);
+            }
         }
         ENTRIES.keySet().retainAll(apertures.keySet());
         var lightSamples=PortalLightSamples.pass();
@@ -180,7 +185,7 @@ public final class PortalShaderLighting {
             if(shadowChanged) {
                 shadow=sourceShadow(a,sun,e.sourceGeometry);e.shadowTick=tick;e.shadowDirection=sun;e.shadowDirty=false;
                 int lit=0;for(byte value:shadow) if(value!=0) lit++;
-                if(rotation.isPresent() && clock.isPresent() && shadowDiagnostics<64
+                if(ipl.sable.render.IplDiagnostics.verbose() && rotation.isPresent() && clock.isPresent() && shadowDiagnostics<64
                     && (!e.shadowLogged || (lit>0 && !e.litShadowLogged))) {
                     shadowDiagnostics++;e.shadowLogged=true;e.litShadowLogged|=lit>0;
                     LogUtils.getLogger().info("[IP shader light] source shadow {}/{} lit texels at angle {}; {} cached sections, {} world reads, {} evictions",
@@ -195,10 +200,24 @@ public final class PortalShaderLighting {
                 float[] cells=e.region!=null && !geometryChanged && !valuesChanged && !occupancyChanged
                     ?e.region.cells:packCells(e.snapshot,min,e.apertureLayer);
                 e.region=new Region(a,min,cells,shadow,a.toTargetDirection.apply(sun),angle,++revision,ambient.min,ambient.max);
-                if(old==null) LogUtils.getLogger().info("[IP shader light] admitted {} receiving cells in {} from {}; sunlight parameters {}",
+                if(ipl.sable.render.IplDiagnostics.verbose() && old==null) LogUtils.getLogger().info("[IP shader light] admitted {} receiving cells in {} from {}; sunlight parameters {}",
                     e.snapshot.field().cells().size(),a.target.dimension().location(),a.source.dimension().location(),rotation.isPresent()?"observed":"pending source shader");
             }
         }
+    }
+    /** Opt-in trace copies only numbers/identifiers, never a ClientLevel or Portal reference. */
+    private static void traceKey(UUID portal,Aperture a,Pos inward,boolean cacheMiss) {
+        var face=new PortalLightCacheTrace.Face(portal,a.target.dimension().location().toString(),inward.x(),inward.y(),inward.z());
+        var sample=new PortalLightCacheTrace.Sample(
+            a.target.dimension().location()+"@"+Integer.toHexString(System.identityHashCode(a.target)),
+            a.source.dimension().location()+"@"+Integer.toHexString(System.identityHashCode(a.source)),
+            new double[]{a.center.x,a.center.y,a.center.z,a.inward.x,a.inward.y,a.inward.z,
+                a.u.x,a.u.y,a.u.z,a.v.x,a.v.y,a.v.z,a.width,a.height,
+                a.sourceCenter.x,a.sourceCenter.y,a.sourceCenter.z,a.sourceNormal.x,a.sourceNormal.y,a.sourceNormal.z,
+                a.sourceU.x,a.sourceU.y,a.sourceU.z,a.sourceV.x,a.sourceV.y,a.sourceV.z});
+        CACHE_TRACE.observe(qouteall.imm_ptl.core.compat.dh_compatibility.DhRenderTrace.captureId(),face,sample,cacheMiss,
+            qouteall.imm_ptl.core.compat.dh_compatibility.DhRenderTrace::reserve,
+            qouteall.imm_ptl.core.compat.dh_compatibility.DhRenderTrace::record);
     }
     private record Bounds(Pos min,Pos max) {}
     private static Bounds bounds(Collection<Pos> positions) {

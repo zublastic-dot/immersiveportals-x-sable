@@ -126,12 +126,15 @@ public abstract class SableSubLevelBlockEntityClipMixin {
         // DIAGNOSTIC: log per-sub-level, rate-limited to once / 5s, to confirm
         // this wrap fires for cog scenes. If absent from latest.log during a
         // cog repro, the wrap target doesn't match Sable's actual call site.
-        java.util.UUID id = sub != null ? sub.getUniqueId() : null;
-        long now = System.nanoTime();
-        Long last = id == null ? null : IPL$LAST_LOG_NS.get(id);
-        if (last == null || now - last > 5_000_000_000L) {
-            if (id != null) IPL$LAST_LOG_NS.put(id, now);
-            IPL$DIAG.info("[IPL-COLL-BRACKET-FIRED] sub={}", id);
+        if (ipl.sable.render.IplDiagnostics.verbose() && sub != null) {
+            java.util.UUID id = sub.getUniqueId();
+            long now = System.nanoTime();
+            Long last = IPL$LAST_LOG_NS.get(id);
+            if ((last != null || IPL$LAST_LOG_NS.size() < 64)
+                && (last == null || now - last > 5_000_000_000L)) {
+                IPL$LAST_LOG_NS.put(id, now);
+                IPL$DIAG.info("[IPL-COLL-BRACKET-FIRED] sub={}", id);
+            }
         }
 
         SourceClipPortalFinder.ClipDecision decision =

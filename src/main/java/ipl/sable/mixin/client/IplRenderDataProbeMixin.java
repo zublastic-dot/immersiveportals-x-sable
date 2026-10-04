@@ -47,7 +47,7 @@ public abstract class IplRenderDataProbeMixin {
     private void ipl$probeCompile(
         PrioritizeChunkUpdates chunkUpdates, RenderRegionCache renderRegionCache, Camera camera, CallbackInfo ci
     ) {
-        if (!ipl$isHosted()) return;
+        if (!ipl.sable.render.IplDiagnostics.verbose() || !ipl$isHosted()) return;
         long now = System.currentTimeMillis();
         if (now - ipl$lastCompileLogMs > 5000) {
             ipl$lastCompileLogMs = now;
@@ -89,7 +89,7 @@ public abstract class IplRenderDataProbeMixin {
 
     @Inject(method = "setDirty", at = @At("HEAD"), require = 0)
     private void ipl$probeSetDirty(int x, int y, int z, boolean playerChanged, CallbackInfo ci) {
-        if (!ipl$isHosted()) return;
+        if (!ipl.sable.render.IplDiagnostics.verbose() || !ipl$isHosted()) return;
         long now = System.currentTimeMillis();
         if (now - ipl$lastSetDirtyLogMs < 5000) return;
         ipl$lastSetDirtyLogMs = now;
@@ -104,7 +104,7 @@ public abstract class IplRenderDataProbeMixin {
         RenderType layer, ShaderInstance shader, Matrix4f modelView,
         double camX, double camY, double camZ, CallbackInfo ci
     ) {
-        if (!ipl$isHosted()) return;
+        if (!ipl.sable.render.IplDiagnostics.verbose() || !ipl$isHosted()) return;
         long now = System.currentTimeMillis();
         if (now - ipl$lastDrawLogMs < 5000) return;
         ipl$lastDrawLogMs = now;

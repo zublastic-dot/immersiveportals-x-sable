@@ -54,6 +54,8 @@ public abstract class IplServerHeartbeatMixin {
         ipl.sable.IplServerWatchdog.onTick(
             Thread.currentThread(), (MinecraftServer) (Object) this);
 
+        // The watchdog remains active; only routine progress logging is opt-in.
+        if (!ipl.sable.render.IplDiagnostics.verbose()) return;
         ipl$tickCount++;
         long now = System.nanoTime();
         if (ipl$lastReportNanos == 0L) {

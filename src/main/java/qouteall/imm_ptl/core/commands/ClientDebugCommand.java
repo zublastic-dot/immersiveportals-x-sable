@@ -93,6 +93,22 @@ public class ClientDebugCommand {
                     ))
                 )
             );
+        builder = builder.then(Commands.literal("dh_render_trace")
+            .executes(context -> {
+                String report = qouteall.imm_ptl.core.compat.dh_compatibility.DhRenderTrace.diagnostics();
+                Helper.log("[IP DH render trace] " + report);
+                context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+            })
+            .then(Commands.literal("arm").then(Commands.argument("seconds", IntegerArgumentType.integer(1, 30))
+                .executes(context -> {
+                    String report = qouteall.imm_ptl.core.compat.dh_compatibility.DhRenderTrace.arm(IntegerArgumentType.getInteger(context, "seconds"));
+                    context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+                })))
+            .then(Commands.literal("stop").executes(context -> {
+                String report = qouteall.imm_ptl.core.compat.dh_compatibility.DhRenderTrace.stop();
+                Helper.log("[IP DH render trace] " + report);
+                context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+            })));
         builder = builder.then(Commands.literal("iris_pipeline_scope").executes(context -> {
             String report = qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface.invoker.pipelineDiagnostics();
             Helper.log("[IP Iris pipeline] " + report);

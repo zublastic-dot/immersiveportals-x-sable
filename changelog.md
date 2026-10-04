@@ -1,3 +1,9 @@
+## 0.5.1-zublastic.56
+
+- Make routine Sable, sunlight and portal snapshot diagnostic logs opt-in; bound missing-sublevel retry warnings and preserve the original retry deadline.
+- Add an opt-in, finite DH/Iris draw trace for dimension, buffer, framebuffer, depth texture and actual shader matrix ownership. No rendering behavior is changed by this diagnostic build.
+- Version .55 did not repair the reverse portal LOD contamination in live testing; shader-enabled remote terrain also remained incorrect in the opposite view.
+
 ## 0.5.1-zublastic.55
 
 - Restore Iris's active dimension pipeline, captured camera/fog state, and rendering phase after every nested world render, including exceptional exits. This addresses destination render state leaking into later outer-world DH draws.

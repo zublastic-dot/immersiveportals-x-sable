@@ -127,3 +127,60 @@ restored pipeline mismatches, failures, and bounded last dimension/identities.
 Native ABI, actual scope execution, and GL target-routing tests cover the state
 contract. Shared DH depth texture handling is unchanged; both viewing directions
 need live visual verification before declaring this rendering failure repaired.
+
+## .56 Finite DH/Iris render trace
+
+The .55 live reverse view still displayed pale destination-inappropriate cave
+surfaces with shaders, despite successful pipeline restoration. Version .56
+adds measurements for that unresolved failure; it does not claim a rendering
+repair.
+
+```
+imm_ptl_client_debug dh_render_trace arm 8
+imm_ptl_client_debug dh_render_trace stop
+imm_ptl_client_debug dh_render_trace
+```
+
+Arming accepts 1-30 seconds. Expiry or an explicit stop ends sampling; stop and
+status write the retained report to chat and the game log. No config or rendering
+state is changed. The trace is disabled by default, samples each view/phase at
+most twice per second, and is limited to 240 samples, 48 retained keys and 12,000
+characters per key. Re-arming replaces the previous report.
+
+Measurements include the active Minecraft dimension, DH level and buffer-owner
+identities, actual GL program/framebuffers/depth attachment, DH and Iris depth
+texture IDs, and main/portal/shadow/source-refresh scope. A selected-buffer sample
+also compares actual GPU projection and view uniforms with the current Iris and
+DH matrices. GL queries happen only within the armed budget. These diagnostics
+support arbitrary dimension identifiers and do not change clip planes, fog,
+texture contents or shader uniforms. Native ABI and bounded-window tests plus a
+real GL uniform-read regression validate the measurement path; live traces are
+still needed to identify the remaining ownership or projection mismatch.
+
+## .56 Routine logging is opt-in
+
+Routine parent-sync, clip, hosted-render, heartbeat, impostor and sunlight build
+messages are quiet by default. To collect those verbose diagnostics deliberately,
+add `-Dipl.diagnostics.verbose=true` to the JVM arguments and restart. The flag
+is cached at initialization and does not depend on a launcher's logger settings.
+The finite DH trace above remains separately available without that flag.
+
+Genuine warnings, exceptions and server-stall watchdog reports remain enabled.
+The watchdog still receives every completed tick. Diagnostic formatting, section
+enumeration, stack creation and BE program queries are skipped when verbose
+logging is off; functional rendering, registrations and hosted compilation remain
+active. BE post-draw logging remembers exact class/program pairs, capped at 64,
+so alternating shader programs cannot emit a message on every draw. Unexpected
+missing clip uniforms retain a bounded warning.
+
+Missing hosted allocations use bounded diagnostic state for 256 identities:
+normal allocation races are silent for one second, continuing delays report at
+one and five seconds, and a failed parent-stamp retry reports expiry. Repeated
+stamps update the latest parent without restarting that attempt's 30-second
+deadline; repeated expiry warnings for an unresolved identity are limited to once
+per five minutes. Successful allocation clears that identity's diagnostic state.
+This does not remove the ordered handoff queue or change portal transforms.
+
+Quiet logs do not establish a sunlight performance repair. Sunlight build
+computation and any remaining repeated rebuild work are unchanged; this cleanup
+only removes routine reporting and the work needed solely to produce it.

@@ -33,7 +33,21 @@
     "src/test/java/qouteall/imm_ptl/core/sunlight",
     "src/test/java/qouteall/imm_ptl/core/lighting",
     "docs/ZUBLASTIC_SHARED_SUNLIGHT.md",
-    "src/main/java/qouteall/imm_ptl/core/compat/IPCompatMixinPlugin.java"
+    "src/main/java/qouteall/imm_ptl/core/compat/IPCompatMixinPlugin.java",
+    "src/main/java/ipl/sable/client/IplParentDimSync.java",
+    "src/main/java/ipl/sable/client/IplClientHostedLookup.java",
+    "src/main/java/ipl/sable/client/IplParentSyncDiagnostics.java",
+    "src/main/java/ipl/sable/render/SourceClipDiag.java",
+    "src/main/java/ipl/sable/render/SubLevelClipUniformPatcher.java",
+    "src/main/java/ipl/sable/mixin/client/SableVanillaSubLevelBERMixin.java",
+    "src/main/java/ipl/sable/mixin/client/SableSubLevelBlockEntityClipMixin.java",
+    "src/main/java/ipl/sable/mixin/client/IplRenderDataProbeMixin.java",
+    "src/main/java/ipl/sable/mixin/IplServerHeartbeatMixin.java",
+    "src/main/java/ipl/sable/mixin/IplHostedTicketManagerMixin.java",
+    "src/main/java/ipl/sable/mixin/IplHostedWorldFrameRouterMixin.java",
+    "src/main/java/ipl/sable/mixin/IplHostingLevelPlayerLookupMixin.java",
+    "src/main/java/qouteall/imm_ptl/core/render/impostor/PortalImpostorManager.java",
+    "src/main/java/ipl/sable/render/IplDiagnostics.java"
   ],
   "value_case": {
     "category": "observable_capability",
@@ -43,7 +57,8 @@
       "Portal terrain no longer exposes a vanilla-to-DH hole when remote full-detail radius is smaller than the main view.",
       "Main view, portal sunlight and audio remain intact; live shader-on/off and settings restoration evidence is recorded separately from build and CI.",
       "Optional experimental server-owned sun trajectory is disabled by default and synchronizes supported rendering and ordinary/portal mob exposure when enabled, independent of shader toggles.",
-      "Nested Iris/DH state restores the actual parent dimension, including custom keys; reverse-view visual acceptance is recorded independently."
+      "Nested Iris/DH state restores the actual parent dimension, including custom keys; reverse-view visual acceptance is recorded independently.",
+      "Repeated diagnostics are opt-in; missing-sublevel retry failures remain observable without per-tick warning floods."
     ]
   }
 }
