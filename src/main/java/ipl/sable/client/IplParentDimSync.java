@@ -11,6 +11,8 @@ import ipl.sable.duck.IplSubLevelDuck;
 import ipl.sable.mixin.client.IplClientSubLevelRenderPoseAccessor;
 import ipl.sable.mixin.client.IplSnapshotInterpolatorAccessor;
 import ipl.sable.mixin.client.IplSubLevelLastPoseAccessor;
+import ipl.sable.client.IplParentSyncDiagnostics.PendingStamp;
+import ipl.sable.render.IplDiagnostics;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -46,9 +48,25 @@ public final class IplParentDimSync {
     private static final Map<UUID, java.util.ArrayDeque<PendingHandoff>> PENDING_HANDOFFS = new HashMap<>();
 
     /** Parent stamps that arrived before their client sub-level was created (retried per tick). */
-    private static final Map<UUID, PendingParentStamp> PENDING_PARENT_STAMPS = new HashMap<>();
+    private static final Map<UUID, PendingStamp> PENDING_PARENT_STAMPS = new HashMap<>();
+    private static final IplParentSyncDiagnostics MISSING = new IplParentSyncDiagnostics();
 
-    private record PendingParentStamp(String parentDimId, long queuedAtMs) {}
+    static {
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+            de.nick1st.imm_ptl.events.ClientExitEvent.class, event -> MISSING.clear());
+    }
+
+    private static void queueParentStamp(UUID id, String parent) {
+        // Repeated server restamps must update ownership without restarting the
+        // allocation deadline. Otherwise the 5s restamp defeats the 30s timeout.
+        PENDING_PARENT_STAMPS.compute(id, (key, previous) -> previous == null
+            ? new PendingStamp(parent, System.currentTimeMillis()) : previous.withLatestParent(parent));
+    }
+
+    private static void warnMissing(IplParentSyncDiagnostics.Notice notice) {
+        if (notice != null) LOG.warn("[IPL-PARENT-SYNC] {}: sub-level {} parent={} reason={} missingForMs={} lookups={}",
+            notice.phase(), notice.id(), notice.parent(), notice.reason(), notice.missingForMs(), notice.lookups());
+    }
 
     private IplParentDimSync() {}
 
@@ -65,6 +83,7 @@ public final class IplParentDimSync {
      * 5s cadence; remove after the declarative-straddle stack stabilizes.
      */
     public static void clientHeartbeat() {
+        if (!IplDiagnostics.verbose()) return;
         long now = System.currentTimeMillis();
         if (now - ipl$lastDiagMs < 5000) return;
         ipl$lastDiagMs = now;
@@ -147,11 +166,12 @@ public final class IplParentDimSync {
         if (PENDING_PARENT_STAMPS.isEmpty()) return;
 
         long now = System.currentTimeMillis();
-        Iterator<Map.Entry<UUID, PendingParentStamp>> iterator = PENDING_PARENT_STAMPS.entrySet().iterator();
+        Iterator<Map.Entry<UUID, PendingStamp>> iterator = PENDING_PARENT_STAMPS.entrySet().iterator();
         while (iterator.hasNext()) {
-            Map.Entry<UUID, PendingParentStamp> entry = iterator.next();
+            Map.Entry<UUID, PendingStamp> entry = iterator.next();
             try {
-                if (now - entry.getValue().queuedAtMs() > 30_000) {
+                if (entry.getValue().expired(now)) {
+                    warnMissing(MISSING.expired(entry.getKey(), entry.getValue().parentDimId(), now));
                     IplStraddleSessionStore.clearAllVisualState(entry.getKey());
                     iterator.remove(); // ship never materialized client-side — stop retrying
                     continue;
@@ -160,7 +180,7 @@ public final class IplParentDimSync {
                     entry.getKey().toString(), entry.getValue().parentDimId());
                 if (subLevel != null) {
                     RemoteCallables.setParentInternal(subLevel, entry.getValue().parentDimId());
-                    LOG.info("[IPL-PARENT-SYNC] deferred parent stamp applied: {} parent={}",
+                    if (IplDiagnostics.verbose()) LOG.info("[IPL-PARENT-SYNC] deferred parent stamp applied: {} parent={}",
                         entry.getKey(), entry.getValue().parentDimId());
                     iterator.remove();
                 }
@@ -183,8 +203,7 @@ public final class IplParentDimSync {
                     // FOREVER — "the ship exists (physics, collision) but is invisible".
                     // Single-block ships (swivel tops, shattered blocks, rope connectors)
                     // never emit further updates that could heal it, so they stayed gone.
-                    PENDING_PARENT_STAMPS.put(subLevelId,
-                        new PendingParentStamp(parentDimId, System.currentTimeMillis()));
+                    queueParentStamp(subLevelId, parentDimId);
                     return;
                 }
                 if (discardPreAllocationHandoffs(subLevelId, parentDimId)) {
@@ -199,14 +218,13 @@ public final class IplParentDimSync {
                     // A parent stamp can race the full-sync that a queued handoff waits for.
                     // Keep it behind the FIFO so ownership never becomes visible before its
                     // delayed render timeline has been mapped into that frame.
-                    PENDING_PARENT_STAMPS.put(subLevelId,
-                        new PendingParentStamp(parentDimId, System.currentTimeMillis()));
+                    queueParentStamp(subLevelId, parentDimId);
                     return;
                 }
                 setParentInternal(subLevel, parentDimId);
                 PENDING_PARENT_STAMPS.remove(subLevelId);
 
-                LOG.info("[IPL-PARENT-SYNC] sub-level {} parent={} (client)",
+                if (IplDiagnostics.verbose()) LOG.info("[IPL-PARENT-SYNC] sub-level {} parent={} (client)",
                     subLevelUuid, parentDimId);
             } catch (Throwable t) {
                 LOG.error("[IPL-PARENT-SYNC] failed to apply parent stamp for {}", subLevelUuid, t);
@@ -350,7 +368,7 @@ public final class IplParentDimSync {
             // exactly where its destination projection left it.
             ((IplClientSubLevelRenderPoseAccessor) clientSubLevel)
                 .ipl$setLastRenderPosePartialTick(-1.0f);
-            LOG.info("[IPL-PARENT-SYNC] handoff applied for {} -> parent {} pose=({},{},{})",
+            if (IplDiagnostics.verbose()) LOG.info("[IPL-PARENT-SYNC] handoff applied for {} -> parent {} pose=({},{},{})",
                 subLevelId, parentDimId,
                 String.format("%.1f", mappedLogicalPose.position().x()),
                 String.format("%.1f", mappedLogicalPose.position().y()),
@@ -443,18 +461,18 @@ public final class IplParentDimSync {
         }
 
         private static SubLevel findHostedSubLevel(String subLevelUuid, String parentDimId) {
+            UUID id = UUID.fromString(subLevelUuid);
             ClientLevel hosting = ClientWorldLoader.getWorld(SableSubLevelDimension.SUBLEVELS);
             SubLevelContainer container = SubLevelContainer.getContainer((Level) hosting);
             if (container == null) {
-                LOG.warn("[IPL-PARENT-SYNC] sublevels client world has no container");
+                warnMissing(MISSING.missing(id, parentDimId, "client hosting container absent", System.currentTimeMillis()));
                 return null;
             }
 
-            SubLevel subLevel = container.getSubLevel(UUID.fromString(subLevelUuid));
+            SubLevel subLevel = container.getSubLevel(id);
             if (subLevel == null) {
-                LOG.warn("[IPL-PARENT-SYNC] no hosted sub-level {} (parent {})",
-                    subLevelUuid, parentDimId);
-            }
+                warnMissing(MISSING.missing(id, parentDimId, "client allocation absent", System.currentTimeMillis()));
+            } else MISSING.recovered(id);
             return subLevel;
         }
 

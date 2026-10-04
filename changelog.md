@@ -1,3 +1,40 @@
+## 0.5.1-zublastic.57
+
+- Preserve native DH depth attachments when Iris replaces its main depth target; prevent remote LOD draws from writing vanilla depth while sampling stale depth from another dimension.
+- Scope ownership to framebuffer identity, retaining native DH resizing and destruction without dimension-name checks.
+- Add installed-Iris bytecode and GPU depth regressions. In-game acceptance remains separate from these tests.
+
+## 0.5.1-zublastic.56
+
+- Make routine Sable, sunlight and portal snapshot diagnostic logs opt-in; bound missing-sublevel retry warnings and preserve the original retry deadline.
+- Add an opt-in, finite DH/Iris draw trace for dimension, buffer, framebuffer, depth texture and actual shader matrix ownership. No rendering behavior is changed by this diagnostic build.
+- Version .55 did not repair the reverse portal LOD contamination in live testing; shader-enabled remote terrain also remained incorrect in the opposite view.
+
+## 0.5.1-zublastic.55
+
+- Restore Iris's active dimension pipeline, captured camera/fog state, and rendering phase after every nested world render, including exceptional exits. This addresses destination render state leaking into later outer-world DH draws.
+- Admit validated DH terrain/water programs by the active shader pipeline, including custom dimension folders, instead of a whitelist of vanilla dimension names. Unsupported packs and changed shader signatures remain unmodified.
+- Add bounded Iris pipeline restoration diagnostics and native pipeline/GL regression tests. In-game verification in both portal viewing directions is required separately.
+- Shared server/gameplay sunlight remains optional, experimental, and disabled by default.
+
+# 0.5.1-zublastic.54
+
+- Add experimental shared sunlight as an optional per-world server setting, disabled by default. Operators may publish the supported shader profile or set its sun path/clock explicitly; ordinary and one-hop portal mob exposure use that server profile even without shaders. Existing helmet, wetness and fire-immunity rules remain in place.
+- Temporarily adapt the verified Complementary/Euphoria shader and Iris sun/shadow direction in memory while the experiment is enabled. Synchronize on login, respawn, dimension change and profile changes; restore native rendering when disabled or disconnected. Unknown shader packs retain their native rendering and report unsupported status.
+- Keep exposure bounded to loaded geometry, with per-query and per-tick limits and conservative unknown results. Do not alter stored light, spawning rules, arbitrary shader files or client preferences.
+- Include the .53 DH depth-projection repair, now visually verified at the reported portal gap with correction-on/off and shader-on/off captures.
+
+# 0.5.1-zublastic.53
+
+- Correct the .52 live regression that hid distant shader terrain behind fog. Preserve DH's native shader render distance and near plane so Iris' separately cached depth reconstruction stays consistent; apply readiness coverage only to the dedicated alpha fade.
+- Restore the pre-.52 loaded-only coverage policy without shaders. Add actual Iris update-scope and depth reconstruction regressions; the conservative shader mesh-readiness overlap still requires live verification.
+
+# 0.5.1-zublastic.52
+
+- Align the supported Complementary/Euphoria DH terrain and water fade with destination chunks whose meshes are ready, preventing a gap when portal loading is shorter than the main view. Keep fog, camera projection and sunlight uniforms unchanged.
+- Scope coverage to first-layer portal views, restore the original fade for main/shadow/nested draws, and preserve unsupported shader programs. Add bounded runtime coverage diagnostics and a temporary A/B switch.
+- Add measured-footprint, scope, Sodium/Iris ABI and actual installed shader/driver regressions. Live acceptance remains separate from build validation; see `docs/ZUBLASTIC_DH_PORTAL_COVERAGE.md`.
+
 # 0.5.1-zublastic.51
 
 - Add an explicit bounded SPA HIGH recorder command for per-sound portal acoustic verification, with runtime-only input changes and automatic restoration.

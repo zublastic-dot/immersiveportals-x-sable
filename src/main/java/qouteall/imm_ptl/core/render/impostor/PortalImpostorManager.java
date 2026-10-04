@@ -282,7 +282,8 @@ public final class PortalImpostorManager {
                 e.nextRenew = now + RENEW_INTERVAL;
                 nextSubscribe = now + 300_000_000L;
                 McRemoteProcedureCallClient.tellServerToInvoke(RPC + "subscribe", metadata.sourceDimension(), e.id, e.token);
-                LOG.info("[PortalImpostor] captured {} {}px; awaiting authoritative metadata", e.id, image.width());
+                if (ipl.sable.render.IplDiagnostics.verbose())
+                    LOG.info("[PortalImpostor] captured {} {}px; awaiting authoritative metadata", e.id, image.width());
             } else {
                 e.captured = metadata;
                 if (e.image != null) e.image.close();
@@ -298,6 +299,7 @@ public final class PortalImpostorManager {
     }
 
     private static void captureSkipped(Portal portal, String reason) {
+        if (!ipl.sable.render.IplDiagnostics.verbose()) return;
         long now = System.nanoTime();
         if (now < nextCaptureReport) return;
         nextCaptureReport = now + 10_000_000_000L;
@@ -330,7 +332,7 @@ public final class PortalImpostorManager {
                 }
             }
         } catch (RuntimeException failure) { fail(failure); }
-        if (rendered && now >= nextReport) {
+        if (ipl.sable.render.IplDiagnostics.verbose() && rendered && now >= nextReport) {
             nextReport = now + 10_000_000_000L;
             LOG.info("[PortalImpostor] entries={} captures={} cachedDraws={} livePortalsThisFrame={}",
                 ENTRIES.size(), captures, draws, RenderStates.getRenderedPortalNum());

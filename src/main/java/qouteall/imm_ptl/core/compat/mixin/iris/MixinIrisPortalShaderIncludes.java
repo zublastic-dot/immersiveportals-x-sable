@@ -9,6 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import qouteall.imm_ptl.core.lighting.PortalShaderPackAdapter;
+import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalShaderPackAdapter;
 
 /** Iris has expanded includes and applied options here, but has not run JCPP yet. */
 @Mixin(value = IncludeProcessor.class, remap = false)
@@ -20,6 +21,7 @@ public class MixinIrisPortalShaderIncludes {
         if (original == null || Iris.getIrisConfig() == null) return;
         String selected = Iris.getIrisConfig().getShaderPackName().orElse("");
         var patched = PortalShaderPackAdapter.patch(selected, path.getPathString(), original);
+        patched = DhPortalShaderPackAdapter.patch(selected, path.getPathString(), patched);
         // The IncludeProcessor cache is immutable and must remain the original pack.
         if (patched != original) cir.setReturnValue(ImmutableList.copyOf(patched));
     }

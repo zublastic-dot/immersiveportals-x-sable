@@ -53,7 +53,9 @@ public class IPCompatMixinPlugin implements IMixinConfigPlugin {
                 version(modList, "euphoria_patcher"), version(modList, "iris")
             );
         }
-        if (mixinClassName.endsWith(".MixinIrisPortalEyeBrightness")) {
+        if (mixinClassName.endsWith(".MixinIrisPortalEyeBrightness") || mixinClassName.contains(".MixinIrisSharedSun")
+            || mixinClassName.endsWith(".MixinIrisWorldRender")
+            || mixinClassName.endsWith(".MixinIrisDhDepthOwnership")) {
             return IrisPortalUniformCompatibility.supports(version(modList, "iris"));
         }
         if (mixinClassName.contains("IrisSodium")) {

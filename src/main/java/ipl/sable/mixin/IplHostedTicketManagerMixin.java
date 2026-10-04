@@ -136,8 +136,8 @@ public abstract class IplHostedTicketManagerMixin {
         });
         enrolledShips += imageRegions[0];
 
-        long now = System.currentTimeMillis();
-        if (enrolledShips > 0 && now - ipl$lastTerrainLogMs > 5000) {
+        long now = ipl.sable.render.IplDiagnostics.verbose() ? System.currentTimeMillis() : 0;
+        if (ipl.sable.render.IplDiagnostics.verbose() && enrolledShips > 0 && now - ipl$lastTerrainLogMs > 5000) {
             ipl$lastTerrainLogMs = now;
             org.slf4j.LoggerFactory.getLogger("ipl-hosted-terrain").info(
                 "[IPL-SCENE-TERRAIN] {} enrolled native terrain for {} hosted ship/image region(s)",

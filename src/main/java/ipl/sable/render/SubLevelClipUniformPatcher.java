@@ -58,7 +58,8 @@ public final class SubLevelClipUniformPatcher {
         Boolean.getBoolean("ipl.sable.clip.forceAll");
 
     static {
-        LOG.info("[IPL-CLIP-PATCH] static init: FORCE_CLIP_ALL={}", FORCE_CLIP_ALL);
+        if (IplDiagnostics.verbose() || FORCE_CLIP_ALL)
+            LOG.info("[IPL-CLIP-PATCH] static init: FORCE_CLIP_ALL={}", FORCE_CLIP_ALL);
     }
 
     // Per-reason last-log-time. With multiple distinct shader names alternating
@@ -69,13 +70,22 @@ public final class SubLevelClipUniformPatcher {
         new java.util.concurrent.ConcurrentHashMap<>();
 
     private static void logEarlyReturn(String reason) {
+        if (!IplDiagnostics.verbose()) return;
         long now = System.nanoTime();
         Long last = earlyReturnLastLogNanos.get(reason);
+        if (last == null && earlyReturnLastLogNanos.size() >= 64) return;
         if (last != null && now - last < 5_000_000_000L) {
             return;
         }
         earlyReturnLastLogNanos.put(reason, now);
-        LOG.warn("[IPL-CLIP-PATCH] early return: {}", reason);
+        LOG.info("[IPL-CLIP-PATCH] diagnostic early return: {}", reason);
+    }
+
+    private static final IplDiagnostics.BoundedKeys missingUniformWarnings = new IplDiagnostics.BoundedKeys(64);
+
+    private static void warnMissingUniform(String name) {
+        if (missingUniformWarnings.first(name))
+            LOG.warn("[IPL-CLIP-PATCH] shader '{}' has no ipl_subLevelClipEquation uniform", name);
     }
 
     /**
@@ -300,7 +310,7 @@ public final class SubLevelClipUniformPatcher {
                 && !name.startsWith("shadow_")
                 && !name.equals("particle")
                 && !name.startsWith("rendertype_")) {
-                logEarlyReturn("shader '" + name + "' has no ipl_subLevelClipEquation uniform");
+                warnMissingUniform(name);
             }
             return;
         }
@@ -488,8 +498,8 @@ public final class SubLevelClipUniformPatcher {
         // distance rather than being min()'d into slot 1.
         GL11.glEnable(GL30.GL_CLIP_DISTANCE2);
 
-        long now = System.nanoTime();
-        if (now - lastReportNanos >= 5_000_000_000L) {
+        long now = IplDiagnostics.verbose() ? System.nanoTime() : 0;
+        if (IplDiagnostics.verbose() && now - lastReportNanos >= 5_000_000_000L) {
             lastReportNanos = now;
             LOG.info("[IPL-CLIP-PATCH] shader={} forceAll={} subLevel={} wrote=({},{},{},{})",
                 shader.getName(),

@@ -108,11 +108,8 @@ public final class IrisSourceShadowRefresh {
             } finally {
                 IPCGlobal.renderer = renderer;
                 ((IEMinecraftClient) mc).ip_setFrameBuffer(primary);
-                // If native rendering threw before finalizeLevelRendering, its cached source
-                // pipeline must not retain an open world phase when a visible portal uses it later.
-                var currentPipeline = Iris.getPipelineManager().getPipelineNullable();
-                if (currentPipeline instanceof IEIrisNewWorldRenderingPipeline nativePipeline)
-                    nativePipeline.ip_setIsRenderingWorld(false);
+                // The common Iris world scope closes the child phase and restores the
+                // parent's native pipeline/globals before renderWorldNew returns.
                 // Native preparePipeline also restores Euphoria's dimension pack and Iris's
                 // global program/material/DH override selection. mc.level is restored first.
                 if (mc.level == receiver)

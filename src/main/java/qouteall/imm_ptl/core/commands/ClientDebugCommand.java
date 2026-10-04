@@ -93,6 +93,37 @@ public class ClientDebugCommand {
                     ))
                 )
             );
+        builder = builder.then(Commands.literal("dh_render_trace")
+            .executes(context -> {
+                String report = qouteall.imm_ptl.core.compat.dh_compatibility.DhRenderTrace.diagnostics();
+                Helper.log("[IP DH render trace] " + report);
+                context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+            })
+            .then(Commands.literal("arm").then(Commands.argument("seconds", IntegerArgumentType.integer(1, 30))
+                .executes(context -> {
+                    String report = qouteall.imm_ptl.core.compat.dh_compatibility.DhRenderTrace.arm(IntegerArgumentType.getInteger(context, "seconds"));
+                    context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+                })))
+            .then(Commands.literal("stop").executes(context -> {
+                String report = qouteall.imm_ptl.core.compat.dh_compatibility.DhRenderTrace.stop();
+                Helper.log("[IP DH render trace] " + report);
+                context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+            })));
+        builder = builder.then(Commands.literal("iris_pipeline_scope").executes(context -> {
+            String report = qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface.invoker.pipelineDiagnostics();
+            Helper.log("[IP Iris pipeline] " + report);
+            context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+        }));
+        builder = builder.then(Commands.literal("sunlight_profile")
+            .executes(context -> {
+                String report = qouteall.imm_ptl.core.sunlight.SunlightClient.diagnostics();
+                Helper.log("[IP shared sunlight] " + report);
+                context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+            })
+            .then(Commands.literal("publish").executes(context -> {
+                String result = qouteall.imm_ptl.core.sunlight.SunlightClient.publishObserved();
+                context.getSource().sendSuccess(() -> Component.literal(result), false); return 1;
+            })));
         builder = builder.then(Commands
             .literal("portal_sound")
             .executes(context -> {
@@ -113,6 +144,23 @@ public class ClientDebugCommand {
             context.getSource().sendSuccess(() -> Component.literal(result.message()), false);
             return result.success() ? 1 : 0;
         }));
+        builder = builder.then(Commands.literal("dh_portal_coverage")
+            .executes(context -> {
+                String report = qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalShaderCoverage.diagnostics();
+                Helper.log("[IP DH coverage] " + report);
+                context.getSource().sendSuccess(() -> Component.literal(report), false);return 1;
+            })
+            .then(Commands.literal("enable").executes(context -> {
+                qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalShaderCoverage.enable();
+                context.getSource().sendSuccess(() -> Component.literal("Portal DH coverage correction enabled"), false);return 1;
+            }))
+            .then(Commands.literal("disable").then(Commands.argument("seconds", IntegerArgumentType.integer(1, 60))
+                .executes(context -> {
+                    int seconds = IntegerArgumentType.getInteger(context, "seconds");
+                    qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalShaderCoverage.disableForSeconds(seconds);
+                    context.getSource().sendSuccess(() -> Component.literal("Portal DH shader coverage correction disabled for "
+                        + seconds + " seconds; it will restore automatically"), false);return 1;
+                }))));
         builder = builder.then(Commands
             .literal("list_portals")
             .executes(context -> {

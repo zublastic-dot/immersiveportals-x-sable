@@ -77,19 +77,15 @@ public abstract class SableVanillaSubLevelBERMixin {
     private static final java.util.concurrent.atomic.AtomicLong IPL$LAST_LOG_NS =
         new java.util.concurrent.atomic.AtomicLong(0L);
 
-    /** Per-class "have we logged the post-draw program for this BE class yet" set. */
+    /** Exact class/program pairs, capped for the entire session even across shader reloads. */
     @Unique
-    private static final java.util.concurrent.ConcurrentHashMap<String, Integer> IPL$POST_DRAW_LOGGED =
-        new java.util.concurrent.ConcurrentHashMap<>();
+    private static final ipl.sable.render.IplDiagnostics.BoundedKeys IPL$POST_DRAW_LOGGED =
+        new ipl.sable.render.IplDiagnostics.BoundedKeys(64);
 
     @Unique
     private static void ipl$logPostDraw(String beClass, int progBefore, int progAfter) {
-        // Log once per (class, progAfter) pair so we see every distinct
-        // program any BE class binds. Capped to keep logs manageable.
-        Integer prev = IPL$POST_DRAW_LOGGED.get(beClass);
-        if (prev != null && prev == progAfter) return;
-        if (IPL$POST_DRAW_LOGGED.size() > 30) return;
-        IPL$POST_DRAW_LOGGED.put(beClass, progAfter);
+        if (!ipl.sable.render.IplDiagnostics.verbose()
+            || !IPL$POST_DRAW_LOGGED.first(beClass + ":" + progAfter)) return;
         IPL$LOG.info("[IPL-BE-POST-DRAW] class={} progBefore={} progAfter={}",
             beClass, progBefore, progAfter);
     }
@@ -122,10 +118,10 @@ public abstract class SableVanillaSubLevelBERMixin {
         // drawing outside any bracket -- this log will confirm whether
         // SableVanillaSubLevelBlockEntityRenderer.renderSingleBE is even on
         // the cog's call path.
-        if (IPL$LOGGED_FIRED.compareAndSet(false, true)) {
+        if (ipl.sable.render.IplDiagnostics.verbose() && IPL$LOGGED_FIRED.compareAndSet(false, true)) {
             IPL$LOG.info("[IPL-BE-BRACKET-FIRED] FIRST-FIRE be={} class={}",
                 be.getBlockPos(), be.getClass().getSimpleName());
-        } else {
+        } else if (ipl.sable.render.IplDiagnostics.verbose()) {
             long now = System.nanoTime();
             long last = IPL$LAST_LOG_NS.get();
             if (now - last > 5_000_000_000L) {
@@ -200,11 +196,14 @@ public abstract class SableVanillaSubLevelBERMixin {
         // Second sub-level cut owns gl_ClipDistance[2] (see SableSourceClipMixin).
         GL11.glEnable(GL30.GL_CLIP_DISTANCE2);
 
-        int progBefore = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+        int progBefore = ipl.sable.render.IplDiagnostics.verbose()
+            ? GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM) : 0;
         try {
             original.call(dispatcher, be, partialTick, pose, source);
-            int progAfter = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
-            ipl$logPostDraw(be.getClass().getSimpleName(), progBefore, progAfter);
+            if (ipl.sable.render.IplDiagnostics.verbose()) {
+                int progAfter = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
+                ipl$logPostDraw(be.getClass().getName(), progBefore, progAfter);
+            }
         } finally {
             // Always disable CD1 on bracket exit (see SableSourceClipMixin
             // for the same fix + rationale).

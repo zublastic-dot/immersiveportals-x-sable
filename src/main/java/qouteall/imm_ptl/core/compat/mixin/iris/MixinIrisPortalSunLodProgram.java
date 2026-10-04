@@ -8,6 +8,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import qouteall.imm_ptl.core.compat.iris_compatibility.PortalShaderBindingSlot;
 import qouteall.imm_ptl.core.lighting.PortalShaderGpu;
+import qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalShaderCoverage;
 
 @Pseudo
 @Mixin(targets = "net.irisshaders.iris.compat.dh.IrisLodRenderProgram", remap = false)
@@ -22,5 +23,9 @@ public class MixinIrisPortalSunLodProgram {
 
     // bind() is too early: fillUniformData replaces sampler bindings afterward.
     @Inject(method = "fillUniformData", at = @At("RETURN"))
-    private void ip_bindSun(CallbackInfo ci) { ip_sun.bind(PortalShaderGpu::bind); }
+    private void ip_bindSun(CallbackInfo ci) {
+        ip_sun.bind(PortalShaderGpu::bind);
+        // Independent of portal sunlight regions and present even in unlit caves.
+        DhPortalShaderCoverage.bind();
+    }
 }

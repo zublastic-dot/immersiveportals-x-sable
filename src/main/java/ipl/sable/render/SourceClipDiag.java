@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
  * which render path (Vanilla vs Sodium) is firing at runtime, and how often the
  * straddle check actually produced a clip plane vs returned null.
  *
- * <p>One summary every 5 seconds; counters reset each emission.
+ * <p>Opt-in only; one summary every 5 seconds, counters reset each emission.
  */
 public final class SourceClipDiag {
 
@@ -24,12 +24,14 @@ public final class SourceClipDiag {
     private SourceClipDiag() {}
 
     public static void onVanillaCall(boolean installed) {
+        if (!IplDiagnostics.verbose()) return;
         vanillaCalls++;
         if (installed) vanillaInstalls++;
         maybeReport();
     }
 
     public static void onSodiumCall(boolean installed) {
+        if (!IplDiagnostics.verbose()) return;
         sodiumCalls++;
         if (installed) sodiumInstalls++;
         maybeReport();

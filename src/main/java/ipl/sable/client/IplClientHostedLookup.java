@@ -93,8 +93,8 @@ public final class IplClientHostedLookup {
 
         // Diagnostic: prove the render hooks fire and show what the gather sees. Rate-limited;
         // remove once the dim-agnostic render path is stable.
-        long now = System.currentTimeMillis();
-        if (now - lastGatherLogMs > 5000) {
+        long now = ipl.sable.render.IplDiagnostics.verbose() ? System.currentTimeMillis() : 0;
+        if (ipl.sable.render.IplDiagnostics.verbose() && now - lastGatherLogMs > 5000) {
             lastGatherLogMs = now;
             int firstMatchedChunks = -1;
             Object firstPose = null;

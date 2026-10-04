@@ -7,7 +7,9 @@ import org.spongepowered.asm.mixin.Mixin;
 public class MixinIrisIris {
     @org.spongepowered.asm.mixin.injection.Inject(method = "destroyEverything", at = @org.spongepowered.asm.mixin.injection.At("HEAD"))
     private static void ip_clearPortalShaderState(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        qouteall.imm_ptl.core.sunlight.SunlightClient.clearCompilation();
         qouteall.imm_ptl.core.lighting.PortalShaderPackAdapter.clear();
+        qouteall.imm_ptl.core.compat.dh_compatibility.DhPortalShaderPackAdapter.clear();
         qouteall.imm_ptl.core.lighting.PortalSourceShadow.clear();
     }
     // test
