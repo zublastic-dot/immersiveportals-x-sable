@@ -1,4 +1,6 @@
 {
+  "text.autoconfig.immersive_portals.option.experimentalPortalColoredLighting": "Experimental Portal Colored Light",
+  "text.autoconfig.immersive_portals.option.experimentalPortalColoredLighting.@Tooltip": "Blend native Colorful Lighting from placed light sources through nearby portals. Requires a supported Colorful Lighting version. Client visuals only; independent of experimental shared gameplay sunlight. Disabled by default.",
   "imm_ptl.loading_chunks": "Loading Chunks %1$s/%2$s",
   "imm_ptl.searching_for_frame": "Searching for existing frame",
   "imm_ptl.generating_new_frame": "Existing Frame Cannot Be Found. Generating New Frame",

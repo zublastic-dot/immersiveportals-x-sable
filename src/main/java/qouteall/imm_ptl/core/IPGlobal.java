@@ -62,6 +62,9 @@ public class IPGlobal {
     
     public static boolean reducedPortalRendering = false;
 
+    /** Opt-in native Colorful Lighting transport; client visual experiment only. */
+    public static volatile boolean experimentalPortalColoredLighting = false;
+
     public static boolean portalImpostors = true;
     public static int portalImpostorLiveDistance = 128;
     public static int portalImpostorMaxDistance = 2048;

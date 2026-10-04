@@ -82,6 +82,10 @@ public final class PortalShaderPackAdapter {
 
     static List<String> patch(String pack, String path, List<String> input, String resource) {
         if (!supports(pack) || input == null || !path.endsWith(".fsh")) return input;
+        // Bloom runs in every dimension and does not depend on a sunlight field.
+        var bloom = PortalBloomShaderAdapter.patch(pack, path, input);
+        if (bloom != input) report(path, "adapted aperture-aware bloom");
+        input = bloom;
         String source = String.join("\n", input);
         if (source.length() > 8 * 1024 * 1024 || source.contains(MARKER)
             || !source.contains("#define NETHER") || !source.contains("// Complementary Shaders by EminGT")) return input;

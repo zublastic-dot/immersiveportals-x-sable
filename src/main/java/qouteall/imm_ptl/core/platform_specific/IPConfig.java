@@ -32,6 +32,9 @@ public class IPConfig implements ConfigData {
     public boolean enableCrossPortalSound = true;
     @ConfigEntry.Category("client")
     @ConfigEntry.Gui.Tooltip
+    public boolean experimentalPortalColoredLighting = false;
+    @ConfigEntry.Category("client")
+    @ConfigEntry.Gui.Tooltip
     public boolean pureMirror = false;
     @ConfigEntry.Category("client")
     public boolean renderYourselfInPortal = true;
@@ -219,6 +222,7 @@ public class IPConfig implements ConfigData {
         IPGlobal.enableClientPerformanceAdjustment = enableClientPerformanceAdjustment;
         IPGlobal.enableServerPerformanceAdjustment = enableServerPerformanceAdjustment;
         IPGlobal.enableCrossPortalSound = enableCrossPortalSound;
+        IPGlobal.experimentalPortalColoredLighting = experimentalPortalColoredLighting;
         IPGlobal.checkModInfoFromInternet = checkModInfoFromInternet;
         IPGlobal.enableUpdateNotification = enableUpdateNotification;
         IPGlobal.enableDepthClampForPortalRendering = useDepthClampForPortalRendering;

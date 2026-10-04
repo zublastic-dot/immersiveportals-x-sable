@@ -1,0 +1,40 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-rgb-20261004",
+  "lease_id": "portal-rgb-20261004",
+  "worker_id": "codex-portal-rgb-20261004",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-rgb-20261004/portal-rgb-20261004",
+  "base_commit": "96747cd9d18d6a8925af54498ea73acc7b93cd70",
+  "resources": [
+    "domain:modautomator:compatibility/ip-sable"
+  ],
+  "paths": [
+    "src/main/java/qouteall/imm_ptl/core/lighting",
+    "src/main/java/qouteall/imm_ptl/core/platform_specific/IPConfig.java",
+    "src/main/java/qouteall/imm_ptl/core/platform_specific/IPConfigGUI.java",
+    "src/main/java/qouteall/imm_ptl/core/commands",
+    "src/main/java/qouteall/imm_ptl/core/IPModMainClient.java",
+    "src/main/java/qouteall/imm_ptl/core/IPGlobal.java",
+    "src/main/java/qouteall/imm_ptl/core/compat",
+    "src/main/java/qouteall/imm_ptl/core/mixin/client/render",
+    "src/main/resources",
+    "src/test/java/qouteall/imm_ptl/core/lighting",
+    "src/test/java/qouteall/imm_ptl/core/compat",
+    "docs/ZUBLASTIC_PORTAL_COLORED_LIGHTING.md",
+    "build.gradle",
+    "gradle.properties",
+    "changelog.md"
+  ],
+  "value_case": {
+    "category": "observable_capability",
+    "statement": "Optional bounded dimension-aware averaged colored-light transport through portals, plus shader tint correction.",
+    "acceptance": [
+      "Experimental portal colored lighting is disabled by default and independent of experimental shared sunlight.",
+      "Colored source changes and removal update dimension-agnostic portal illumination without requiring aperture visibility or feeding imported light back.",
+      "Unknown/unloaded/unsupported mod data remains bounded with documented fallback.",
+      "Shader-on and shader-off visual checks, performance bounds, optional-mod absence and settings restoration are verified separately.",
+      "Investigate and correct reported shader portal tint with source-grounded rendering tests."
+    ]
+  }
+}

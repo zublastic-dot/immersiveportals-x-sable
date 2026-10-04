@@ -7,6 +7,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import qouteall.imm_ptl.core.compat.iris_compatibility.PortalShaderBindingSlot;
+import qouteall.imm_ptl.core.compat.iris_compatibility.PortalBloomBinding;
 import qouteall.imm_ptl.core.lighting.PortalShaderGpu;
 
 /** Iris Program.unbind is static: at most one fullscreen program can be current. */
@@ -21,7 +22,10 @@ public class MixinIrisPortalSunFullscreenProgram {
     private void ip_closePreviousSun(CallbackInfo ci) { ip_sun.close(); }
 
     @Inject(method = "use", at = @At("RETURN"))
-    private void ip_bindSun(CallbackInfo ci) { ip_sun.bind(PortalShaderGpu::bind); }
+    private void ip_bindSun(CallbackInfo ci) {
+        ip_sun.bind(PortalShaderGpu::bind);
+        PortalBloomBinding.bind();
+    }
 
     @Inject(method = "unbind", at = @At("HEAD"))
     private static void ip_closeSun(CallbackInfo ci) { PortalShaderBindingSlot.closeCurrent(); }

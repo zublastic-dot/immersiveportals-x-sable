@@ -31,6 +31,9 @@ public class IPCompatMixinPlugin implements IMixinConfigPlugin {
 
 
         LoadingModList modList = LoadingModList.get();
+        if (mixinClassName.contains(".colorful.")) {
+            return qouteall.imm_ptl.core.lighting.PortalColoredLightCompatibility.supports(version(modList, "colorful_lighting"));
+        }
         if (mixinClassName.contains(".dh.")) {
             String dhVersion = version(modList, "distanthorizons");
             boolean supported = DhCompatibility.supports(dhVersion);

@@ -88,6 +88,7 @@ class PortalShaderPackAdapterTest {
         IncludeGraph graph;
         Map<String, String> settings;
         String dimension = "/world-1/";
+        boolean nativeColorfulCarrier;
         qouteall.imm_ptl.core.sunlight.SunlightProfile sharedProfile;
         final List<StringPair> defines = new java.util.ArrayList<>(List.of(new StringPair("IS_IRIS", ""),
             new StringPair("MC_VERSION", "12101"), new StringPair("IRIS_VERSION", "10814"),
@@ -117,11 +118,11 @@ class PortalShaderPackAdapterTest {
             System.out.println("PORTAL_SHADER_DRIVER " + glGetString(GL_VENDOR) + " | "
                 + glGetString(GL_RENDERER) + " | " + glGetString(GL_VERSION));
             var entries = ImmutableList.<AbsolutePackPath>builder();
-            for (String name : List.of("gbuffers_terrain", "dh_terrain", "deferred1", "composite1", "gbuffers_water",
+            for (String name : List.of("gbuffers_terrain", "dh_terrain", "deferred1", "composite1", "composite4", "gbuffers_water",
                 "gbuffers_entities", "gbuffers_hand", "gbuffers_block", "gbuffers_hand_water"))
                 for (String extension : List.of(".vsh", ".fsh"))
                     entries.add(AbsolutePackPath.fromAbsolutePath("/world-1/" + name + extension));
-            for (String name : List.of("gbuffers_terrain", "dh_terrain", "gbuffers_skybasic", "shadow"))
+            for (String name : List.of("gbuffers_terrain", "dh_terrain", "gbuffers_skybasic", "shadow", "composite4", "gbuffers_water"))
                 for (String extension : List.of(".vsh", ".fsh"))
                     entries.add(AbsolutePackPath.fromAbsolutePath("/world0/" + name + extension));
             Path root = Path.of(System.getProperty("ipsable.shaderPack"));
@@ -167,7 +168,8 @@ class PortalShaderPackAdapterTest {
             }
             assertEquals(0, depth, path + " unbalanced directives");
             String preprocessed = JcppProcessor.glslPreprocessSource(expanded, defines);
-            if (patched && extension.equals(".fsh") && dimension.equals("/world-1/")) assertTrue(preprocessed.contains("ipSunCount"), path);
+            if (patched && extension.equals(".fsh") && dimension.equals("/world-1/"))
+                assertTrue(preprocessed.contains(name.equals("composite4") ? "ipBloomEdgeCount" : "ipSunCount"), path);
             PortalShaderPackAdapter.observePreprocessed(PACK, preprocessed);
             return preprocessed;
         }
@@ -185,7 +187,7 @@ class PortalShaderPackAdapterTest {
                 new Object2ObjectOpenHashMap<>());
             if (name.equals("dh_terrain")) return TransformPatcher.patchDHTerrain(name, vertex, null, null, null,
                 fragment, new Object2ObjectOpenHashMap<>());
-            if (name.equals("deferred1") || name.equals("composite1")) return TransformPatcher.patchComposite(name,
+            if (name.equals("deferred1") || name.startsWith("composite")) return TransformPatcher.patchComposite(name,
                 vertex, null, fragment, name.equals("deferred1") ? TextureStage.DEFERRED : TextureStage.COMPOSITE_AND_FINAL,
                 new Object2ObjectOpenHashMap<>());
             return TransformPatcher.patchSodium(name, vertex, null, null, null, fragment,
@@ -201,6 +203,16 @@ class PortalShaderPackAdapterTest {
             // unsupported fixture option/environment before testing the patch.
             for (boolean patched : new boolean[]{false, true}) {
                 var sources = transformed(name, patched, nativeProgram);
+                if (nativeColorfulCarrier) {
+                    try {
+                        sources = new java.util.HashMap<>(sources);
+                        sources.put(PatchShaderType.VERTEX, PortalColoredShaderCarrierTest.nativePatch(sources.get(PatchShaderType.VERTEX), true));
+                        String nativeFragment = PortalColoredShaderCarrierTest.nativePatch(sources.get(PatchShaderType.FRAGMENT));
+                        String fragment = patched ? PortalColoredShaderCarrier.patch(PACK, nativeFragment) : nativeFragment;
+                        if (patched) assertNotSame(nativeFragment, fragment, "Actual installed terrain carrier was not admitted: " + dimension);
+                        sources.put(PatchShaderType.FRAGMENT, fragment);
+                    } catch (Exception failure) { throw new AssertionError("Installed Colorful shader patch failed", failure); }
+                }
                 int program = glCreateProgram();
                 try {
                     for (var stage : List.of(PatchShaderType.VERTEX, PatchShaderType.FRAGMENT)) {
@@ -218,6 +230,9 @@ class PortalShaderPackAdapterTest {
                     driverCall(name + " native=" + nativeProgram + " patched=" + patched + " LINK", () -> {
                         glLinkProgram(program);
                         assertEquals(GL_TRUE, glGetProgrami(program, GL_LINK_STATUS), name + "\n" + glGetProgramInfoLog(program));
+                        if (nativeColorfulCarrier && patched)
+                            assertTrue(glGetUniformLocation(program, "ipPortalRgbCarrierCount") >= 0,
+                                "Carrier must remain active in the fully linked installed terrain shader");
                     });
                 } finally { glDeleteProgram(program); }
             }
@@ -329,6 +344,21 @@ class PortalShaderPackAdapterTest {
         @Test void fullBorderFogPassCompilesAndLinks() { verify("deferred1"); }
         @Test void fullNetherStormPassCompilesAndLinks() { verify("composite1"); }
         @Test void fullWaterPassCompilesAndLinks() { verify("gbuffers_water"); }
+        @Test void apertureBloomCompilesInNetherAndOverworldWithoutSunlightDependency() {
+            try {
+                verify("composite4");
+                dimension = "/world0/"; verify("composite4");
+                assertTrue(source("composite4", ".fsh", true).contains("ipBloomEdgeCount"));
+            } finally { dimension = "/world-1/"; }
+        }
+        @Test void fullInstalledTerrainLinksWithActualColorfulAndPortalCarrierInBothDimensions() {
+            nativeColorfulCarrier = true;
+            try {
+                verify("gbuffers_terrain");
+                verify("gbuffers_water");
+                dimension = "/world0/"; verify("gbuffers_terrain"); verify("gbuffers_water");
+            } finally { dimension = "/world-1/"; nativeColorfulCarrier = false; }
+        }
 
         void verifyShared(qouteall.imm_ptl.core.sunlight.SunlightProfile.Clock clock) {
             sharedProfile = new qouteall.imm_ptl.core.sunlight.SunlightProfile(true, 27.5, clock);

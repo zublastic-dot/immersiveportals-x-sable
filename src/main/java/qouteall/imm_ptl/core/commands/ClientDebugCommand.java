@@ -76,6 +76,14 @@ import java.util.stream.Collectors;
 //@OnlyIn(Dist.CLIENT)
 public class ClientDebugCommand {
     
+    private static void setPortalColoredLighting(boolean enabled) {
+        IPConfig config = IPConfig.getConfig();
+        config.experimentalPortalColoredLighting = enabled;
+        config.onConfigChanged();
+        config.saveConfigFile();
+        // The next client tick retires the old field and schedules mesh invalidation.
+    }
+
     public static void register(
         CommandDispatcher<CommandSourceStack> dispatcher
     ) {
@@ -114,6 +122,23 @@ public class ClientDebugCommand {
             Helper.log("[IP Iris pipeline] " + report);
             context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
         }));
+        builder = builder.then(Commands.literal("portal_colored_light")
+            .executes(context -> {
+                String report = qouteall.imm_ptl.core.lighting.PortalColoredLighting.status().toString();
+                Helper.log("[IP experimental portal colored light] " + report);
+                context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+            })
+            .then(Commands.literal("enable").executes(context -> {
+                setPortalColoredLighting(true);
+                context.getSource().sendSuccess(() -> Component.literal(
+                    "Experimental portal colored light enabled (client visuals). "
+                    + qouteall.imm_ptl.core.lighting.PortalColoredLighting.status()), false); return 1;
+            }))
+            .then(Commands.literal("disable").executes(context -> {
+                setPortalColoredLighting(false);
+                context.getSource().sendSuccess(() -> Component.literal(
+                    "Experimental portal colored light disabled."), false); return 1;
+            })));
         builder = builder.then(Commands.literal("sunlight_profile")
             .executes(context -> {
                 String report = qouteall.imm_ptl.core.sunlight.SunlightClient.diagnostics();
