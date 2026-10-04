@@ -8,6 +8,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import qouteall.imm_ptl.core.ClientWorldLoader;
 import qouteall.imm_ptl.core.IPGlobal;
+import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.imm_ptl.core.portal.shape.RectangularPortalShape;
 
@@ -28,6 +29,8 @@ public final class PortalColoredLighting {
     private record Region(Aperture aperture, Map<Pos, Integer> rgb, Bounds bounds) {
         Region(Aperture aperture, Map<Pos, Integer> rgb) { this(aperture, rgb, PortalColoredLighting.bounds(rgb.keySet())); }
     }
+    record FieldSummary(int cells, int coloredCells, int red, int green, int blue) {}
+    public record CarrierBounds(Pos min, Pos max) {}
     private record DirtySection(ClientLevel world, int x, int y, int z) {}
     private static final class Entry {
         PortalLightSnapshot.Snapshot snapshot;
@@ -37,6 +40,7 @@ public final class PortalColoredLighting {
     }
     private static final Map<Aperture, Entry> ENTRIES = new LinkedHashMap<>();
     private static final LinkedHashSet<DirtySection> DIRTY = new LinkedHashSet<>();
+    private static final PortalColoredShaderAdmission<ClientLevel> SHADER_ADMISSION = new PortalColoredShaderAdmission<>();
     // Chunk workers read this immutable publication without touching live worlds or mutable caches.
     private static volatile List<Region> published = List.of();
     private static volatile String reason = "disabled";
@@ -66,11 +70,40 @@ public final class PortalColoredLighting {
             Map.entry("pendingSections", DIRTY.size()), Map.entry("rebuiltLastTick", rebuilt),
             Map.entry("maxRegions", MAX_REGIONS), Map.entry("maxRebuildsPerTick", MAX_REBUILDS_PER_TICK),
             Map.entry("maxPendingSections", MAX_DIRTY_SECTIONS), Map.entry("pendingHighWater", dirtyHighWater),
-            Map.entry("sampler", PortalColoredLightSampler.status()));
+            Map.entry("sampler", PortalColoredLightSampler.status()), Map.entry("fields", fieldStatus()));
+    }
+    private static List<Map<String, Object>> fieldStatus() {
+        // At most four immutable fields; computed only on an explicit status request, never per vertex.
+        return published.stream().map(region -> Map.<String, Object>of(
+            "target", region.aperture.target.dimension().location().toString(),
+            "source", region.aperture.source.dimension().location().toString(),
+            "bounds", region.bounds.toString(), "rgb8", summarize(region.rgb))).toList();
+    }
+    static FieldSummary summarize(Map<Pos, Integer> cells) {
+        int colored = 0, maximum = 0;
+        for (int rgb : cells.values()) {
+            if (rgb != 0) colored++;
+            maximum = max(maximum, rgb);
+        }
+        return new FieldSummary(cells.size(), colored, maximum >>> 16 & 255, maximum >>> 8 & 255, maximum & 255);
     }
     public static void clear() {
         published = List.of(); ENTRIES.clear(); DIRTY.clear();
+        SHADER_ADMISSION.clear();
         PortalColoredLightSampler.clear(); revision++; reason = "disabled";
+    }
+    public static void observeShaderProgram(ClientLevel world, int program, boolean carrier) {
+        if (!IrisInterface.invoker.isRenderingShadowMap())
+            SHADER_ADMISSION.observe(world, IrisInterface.invoker.getShaderpackName(), program, carrier);
+    }
+    public static void invalidateShaders() {
+        SHADER_ADMISSION.clear();
+        // Keep source snapshots, but revoke imported render fields until replacement programs prove admission.
+        publish(List.of());
+    }
+    private static boolean shaderAllowed(ClientLevel world) {
+        return !IrisInterface.invoker.isShaders()
+            || SHADER_ADMISSION.allows(world, IrisInterface.invoker.getShaderpackName());
     }
     public static void blockChanged(ClientLevel world, BlockPos pos) {
         Pos p = new Pos(pos.getX(), pos.getY(), pos.getZ());
@@ -83,9 +116,19 @@ public final class PortalColoredLighting {
     }
     /** Scalar transport remains the fallback until this exact endpoint has an RGB publication. */
     public static boolean transports(ClientLevel target, ClientLevel source, Map<Pos, Pos> samples) {
-        if (!IPGlobal.experimentalPortalColoredLighting || renderFailed) return false;
+        if (!IPGlobal.experimentalPortalColoredLighting || renderFailed || !shaderAllowed(target)) return false;
         return published.stream().anyMatch(r -> r.aperture.target == target && r.aperture.source == source
             && r.aperture.samples.equals(samples));
+    }
+    /** Render-pass scoped gate; a same-key replacement world must not inherit another world's colors. */
+    public static boolean hasField(ClientLevel target) {
+        return IPGlobal.experimentalPortalColoredLighting && !renderFailed && shaderAllowed(target)
+            && published.stream().anyMatch(r -> r.aperture.target == target);
+    }
+    public static List<CarrierBounds> carrierBounds(ClientLevel target) {
+        if (!hasField(target)) return List.of();
+        return published.stream().filter(r -> r.aperture.target == target)
+            .map(r -> new CarrierBounds(r.bounds.min, r.bounds.max)).toList();
     }
     private static void update() {
         long start = System.nanoTime(); tick++; rebuilt = 0;
@@ -130,6 +173,7 @@ public final class PortalColoredLighting {
         var next = new ArrayList<Region>();
         String pending = "no supported loaded portal";
         for (Aperture a : apertures) {
+            if (!shaderAllowed(a.target)) { pending = "receiving shader terrain RGB carrier unavailable"; continue; }
             var source = PortalColoredLightSampler.sample(a.source, a.samples.values().stream()
                 .map(p -> new BlockPos(p.x(), p.y(), p.z())).toList(), tick);
             if (!source.supported() || !source.ready()) { pending = source.reason(); continue; }

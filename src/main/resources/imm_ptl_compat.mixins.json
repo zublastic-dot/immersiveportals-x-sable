@@ -27,6 +27,7 @@
   ],
   "client": [
     "colorful.MixinPortalColoredLightGate",
+    "colorful.MixinPortalColoredIrisCarrier",
     "dh.MixinDhPortalCancellation",
     "dh.MixinDhRenderParams",
     "dh.MixinDhClientApi",
@@ -49,6 +50,7 @@
     "dh.MixinDhSsaoApply",
     "real_camera.MixinRealCameraCore",
     "iris.MixinIrisPortalEyeBrightness",
+    "iris.MixinIrisPortalRgbLifecycle",
     "iris.MixinIrisWorldRender",
     "iris.MixinIrisDhDepthOwnership",
     "iris.MixinIrisPortalShaderIncludes",

@@ -58,6 +58,23 @@ class PortalColoredLightNativeContractTest {
             nativeCap |= field.name.equals("transmittance") && field.desc.equals(RGB);
         assertTrue(nativeCap, "Propagation must cap each channel with native filter transmittance");
     }
+    @Test void snapshotStateCachingIsLimitedToNativePositionIndependentInputs() throws IOException {
+        var wrapper = node(ROOT + "accessors/BlockStateWrapper");
+        assertEquals(1, wrapper.fields.size(), "Caching wrappers is safe only while they carry no query/world state");
+        var field = wrapper.fields.getFirst();
+        assertEquals("Lnet/minecraft/world/level/block/state/BlockState;", field.desc);
+        assertTrue((field.access & Opcodes.ACC_FINAL) != 0);
+        var config = node(ROOT + "common/Config");
+        var filter = method(config, "getColoredLightTransmittance", "(" + LEVEL + POS + STATE + ")" + RGB);
+        for (var instruction : filter.instructions) if (instruction instanceof VarInsnNode local)
+            assertFalse(local.getOpcode() == Opcodes.ALOAD && local.var < 2,
+                "Snapshot filter caching must not discard native level/position inputs");
+        var emission = method(config, "getColorEmission", "(" + LEVEL + POS + STATE + ")" + RGB);
+        boolean callsPositionDependentEmission = false;
+        for (var instruction : emission.instructions) if (instruction instanceof MethodInsnNode call)
+            callsPositionDependentEmission |= call.name.equals("getLightEmission") && call.desc.equals("(" + LEVEL + POS + ")I");
+        assertTrue(callsPositionDependentEmission, "Emission results must remain uncached per position");
+    }
     private static ClassNode node(String name) throws IOException {
         String path = System.getProperty("colorfulJar", "");
         if (path.isBlank()) path = System.getenv("IP_PORTAL_TEST_COLORFUL_JAR");

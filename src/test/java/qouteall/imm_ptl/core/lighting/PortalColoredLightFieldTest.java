@@ -2,6 +2,7 @@ package qouteall.imm_ptl.core.lighting;
 
 import org.junit.jupiter.api.Test;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 import static qouteall.imm_ptl.core.lighting.PortalColoredLightField.*;
@@ -60,5 +61,30 @@ class PortalColoredLightFieldTest {
         assertEquals(new Rgb(6, 1, 4), lit.at(ORIGIN.add(1, 0, 0)));
         var removed = finish(new Job(p -> Cell.AIR, List.of(ORIGIN.add(1, 0, 0))));
         assertEquals(Rgb.DARK, removed.at(ORIGIN.add(1, 0, 0)));
+    }
+    @Test void cooperativeDeadlineStopsCaptureAndFloodWithoutPublishingPartialAverage() {
+        var reads = new AtomicInteger();
+        var job = new Job(p -> { reads.incrementAndGet(); return p.equals(ORIGIN) ? emitter(3,15,4) : Cell.AIR; }, List.of(ORIGIN));
+        var limited = job.advance(1024, 1024, () -> reads.get() < 3);
+        assertEquals(3, limited.reads()); assertFalse(limited.complete());
+        assertThrows(IllegalStateException.class, job::average);
+        job.advance(job.volume(), 0);
+        assertFalse(job.complete());
+        assertEquals(new Work(0,0,false), job.advance(100,100, () -> false));
+        assertEquals(1, job.advance(0,100, new java.util.function.BooleanSupplier() {
+            int remaining = 1;
+            public boolean getAsBoolean() { return remaining-- > 0; }
+        }).steps());
+        finish(job); assertEquals(new Average(3,15,4), job.average());
+        assertTrue(job.captureStatus().contains("emitters=1"));
+    }
+    @Test void greenEmitterPanelLightsEntireAdjacentApertureWithItsNativeMagnitude() {
+        var aperture = new ArrayList<Pos>();
+        for (int y = 0; y < 15; y++) for (int z = 0; z < 20; z++) aperture.add(new Pos(0,y,z));
+        var job = finish(new Job(p -> p.x() == -2 && p.y() >= 0 && p.y() < 15 && p.z() >= 0 && p.z() < 20
+            ? emitter(3,15,4) : Cell.AIR, aperture));
+        assertEquals(59_856, job.volume(), "15x20 aperture plus fourteen-block native source support");
+        assertEquals(new Average(1,13,2), job.average());
+        assertTrue(job.captureStatus().contains("emitters=300"));
     }
 }

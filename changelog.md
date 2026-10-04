@@ -1,4 +1,9 @@
-# 0.5.1-zublastic.58
+# 0.5.1-zublastic.59
+
+- Correct the experimental portal RGB brightness handoff to Colorful Lighting's Sodium/Iris shader path. Version .58's live test produced green illumination without shaders but a dark receiving wall with shaders enabled.
+- Add cooperative source-sampling time limits and bounded per-source/receiver diagnostics. The experimental setting remains disabled by default; live acceptance is recorded separately.
+
+## 0.5.1-zublastic.58
 
 - Add optional experimental portal colored light, disabled by default. Supported Colorful Lighting 2.5.1 native block emission is sampled from the explicit source world, averaged over the opening, and rendered through native RGB attributes with or without shaders. The integration is independent of experimental shared sunlight. Native-only inputs prevent transported light feeding back through other portals.
 - Bound RGB source capture, propagation, endpoint caches, publication and terrain rebuild work. Default-off and absent/unsupported-mod paths retain scalar lighting. Support initially covers loaded, rectangular, unscaled, cardinal receiving apertures; held-item/entity sources and arbitrary rotated receivers are not included.

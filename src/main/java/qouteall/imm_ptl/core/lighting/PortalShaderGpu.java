@@ -166,6 +166,7 @@ public final class PortalShaderGpu {
     public static PortalLightGpu.Binding bind(ClientLevel world,Vec3 camera) {
         int program=glGetInteger(GL_CURRENT_PROGRAM);
         if(program==0) return EMPTY;
+        rgbCarrierUniforms(program,world,camera);
         int count=glGetUniformLocation(program,"ipSunCount");
         if(count<0) return EMPTY;
         glUniform1i(count,0);
@@ -199,6 +200,25 @@ public final class PortalShaderGpu {
             if(!warned) { warned=true;LogUtils.getLogger().warn("[IP shader light] disabled draw after binding failure",failure); }
             return bindInert(program,world);
         }
+    }
+
+    private static void rgbCarrierUniforms(int program,ClientLevel world,Vec3 camera) {
+        int count=glGetUniformLocation(program,"ipPortalRgbCarrierCount");
+        if(count<0) return;
+        var bounds=PortalColoredLighting.carrierBounds(world);
+        glUniform1i(count,0);
+        int index=0;
+        for(var box:bounds) {
+            if(index>=4) break;
+            // The field contains air samples; its receiving wall vertices lie on
+            // their neighboring faces. Include that one-cell receiver border.
+            glUniform3f(glGetUniformLocation(program,"ipPortalRgbCarrierMin["+index+"]"),
+                (float)(box.min().x()-1-camera.x),(float)(box.min().y()-1-camera.y),(float)(box.min().z()-1-camera.z));
+            glUniform3f(glGetUniformLocation(program,"ipPortalRgbCarrierMax["+index+"]"),
+                (float)(box.max().x()+2-camera.x),(float)(box.max().y()+2-camera.y),(float)(box.max().z()+2-camera.z));
+            index++;
+        }
+        glUniform1i(count,index);
     }
 
     /** Bounded diagnostics from the actual draw consumer, not merely the capture producer. */

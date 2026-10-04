@@ -3,6 +3,7 @@ package qouteall.imm_ptl.core.lighting;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import static qouteall.imm_ptl.core.lighting.PortalLightField.Pos;
 
 /** Bounded native-emission-only RGB propagation. No imported light is an input. */
@@ -31,7 +32,8 @@ public final class PortalColoredLightField {
         private final int[] filter, light, queue;
         private final byte[] opacity;
         private final boolean[] queued;
-        private int scanned, head, tail, pending;
+        private int scanned, head, tail, pending, emitters, unknown;
+        private int maxRed, maxGreen, maxBlue;
         private Average average;
 
         public Job(Reader reader, Collection<Pos> aperture) {
@@ -58,6 +60,10 @@ public final class PortalColoredLightField {
         }
 
         public int volume() { return count; }
+        public String captureStatus() {
+            return "captured=" + scanned + "/" + count + ", unknown=" + unknown + ", emitters=" + emitters
+                + ", sourceMax=" + maxRed + "/" + maxGreen + "/" + maxBlue + ", queued=" + pending;
+        }
         public boolean complete() { return average != null; }
         public Average average() { if (average == null) throw new IllegalStateException("unfinished RGB snapshot"); return average; }
         public Rgb at(Pos position) {
@@ -66,18 +72,28 @@ public final class PortalColoredLightField {
             return x < 0 || x >= sizeX || y < 0 || y >= sizeY || z < 0 || z >= sizeZ ? Rgb.DARK : Rgb.unpack(light[index(x, y, z)]);
         }
         public Work advance(int maxReads, int maxSteps) {
+            return advance(maxReads, maxSteps, () -> true);
+        }
+        /** Cooperative deadline checked before each native read/flood step; a native call cannot be preempted. */
+        public Work advance(int maxReads, int maxSteps, BooleanSupplier withinDeadline) {
             if (maxReads < 0 || maxSteps < 0) throw new IllegalArgumentException("negative budget");
+            Objects.requireNonNull(withinDeadline);
             int reads = 0, steps = 0;
-            while (scanned < count && reads < maxReads) {
+            while (scanned < count && reads < maxReads && withinDeadline.getAsBoolean()) {
                 int i = scanned++, x = i % sizeX, y = i / sizeX % sizeY, z = i / (sizeX * sizeY);
                 Cell cell = reader.read(new Pos(minX + x, minY + y, minZ + z));
                 if (cell == null) cell = Cell.UNKNOWN;
+                if (cell == Cell.UNKNOWN) unknown++;
                 filter[i] = cell.filter.packed(); opacity[i] = (byte) cell.opacity; light[i] = cell.emission.packed();
-                if (light[i] != 0) enqueue(i);
+                if (light[i] != 0) {
+                    emitters++; maxRed = Math.max(maxRed, cell.emission.red());
+                    maxGreen = Math.max(maxGreen, cell.emission.green()); maxBlue = Math.max(maxBlue, cell.emission.blue());
+                    enqueue(i);
+                }
                 reads++;
             }
             // Never propagate through cells which have not been captured yet.
-            if (scanned == count) while (pending > 0 && steps < maxSteps) {
+            if (scanned == count) while (pending > 0 && steps < maxSteps && withinDeadline.getAsBoolean()) {
                 int i = queue[head]; head = (head + 1) % count; pending--; queued[i] = false; steps++;
                 int x = i % sizeX, y = i / sizeX % sizeY, z = i / (sizeX * sizeY);
                 if (x > 0) spread(i, i - 1); if (x + 1 < sizeX) spread(i, i + 1);

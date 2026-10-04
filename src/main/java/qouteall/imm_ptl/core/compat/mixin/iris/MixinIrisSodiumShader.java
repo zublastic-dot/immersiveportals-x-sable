@@ -22,6 +22,8 @@ import java.util.function.Supplier;
 public class MixinIrisSodiumShader {
     @Unique private final qouteall.imm_ptl.core.compat.iris_compatibility.PortalShaderBindingSlot ip_sun =
         new qouteall.imm_ptl.core.compat.iris_compatibility.PortalShaderBindingSlot();
+    @Unique private int ip_rgbProgram;
+    @Unique private boolean ip_rgbTerrain, ip_rgbCarrier;
 
     @Inject(method = "setupState", at = @At("HEAD"))
     private void ip_beginSun(CallbackInfo ci) { ip_sun.begin(); }
@@ -31,6 +33,8 @@ public class MixinIrisSodiumShader {
 
     @Inject(method = "setupState", at = @At("RETURN"))
     private void ip_bindSun(CallbackInfo ci) {
+        if (ip_rgbTerrain) qouteall.imm_ptl.core.lighting.PortalColoredLighting.observeShaderProgram(
+            net.minecraft.client.Minecraft.getInstance().level, ip_rgbProgram, ip_rgbCarrier);
         ip_sun.bind(qouteall.imm_ptl.core.lighting.PortalShaderGpu::bind);
     }
 
@@ -42,7 +46,11 @@ public class MixinIrisSodiumShader {
         at = @At("RETURN")
     )
     private void onInit(IrisRenderingPipeline pipeline, SodiumPrograms.Pass pass, ShaderBindingContext context, int handle, BlendModeOverride blendModeOverride, List bufferBlendOverrides, CustomUniforms customUniforms, Supplier flipState, float alphaTest, boolean containsTessellation, CallbackInfo ci) {
-        
+        ip_rgbProgram = handle;
+        ip_rgbTerrain = pass == SodiumPrograms.Pass.TERRAIN || pass == SodiumPrograms.Pass.TERRAIN_CUTOUT
+            || pass == SodiumPrograms.Pass.TRANSLUCENT;
+        ip_rgbCarrier = ip_rgbTerrain && org.lwjgl.opengl.GL20.glGetUniformLocation(handle, "ipPortalRgbCarrierCount") >= 0;
+
         this.uIPClippingEquation = context.bindUniformOptional("iportal_ClippingEquation", GlUniformFloat4v::new);
         if (this.uIPClippingEquation != null) {
             Helper.LOGGER.info("Found iportal_ClippingEquation in program {}", handle);
