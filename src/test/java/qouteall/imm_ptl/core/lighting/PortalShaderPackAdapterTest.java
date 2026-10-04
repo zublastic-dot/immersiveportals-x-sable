@@ -117,11 +117,11 @@ class PortalShaderPackAdapterTest {
             System.out.println("PORTAL_SHADER_DRIVER " + glGetString(GL_VENDOR) + " | "
                 + glGetString(GL_RENDERER) + " | " + glGetString(GL_VERSION));
             var entries = ImmutableList.<AbsolutePackPath>builder();
-            for (String name : List.of("gbuffers_terrain", "dh_terrain", "deferred1", "composite1", "gbuffers_water",
+            for (String name : List.of("gbuffers_terrain", "dh_terrain", "deferred1", "composite1", "composite4", "gbuffers_water",
                 "gbuffers_entities", "gbuffers_hand", "gbuffers_block", "gbuffers_hand_water"))
                 for (String extension : List.of(".vsh", ".fsh"))
                     entries.add(AbsolutePackPath.fromAbsolutePath("/world-1/" + name + extension));
-            for (String name : List.of("gbuffers_terrain", "dh_terrain", "gbuffers_skybasic", "shadow"))
+            for (String name : List.of("gbuffers_terrain", "dh_terrain", "gbuffers_skybasic", "shadow", "composite4"))
                 for (String extension : List.of(".vsh", ".fsh"))
                     entries.add(AbsolutePackPath.fromAbsolutePath("/world0/" + name + extension));
             Path root = Path.of(System.getProperty("ipsable.shaderPack"));
@@ -167,7 +167,8 @@ class PortalShaderPackAdapterTest {
             }
             assertEquals(0, depth, path + " unbalanced directives");
             String preprocessed = JcppProcessor.glslPreprocessSource(expanded, defines);
-            if (patched && extension.equals(".fsh") && dimension.equals("/world-1/")) assertTrue(preprocessed.contains("ipSunCount"), path);
+            if (patched && extension.equals(".fsh") && dimension.equals("/world-1/"))
+                assertTrue(preprocessed.contains(name.equals("composite4") ? "ipBloomEdgeCount" : "ipSunCount"), path);
             PortalShaderPackAdapter.observePreprocessed(PACK, preprocessed);
             return preprocessed;
         }
@@ -185,7 +186,7 @@ class PortalShaderPackAdapterTest {
                 new Object2ObjectOpenHashMap<>());
             if (name.equals("dh_terrain")) return TransformPatcher.patchDHTerrain(name, vertex, null, null, null,
                 fragment, new Object2ObjectOpenHashMap<>());
-            if (name.equals("deferred1") || name.equals("composite1")) return TransformPatcher.patchComposite(name,
+            if (name.equals("deferred1") || name.startsWith("composite")) return TransformPatcher.patchComposite(name,
                 vertex, null, fragment, name.equals("deferred1") ? TextureStage.DEFERRED : TextureStage.COMPOSITE_AND_FINAL,
                 new Object2ObjectOpenHashMap<>());
             return TransformPatcher.patchSodium(name, vertex, null, null, null, fragment,
@@ -329,6 +330,13 @@ class PortalShaderPackAdapterTest {
         @Test void fullBorderFogPassCompilesAndLinks() { verify("deferred1"); }
         @Test void fullNetherStormPassCompilesAndLinks() { verify("composite1"); }
         @Test void fullWaterPassCompilesAndLinks() { verify("gbuffers_water"); }
+        @Test void apertureBloomCompilesInNetherAndOverworldWithoutSunlightDependency() {
+            try {
+                verify("composite4");
+                dimension = "/world0/"; verify("composite4");
+                assertTrue(source("composite4", ".fsh", true).contains("ipBloomEdgeCount"));
+            } finally { dimension = "/world-1/"; }
+        }
 
         void verifyShared(qouteall.imm_ptl.core.sunlight.SunlightProfile.Clock clock) {
             sharedProfile = new qouteall.imm_ptl.core.sunlight.SunlightProfile(true, 27.5, clock);

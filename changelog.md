@@ -1,3 +1,9 @@
+# 0.5.1-zublastic.58
+
+- Add optional experimental portal colored light, disabled by default. Supported Colorful Lighting 2.5.1 native block emission is sampled from the explicit source world, averaged over the opening, and rendered through native RGB attributes with or without shaders. The integration is independent of experimental shared sunlight. Native-only inputs prevent transported light feeding back through other portals.
+- Bound RGB source capture, propagation, endpoint caches, publication and terrain rebuild work. Default-off and absent/unsupported-mod paths retain scalar lighting. Support initially covers loaded, rectangular, unscaled, cardinal receiving apertures; held-item/entity sources and arbitrary rotated receivers are not included.
+- Make the supported Complementary/Euphoria bloom filter respect the active portal aperture in any dimension. Bright terrain outside rectangular/nested rectangular openings no longer contributes bloom across their edges. Main-world bloom is unchanged; unsupported shapes retain the native filter.
+
 ## 0.5.1-zublastic.57
 
 - Preserve native DH depth attachments when Iris replaces its main depth target; prevent remote LOD draws from writing vanilla depth while sampling stale depth from another dimension.

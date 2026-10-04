@@ -84,6 +84,7 @@ public final class PortalLighting {
         PortalLightPalette nativePalette, incomingPalette, referencePalette;
         float[][] paletteOffsets;
         boolean geometryDirty = true;
+        boolean rgbTransport;
         int retryAt;
         Set<Long> geometryChunks = Set.of(), sourceChunks = Set.of();
     }
@@ -102,6 +103,7 @@ public final class PortalLighting {
     private PortalLighting() {}
 
     public static void init() {
+        PortalColoredLighting.init();
         PortalShaderLighting.init();
         // Sable dynamic lights refresh at LevelTickEvent.Post. IP's older tick event
         // fires before that; sample at the end of the whole client tick instead.
@@ -142,6 +144,7 @@ public final class PortalLighting {
 
     /** Called only for actual air/solid classification changes, never light-engine writes. */
     public static void blockChanged(ClientLevel world, BlockPos position) {
+        PortalColoredLighting.blockChanged(world, position);
         PortalShaderLighting.blockChanged(world, position);
         Pos p = new Pos(position.getX(), position.getY(), position.getZ());
         ENTRIES.forEach((aperture, entry) -> {
@@ -241,12 +244,15 @@ public final class PortalLighting {
                 remove(a); report(a, "lightmap unavailable"); continue;
             }
             PortalLightPalette reference = vanillaReference(a.world, a.source, nativePalette, incoming);
+            boolean rgbTransport = PortalColoredLighting.transports(a.world, a.source, a.samples);
             if (previous != null && previous.field() == result.field() && entry.nativePalette == nativePalette
                     && entry.incomingPalette == incoming && entry.referencePalette == reference
+                    && entry.rgbTransport == rgbTransport
                     && REGIONS.containsKey(a)) continue;
             if (entry.nativePalette != nativePalette || entry.incomingPalette != incoming || entry.paletteOffsets == null)
                 entry.paletteOffsets = nativePalette.offsetTable(incoming);
             entry.nativePalette = nativePalette; entry.incomingPalette = incoming; entry.referencePalette = reference;
+            entry.rgbTransport = rgbTransport;
             var offsets = new HashMap<Pos, float[]>();
             Map<Pos, float[]> vanillaCells = reference == null ? null : new HashMap<>();
             // Most dark fields have no incoming block light: share their maps/arrays
@@ -255,6 +261,9 @@ public final class PortalLighting {
             int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
             for (var cell : result.field().cells().entrySet()) {
                 Pos p = cell.getKey(); Light light = cell.getValue();
+                // RGB is already merged into Colorful's native vertex sample. Keep sky/ambient correction,
+                // but never add this same portal's old scalar emission a second time.
+                if (rgbTransport) light = new Light(light.sky(), 0);
                 float[] delta = entry.paletteOffsets[light.sky() * 16 + light.block()];
                 float weight = result.field().replacement().get(p);
                 if (vanillaCells != null) vanillaCells.put(p, new float[]{light.sky(), light.block(), weight});

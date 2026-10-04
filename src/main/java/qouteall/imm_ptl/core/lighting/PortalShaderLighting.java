@@ -46,6 +46,7 @@ public final class PortalShaderLighting {
         Region region;
         Map<Pos,Cell> apertureLayer=Map.of();
         boolean dirty=true, shadowDirty=true;
+        boolean rgbTransport;
         Vec3 shadowDirection=Vec3.ZERO;
         int shadowTick=-100, retry;
         final PortalSunOcclusion sourceGeometry;
@@ -193,12 +194,14 @@ public final class PortalShaderLighting {
                 }
             }
             boolean geometryChanged=old==null || old.topology()!=e.snapshot.topology();
-            boolean valuesChanged=old==null || old.field()!=e.snapshot.field();
+            boolean rgbTransport=PortalColoredLighting.transports(a.target,a.source,a.seeds);
+            boolean valuesChanged=old==null || old.field()!=e.snapshot.field() || e.rgbTransport!=rgbTransport;
+            e.rgbTransport=rgbTransport;
             if(e.region==null || geometryChanged || valuesChanged || occupancyChanged || shadowChanged) {
                 Bounds ambient=bounds(e.snapshot.field().cells().keySet());
                 Pos min=atlasMin(e.snapshot,e.apertureLayer);
                 float[] cells=e.region!=null && !geometryChanged && !valuesChanged && !occupancyChanged
-                    ?e.region.cells:packCells(e.snapshot,min,e.apertureLayer);
+                    ?e.region.cells:packCells(e.snapshot,min,e.apertureLayer,rgbTransport);
                 e.region=new Region(a,min,cells,shadow,a.toTargetDirection.apply(sun),angle,++revision,ambient.min,ambient.max);
                 if(ipl.sable.render.IplDiagnostics.verbose() && old==null) LogUtils.getLogger().info("[IP shader light] admitted {} receiving cells in {} from {}; sunlight parameters {}",
                     e.snapshot.field().cells().size(),a.target.dimension().location(),a.source.dimension().location(),rotation.isPresent()?"observed":"pending source shader");
@@ -270,6 +273,9 @@ public final class PortalShaderLighting {
         return ((z*EDGE+y)*EDGE+x)*4;
     }
     static float[] packCells(PortalLightSnapshot.Snapshot snapshot,Pos min,Map<Pos,Cell> apertureLayer) {
+        return packCells(snapshot,min,apertureLayer,false);
+    }
+    static float[] packCells(PortalLightSnapshot.Snapshot snapshot,Pos min,Map<Pos,Cell> apertureLayer,boolean rgbTransport) {
         float[] cells=new float[EDGE*EDGE*EDGE*4];
         for(var cell:apertureLayer.entrySet()) {
             int i=cellIndex(cell.getKey(),min);
@@ -277,7 +283,7 @@ public final class PortalShaderLighting {
         }
         for(var cell:snapshot.field().cells().entrySet()) {
             Pos p=cell.getKey();int i=cellIndex(p,min);
-            cells[i]=cell.getValue().sky()/15f;cells[i+1]=cell.getValue().block()/15f;
+            cells[i]=cell.getValue().sky()/15f;cells[i+1]=rgbTransport?0:cell.getValue().block()/15f;
             cells[i+2]=snapshot.field().replacement().get(p);cells[i+3]=1;
         }
         return cells;

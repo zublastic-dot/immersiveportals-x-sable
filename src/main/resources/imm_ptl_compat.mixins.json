@@ -26,6 +26,7 @@
     "sodium.MixinSodiumWorldRenderer"
   ],
   "client": [
+    "colorful.MixinPortalColoredLightGate",
     "dh.MixinDhPortalCancellation",
     "dh.MixinDhRenderParams",
     "dh.MixinDhClientApi",
