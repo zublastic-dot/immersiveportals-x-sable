@@ -9,6 +9,7 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
 import qouteall.imm_ptl.core.ClientWorldLoader;
 import qouteall.imm_ptl.core.IPGlobal;
 import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
+import qouteall.imm_ptl.core.compat.sodium_compatibility.SodiumInterface;
 import qouteall.imm_ptl.core.portal.Portal;
 import qouteall.imm_ptl.core.portal.shape.RectangularPortalShape;
 
@@ -255,13 +256,20 @@ public final class PortalColoredLighting {
     }
     private static void rebuild() {
         var worlds = ClientWorldLoader.getClientWorlds();
-        var iterator = DIRTY.iterator();
-        int processed = 0;
-        while (iterator.hasNext() && processed++ < MAX_REBUILDS_PER_TICK) {
-            DirtySection section = iterator.next(); iterator.remove();
-            if (worlds.stream().noneMatch(w -> w == section.world)) continue;
-            ClientWorldLoader.getWorldRenderer(section.world.dimension()).setSectionDirty(section.x, section.y, section.z);
-            rebuilt++;
+        drainRebuilds(DIRTY, MAX_REBUILDS_PER_TICK, section -> {
+            if (worlds.stream().noneMatch(w -> w == section.world)) return true;
+            var result = SodiumInterface.invoker.schedulePortalLightRebuild(
+                ClientWorldLoader.getWorldRenderer(section.world.dimension()), section.x, section.y, section.z);
+            if (result == SodiumInterface.PortalLightRebuild.SCHEDULED) rebuilt++;
+            return result != SodiumInterface.PortalLightRebuild.RETRY;
+        });
+    }
+    static <T> void drainRebuilds(LinkedHashSet<T> pending, int budget, java.util.function.Predicate<T> accepted) {
+        int attempts = Math.min(pending.size(), Math.max(0, budget));
+        for (int i = 0; i < attempts; i++) {
+            T section = pending.removeFirst();
+            // Rotate unready initial builds so they cannot starve ready sections in another world.
+            if (!accepted.test(section)) pending.add(section);
         }
     }
     /** Called only by the optional Colorful mixin, including Sodium's worker threads. */

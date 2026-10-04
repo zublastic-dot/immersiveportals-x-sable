@@ -3,10 +3,56 @@ package qouteall.imm_ptl.core.lighting;
 import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.Set;
+import java.util.LinkedHashSet;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static qouteall.imm_ptl.core.lighting.PortalLightField.*;
 
 class PortalColoredLightingTest {
+    @Test void shaderReloadRetriesAnInitialMeshUntilTheUnchangedColorFieldCanBeRebuilt() {
+        Pos cell = new Pos(0,0,0);
+        var pending = new LinkedHashSet<>(List.of(cell));
+        int[] displayedMesh = {PortalColoredLighting.sample(Map.of(), .5,.5,.5)};
+        boolean[] initialBuildUploaded = {false};
+        int[] submitted = {0};
+        // Iris began this first mesh while the shader-destroy hook temporarily revoked RGB.
+        Map<Pos,Integer> restoredPublication = Map.of(cell, PortalColoredLighting.attenuated(0,15,0,2));
+        java.util.function.Predicate<Pos> nativeRebuild = section -> {
+            if (!initialBuildUploaded[0]) return false; // Sodium would silently drop this notification.
+            submitted[0]++;
+            displayedMesh[0] = PortalColoredLighting.sample(restoredPublication,.5,.5,.5);
+            return true;
+        };
+        for (int tick = 0; tick < 20; tick++) PortalColoredLighting.drainRebuilds(pending,8,nativeRebuild);
+        assertEquals(0, submitted[0]);
+        assertEquals(0, displayedMesh[0]);
+        assertEquals(Set.of(cell), pending);
+        initialBuildUploaded[0] = true;
+        // The source publication is identical: completion must not depend on another color change.
+        PortalColoredLighting.drainRebuilds(pending,8,nativeRebuild);
+        assertEquals(0x00dd00, displayedMesh[0]);
+        assertEquals(1, submitted[0]);
+        assertTrue(pending.isEmpty());
+        PortalColoredLighting.drainRebuilds(pending,8,nativeRebuild);
+        assertEquals(1, submitted[0]);
+    }
+
+    @Test void waitingMeshesRotateWithoutStarvingReadyOrRemovedWorlds() {
+        var pending = new LinkedHashSet<Integer>();
+        for (int section = 0; section < 12; section++) pending.add(section);
+        var attempted = new java.util.ArrayList<Integer>();
+        java.util.function.Predicate<Integer> nativeRebuild = section -> {
+            attempted.add(section);
+            return section >= 8; // Includes discarded stale worlds and newly ready sections.
+        };
+        PortalColoredLighting.drainRebuilds(pending,8,nativeRebuild);
+        assertEquals(List.of(0,1,2,3,4,5,6,7),attempted);
+        attempted.clear();
+        PortalColoredLighting.drainRebuilds(pending,8,nativeRebuild);
+        assertEquals(List.of(8,9,10,11,0,1,2,3),attempted);
+        assertEquals(Set.of(0,1,2,3,4,5,6,7),pending);
+    }
+
     @Test void runtimeAndOptionalMixinAdmitOnlyTheSameVerifiedVersion() {
         assertTrue(PortalColoredLightCompatibility.supports("2.5.1"));
         for (String version : new String[]{null,"","2.5.0","2.5.2","3.0.0","2.5.1-custom"})

@@ -15,11 +15,16 @@ import qouteall.imm_ptl.core.render.FrustumCuller;
 
 //@OnlyIn(Dist.CLIENT)
 public class SodiumInterface {
+    public enum PortalLightRebuild { RETRY, UNNEEDED, SCHEDULED }
     
     @Nullable
     public static FrustumCuller frustumCuller = null;
     
     public static class Invoker {
+        public PortalLightRebuild schedulePortalLightRebuild(net.minecraft.client.renderer.LevelRenderer renderer, int x, int y, int z) {
+            renderer.setSectionDirty(x, y, z);
+            return PortalLightRebuild.SCHEDULED;
+        }
         public boolean isSodiumPresent() {
             return false;
         }
@@ -55,6 +60,14 @@ public class SodiumInterface {
     public static Invoker invoker = new Invoker();
     
     public static class OnSodiumPresent extends Invoker {
+        @Override public PortalLightRebuild schedulePortalLightRebuild(net.minecraft.client.renderer.LevelRenderer renderer, int x, int y, int z) {
+            var sodium = ((LevelRendererExtension)renderer).sodium$getWorldRenderer();
+            if (sodium == null) return PortalLightRebuild.UNNEEDED;
+            var manager = ((IESodiumWorldRenderer)sodium).ip_getRenderSectionManager();
+            return manager == null ? PortalLightRebuild.UNNEEDED
+                : ((IESodiumRenderSectionManager)manager).ip_schedulePortalLightRebuild(x, y, z);
+        }
+
         @Override
         public boolean isSodiumPresent() {
             return true;

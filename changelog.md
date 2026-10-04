@@ -1,4 +1,8 @@
-# 0.5.1-zublastic.59
+# 0.5.1-zublastic.60
+
+- Refresh experimental portal RGB terrain after renderer reloads so changing shader mode does not leave stale uncolored meshes. Version .59 passed source recoloring but failed the live shader-toggle test.
+
+## 0.5.1-zublastic.59
 
 - Correct the experimental portal RGB brightness handoff to Colorful Lighting's Sodium/Iris shader path. Version .58's live test produced green illumination without shaders but a dark receiving wall with shaders enabled.
 - Add cooperative source-sampling time limits and bounded per-source/receiver diagnostics. The experimental setting remains disabled by default; live acceptance is recorded separately.
