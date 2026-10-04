@@ -157,6 +157,35 @@ texture contents or shader uniforms. Native ABI and bounded-window tests plus a
 real GL uniform-read regression validate the measurement path; live traces are
 still needed to identify the remaining ownership or projection mismatch.
 
+## .57 Preserve DH framebuffer depth ownership
+
+The .56 live trace measured correct dimension owners and zero GPU matrix deltas,
+but remote DH draws attached the main depth texture (7) while DH/Iris sampled
+the unchanged shared DH texture (140). The installed Iris implementation explains
+this mismatch: `createDHFramebuffer` adds DH targets to `ownedFramebuffers`, and
+`resizeIfNeeded` replaces every owned depth attachment when the main target's
+depth version changes. `DHCompatInternal.reconnectDHTextures` skips reconnecting
+when DH's texture ID is unchanged. A remote draw then overwrites vanilla depth
+while shader reconstruction still samples the previous dimension's DH depths.
+
+For the verified Iris 1.8.14 build, .57 tracks the identity of each framebuffer
+returned by `createDHFramebuffer` within its owning `RenderTargets` instance.
+Only the main-depth replacement call skips those targets. Native colour resizing,
+DH depth creation/reconnection, framebuffer ownership and destruction remain
+unchanged. Tracking is removed on framebuffer destruction and cleared on pipeline
+destruction. There are no dimension-name checks or per-frame GL queries.
+
+The GPU regression executes installed Iris resize bytecode through a framebuffer
+boundary, comparing the native failure with the guarded path: the native path
+leaves sampled DH pixels stale and overwrites vanilla depth; the guarded path
+writes the intended DH depth and preserves vanilla. Separate cases cover native
+DH texture replacement, identity tracking, cleanup and installed method shapes.
+These tests establish the diagnosed mechanism, not general runtime acceptance.
+Verify both portal directions before and after shader reload, with shader-off
+comparisons and delayed captures. Each shader DH draw must attach the depth
+texture actually sampled by Iris, and screenshots must retain the correct distant
+terrain without cross-dimension silhouettes or a full-detail/LOD gap.
+
 ## .56 Routine logging is opt-in
 
 Routine parent-sync, clip, hosted-render, heartbeat, impostor and sunlight build

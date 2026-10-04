@@ -1,3 +1,9 @@
+## 0.5.1-zublastic.57
+
+- Preserve native DH depth attachments when Iris replaces its main depth target; prevent remote LOD draws from writing vanilla depth while sampling stale depth from another dimension.
+- Scope ownership to framebuffer identity, retaining native DH resizing and destruction without dimension-name checks.
+- Add installed-Iris bytecode and GPU depth regressions. In-game acceptance remains separate from these tests.
+
 ## 0.5.1-zublastic.56
 
 - Make routine Sable, sunlight and portal snapshot diagnostic logs opt-in; bound missing-sublevel retry warnings and preserve the original retry deadline.

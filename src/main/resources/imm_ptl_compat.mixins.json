@@ -49,6 +49,7 @@
     "real_camera.MixinRealCameraCore",
     "iris.MixinIrisPortalEyeBrightness",
     "iris.MixinIrisWorldRender",
+    "iris.MixinIrisDhDepthOwnership",
     "iris.MixinIrisPortalShaderIncludes",
     "iris.MixinIrisPortalSunGeometry",
     "iris.MixinIrisPortalShaderPreprocessor",

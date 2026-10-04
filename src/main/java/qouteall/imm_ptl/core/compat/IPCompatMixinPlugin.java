@@ -54,7 +54,8 @@ public class IPCompatMixinPlugin implements IMixinConfigPlugin {
             );
         }
         if (mixinClassName.endsWith(".MixinIrisPortalEyeBrightness") || mixinClassName.contains(".MixinIrisSharedSun")
-            || mixinClassName.endsWith(".MixinIrisWorldRender")) {
+            || mixinClassName.endsWith(".MixinIrisWorldRender")
+            || mixinClassName.endsWith(".MixinIrisDhDepthOwnership")) {
             return IrisPortalUniformCompatibility.supports(version(modList, "iris"));
         }
         if (mixinClassName.contains("IrisSodium")) {
