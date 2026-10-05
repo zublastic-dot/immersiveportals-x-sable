@@ -95,6 +95,12 @@ final class PortalNativeColorCache<W> {
         }
         return null;
     }
+    /** Read-only handoff for a newly primary world; never creates work or admits a primary request. */
+    Integer sampleRetained(W world,double x,double y,double z) {
+        if (!finiteCoordinate(x) || !finiteCoordinate(y) || !finiteCoordinate(z)) return null;
+        Snapshot snapshot=published.get(new Section<>(world,(int)Math.floor(x)>>4,(int)Math.floor(y)>>4,(int)Math.floor(z)>>4));
+        return snapshot==null ? null : snapshot.sample(x,y,z);
+    }
     private static boolean finiteCoordinate(double coordinate) {
         return Double.isFinite(coordinate) && coordinate>=-30_000_000 && coordinate<=30_000_000;
     }

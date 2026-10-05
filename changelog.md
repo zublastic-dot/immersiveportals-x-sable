@@ -1,3 +1,8 @@
+## 0.5.1-zublastic.63
+
+- Preserve already-calculated destination RGB during the native lighting warm-up after a real portal crossing, including native dynamic-light contributions. Hand off to native lighting before its initial nearby-terrain remesh.
+- .62 passed settled torch, crossing-recovery and shader-toggle checks, but the owner observed a default-color flash at the threshold. This release targets that remaining transient; live acceptance is recorded separately.
+
 ## 0.5.1-zublastic.62
 
 - Keep completed remote RGB snapshots visible until an updated field is ready, avoiding temporary neutral light during recapture.

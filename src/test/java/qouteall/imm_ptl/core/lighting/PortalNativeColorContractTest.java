@@ -55,6 +55,20 @@ class PortalNativeColorContractTest {
         }
         assertTrue(cleared && dynamic,"Crossing uses native lifecycle reset rather than dropping the primary sampler");
     }
+    @Test void nativeInitialHandoffHasOneRebuildSiteAndDynamicSamplerIsIndependentlyAvailable() throws IOException {
+        var engine=nativeClass("me/erykczy/colorfullighting/common/ColoredLightEngine");
+        var update=method(engine,"onLightUpdate","()V"); int rebuilds=0; boolean completionConsumed=false;
+        for (var instruction:update.instructions) if (instruction instanceof MethodInsnNode call) {
+            if (call.owner.equals("java/util/concurrent/atomic/AtomicBoolean") && call.name.equals("compareAndSet"))
+                completionConsumed=true;
+            if (call.owner.endsWith("accessors/LevelAccessor") && call.name.equals("rebuildAllSections")) {
+                assertTrue(completionConsumed,"The handoff must follow native completion consumption"); rebuilds++;
+            }
+        }
+        assertEquals(1,rebuilds);
+        method(nativeClass("me/erykczy/colorfullighting/common/EntityLightManager"),"sampleLightColor",
+            "(DDD)Lme/erykczy/colorfullighting/common/util/ColorRGB4;");
+    }
     @Test void workerCallbackIsIndependentOfExperimentAndCannotReadLiveBlocksOrGlobalMinecraftLevel() throws IOException {
         var node=new ClassNode();
         try (var input=getClass().getResourceAsStream("/qouteall/imm_ptl/core/lighting/PortalNativeColoredLighting.class")) {

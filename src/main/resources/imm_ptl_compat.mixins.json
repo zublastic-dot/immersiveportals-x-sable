@@ -29,6 +29,7 @@
     "colorful.MixinPortalColoredLightGate",
     "colorful.MixinPortalColoredLightConfig",
     "colorful.MixinPortalColoredClientLevel",
+    "colorful.MixinPortalColoredEngineLifecycle",
     "colorful.MixinPortalColoredIrisCarrier",
     "dh.MixinDhPortalCancellation",
     "dh.MixinDhRenderParams",

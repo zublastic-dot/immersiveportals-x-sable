@@ -28,6 +28,7 @@ public final class PortalNativeColoredLighting {
     private static volatile boolean active, failed;
     private static final AtomicBoolean CONFIG_CHANGED = new AtomicBoolean();
     private static final PortalPrimaryColorContext<ClientLevel,Object> PRIMARY = new PortalPrimaryColorContext<>();
+    private static final PortalColorWarmup<ClientLevel> WARMUP = new PortalColorWarmup<>();
     private static volatile ClientLevel primaryWorld;
     private static LevelRenderer primaryRenderer;
     private static boolean initialized, checked;
@@ -56,7 +57,7 @@ public final class PortalNativeColoredLighting {
         CACHE.invalidate(world,new Pos(pos.getX(),pos.getY(),pos.getZ()));
     }
     public static void clear() {
-        active=false; PRIMARY.clear(); primaryWorld=null; primaryRenderer=null; CACHE.clear(); state="no client world";
+        active=false; PRIMARY.clear(); WARMUP.clear(); primaryWorld=null; primaryRenderer=null; CACHE.clear(); state="no client world";
     }
     /** Config setters may run on a resource-reload thread; only the next client tick touches cache state. */
     public static void configChanged() { CONFIG_CHANGED.set(true); }
@@ -65,7 +66,7 @@ public final class PortalNativeColoredLighting {
     private static void publishPrimary() {
         var minecraft=Minecraft.getInstance();
         if (minecraft.player==null || !ClientWorldLoader.getIsInitialized()) {
-            PRIMARY.clear(); primaryWorld=null; primaryRenderer=null; return;
+            PRIMARY.clear(); WARMUP.clear(); primaryWorld=null; primaryRenderer=null; return;
         }
         if (!initializeApi()) return;
         var world=(ClientLevel)minecraft.player.level();
@@ -79,7 +80,12 @@ public final class PortalNativeColoredLighting {
                 // another dimension must not reuse it. Stop/join the old native producer first.
                 PRIMARY.clear();
                 Object engine=api.engine.invokeExact();
-                if (engine!=null) api.reset.invokeExact(engine);
+                if (engine!=null) {
+                    api.reset.invokeExact(engine);
+                    // reset's callback still sees the previous primary; arm the new exact identity
+                    // before publishing it and before native Post tick begins destination propagation.
+                    WARMUP.begin(world,engine);
+                }
             }
             PRIMARY.publish(world,accessor); primaryWorld=world; primaryRenderer=renderer;
         } catch (Throwable failure) {
@@ -95,6 +101,10 @@ public final class PortalNativeColoredLighting {
         ClientLevel actual=minecraft.player==null ? null : (ClientLevel)minecraft.player.level();
         return PRIMARY.select(actual);
     }
+    /** Identity/generation guarded lifecycle callbacks, including resets outside IP crossings. */
+    public static void nativeReset(Object engine) { WARMUP.begin(primaryWorld,engine); }
+    public static long nativeWarmupGeneration(Object engine) { return WARMUP.token(primaryWorld,engine); }
+    public static void nativeInitialLightReady(Object engine,long generation) { WARMUP.complete(primaryWorld,engine,generation); }
 
     private static void update() {
         var minecraft=Minecraft.getInstance(); tick++;
@@ -155,7 +165,18 @@ public final class PortalNativeColoredLighting {
         if (!active || current==null || failed) return original;
         try {
             Object root=current.viewType.isInstance(view) ? current.root.invokeExact(view) : view;
-            if (!(root instanceof ClientLevel level) || level==primaryWorld || !CACHE.accepts(level)) return original;
+            if (!(root instanceof ClientLevel level)) return original;
+            if (level==primaryWorld) {
+                if (!WARMUP.applies(level)) return original;
+                Integer retained=CACHE.sampleRetained(level,x,y,z);
+                if (retained==null) return original;
+                // Native trySampleTrilinear returns null before it samples dynamics when static
+                // storage is cold. Preserve its primary-world held/entity lights explicitly here.
+                Object dynamic=current.dynamic.invokeExact(x,y,z);
+                int rgb=PortalColorWarmup.combine(retained,current.dynamicRgb(dynamic));
+                return current.color.invokeExact(rgb>>>16 & 255,rgb>>>8 & 255,rgb & 255);
+            }
+            if (!CACHE.accepts(level)) return original;
             Integer color=CACHE.sample(level,x,y,z);
             // A pending remote field deliberately uses vanilla's scalar fallback, never another world's RGB.
             return color==null ? null : current.color.invokeExact(color>>>16 & 255,color>>>8 & 255,color & 255);
@@ -187,6 +208,7 @@ public final class PortalNativeColoredLighting {
     }
     public static Map<String,Object> status() {
         return Map.ofEntries(Map.entry("active",active),Map.entry("state",state),
+            Map.entry("primaryWarmup",WARMUP.applies(primaryWorld)),Map.entry("warmupGeneration",WARMUP.generation()),
             Map.entry("fields",CACHE.size()),Map.entry("ready",CACHE.ready()),Map.entry("pending",CACHE.pending()),
             Map.entry("completed",CACHE.completed),Map.entry("readsLastTick",CACHE.reads),Map.entry("stepsLastTick",CACHE.steps),
             Map.entry("nanosLastTick",CACHE.elapsed),Map.entry("maxNanosPerTick",PortalNativeColorCache.MAX_NANOS),
@@ -195,7 +217,7 @@ public final class PortalNativeColoredLighting {
     }
     private static final class Api {
         final Class<?> viewType;
-        final MethodHandle root,color,level,engine,reset;
+        final MethodHandle root,color,level,engine,reset,dynamic,red4,green4,blue4;
         Api() throws ReflectiveOperationException {
             var lookup=MethodHandles.publicLookup(); var loader=PortalNativeColoredLighting.class.getClassLoader();
             viewType=Class.forName("dev.colorfullighting.compat.level.RenderLevelView",false,loader);
@@ -210,6 +232,16 @@ public final class PortalNativeColoredLighting {
             var engineType=Class.forName("me.erykczy.colorfullighting.common.ColoredLightEngine",false,loader);
             engine=lookup.unreflect(engineType.getMethod("getInstance")).asType(MethodType.methodType(Object.class));
             reset=lookup.unreflect(engineType.getMethod("reset")).asType(MethodType.methodType(void.class,Object.class));
+            var dynamicType=Class.forName("me.erykczy.colorfullighting.common.EntityLightManager",false,loader);
+            dynamic=lookup.unreflect(dynamicType.getMethod("sampleLightColor",double.class,double.class,double.class))
+                .asType(MethodType.methodType(Object.class,double.class,double.class,double.class));
+            var rgb4=Class.forName("me.erykczy.colorfullighting.common.util.ColorRGB4",false,loader);
+            red4=lookup.unreflectGetter(rgb4.getField("red4")).asType(MethodType.methodType(int.class,Object.class));
+            green4=lookup.unreflectGetter(rgb4.getField("green4")).asType(MethodType.methodType(int.class,Object.class));
+            blue4=lookup.unreflectGetter(rgb4.getField("blue4")).asType(MethodType.methodType(int.class,Object.class));
+        }
+        int dynamicRgb(Object value) throws Throwable {
+            return ((int)red4.invokeExact(value))*17<<16 | ((int)green4.invokeExact(value))*17<<8 | ((int)blue4.invokeExact(value))*17;
         }
     }
 }

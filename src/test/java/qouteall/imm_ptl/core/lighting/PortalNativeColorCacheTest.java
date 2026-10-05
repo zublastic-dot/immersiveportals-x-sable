@@ -181,6 +181,10 @@ class PortalNativeColorCacheTest {
         long completed=cache.completed;
         cache.worlds(List.of(other),List.of(nether,other));
         assertFalse(cache.accepts(nether)); assertNull(cache.sample(nether,8.5,8.5,8.5));
+        assertEquals(0xff,cache.sampleRetained(nether,8.5,8.5,8.5),"Primary warmup may read an existing snapshot");
+        int pending=cache.pending();
+        assertNull(cache.sampleRetained(nether,1000,8.5,8.5));
+        assertEquals(pending,cache.pending(),"Warmup never creates primary-world snapshot work");
         assertEquals(1,cache.ready(),"Dormant snapshots retain their exact ClientLevel identity");
         cache.worlds(List.of(nether),List.of(nether,other));
         assertEquals(0xff,cache.sample(nether,8.5,8.5,8.5)); assertEquals(completed,cache.completed);
