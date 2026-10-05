@@ -122,6 +122,11 @@ public class ClientDebugCommand {
             Helper.log("[IP Iris pipeline] " + report);
             context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
         }));
+        builder = builder.then(Commands.literal("portal_native_color").executes(context -> {
+            String report = qouteall.imm_ptl.core.lighting.PortalNativeColoredLighting.status().toString();
+            Helper.log("[IP native portal colored light] " + report);
+            context.getSource().sendSuccess(() -> Component.literal(report), false); return 1;
+        }));
         builder = builder.then(Commands.literal("portal_colored_light")
             .executes(context -> {
                 String report = qouteall.imm_ptl.core.lighting.PortalColoredLighting.status().toString();

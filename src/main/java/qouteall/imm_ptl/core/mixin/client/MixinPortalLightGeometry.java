@@ -17,7 +17,7 @@ public abstract class MixinPortalLightGeometry {
     private void portalLightGeometryChanged(BlockPos pos, BlockState state, boolean moving,
             CallbackInfoReturnable<BlockState> cir) {
         BlockState previous = cir.getReturnValue();
-        if (previous != null && previous.isAir() != state.isAir()
+        if (previous != null && previous != state
                 && ((LevelChunk) (Object) this).getLevel() instanceof ClientLevel level)
             PortalLighting.blockChanged(level, pos);
     }

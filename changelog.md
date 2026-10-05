@@ -1,3 +1,21 @@
+## 0.5.1-zublastic.63
+
+- Preserve already-calculated destination RGB during the native lighting warm-up after a real portal crossing, including native dynamic-light contributions. Hand off to native lighting before its initial nearby-terrain remesh.
+- .62 passed settled torch, crossing-recovery and shader-toggle checks, but the owner observed a default-color flash at the threshold. This release targets that remaining transient; live acceptance is recorded separately.
+
+## 0.5.1-zublastic.62
+
+- Keep completed remote RGB snapshots visible until an updated field is ready, avoiding temporary neutral light during recapture.
+- Give Colorful Lighting a stable primary-world accessor across temporary portal render-world switches, preserving its native dynamic-light path.
+- Candidate .61 failed live acceptance: destination soul-torch color appeared but flickered during rebuilds, and local terrain showed color seams. This candidate requires fresh visual acceptance.
+
+## 0.5.1-zublastic.61
+
+- Preserve destination-native Colorful Lighting block colors in portal views using bounded, world-scoped RGB snapshots. This compatibility path is separate from experimental light transport and shared sunlight.
+- Let non-colliding wall decorations receive portal light instead of treating torch cells as solid cubes. Solid and partial solid blocks remain conservative occluders.
+- Refresh lighting for all block-state changes, including torch replacements and redstone state changes.
+- Add `imm_ptl_client_debug portal_native_color` diagnostics. Build and live acceptance are recorded separately; this entry alone does not certify runtime results.
+
 # 0.5.1-zublastic.60
 
 - Refresh experimental portal RGB terrain after renderer reloads so changing shader mode does not leave stale uncolored meshes. Version .59 passed source recoloring but failed the live shader-toggle test.

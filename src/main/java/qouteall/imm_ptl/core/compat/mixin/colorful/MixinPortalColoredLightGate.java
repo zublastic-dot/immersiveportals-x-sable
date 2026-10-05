@@ -6,6 +6,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import qouteall.imm_ptl.core.lighting.PortalColoredLighting;
+import qouteall.imm_ptl.core.lighting.PortalNativeColoredLighting;
 
 /** Optional native RGB vertex sampling; does not modify Colorful's propagation storage. */
 @Pseudo
@@ -15,7 +16,8 @@ public abstract class MixinPortalColoredLightGate {
         at = @At("RETURN"), cancellable = true, remap = false)
     private static void ip_portalRgb(Object level, double x, double y, double z, CallbackInfoReturnable<Object> cir) {
         Object original = cir.getReturnValue();
-        Object merged = PortalColoredLighting.merge(level, x, y, z, original);
+        Object local = PortalNativeColoredLighting.sample(level, x, y, z, original);
+        Object merged = PortalColoredLighting.merge(level, x, y, z, local);
         if (merged != original) cir.setReturnValue(merged);
     }
 }
