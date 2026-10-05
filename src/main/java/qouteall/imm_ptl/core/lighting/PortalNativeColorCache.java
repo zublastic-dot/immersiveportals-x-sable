@@ -59,7 +59,7 @@ final class PortalNativeColorCache<W> {
     }
     private static final class Entry {
         boolean dirty = true;
-        long order;
+        long order, generation, completedAt=Long.MIN_VALUE;
         String capture = "queued";
     }
     private final Function<W, PortalColoredLightField.Reader> readers;
@@ -69,9 +69,11 @@ final class PortalNativeColorCache<W> {
     private final LinkedHashSet<Section<W>> dirty = new LinkedHashSet<>();
     private volatile Map<Section<W>, Snapshot> published = Map.of();
     private volatile List<W> allowed = List.of();
+    private List<W> retained = List.of();
     private Section<W> working;
     private PortalColoredLightField.Job job;
-    private long serial, lastTick=Long.MIN_VALUE;
+    private long serial, lastTick=Long.MIN_VALUE, captureGeneration;
+    private boolean lastWasRefresh;
     long completed, elapsed;
     int reads, steps, rebuilt;
 
@@ -111,21 +113,24 @@ final class PortalNativeColorCache<W> {
     }
     /** Called on the client thread; an equal dimension key never admits a replaced level object. */
     void worlds(List<W> remoteWorlds) {
-        if (allowed.size()==remoteWorlds.size()) {
-            boolean same=true;
-            for (int i=0;i<allowed.size();i++) if (allowed.get(i)!=remoteWorlds.get(i)) { same=false; break; }
-            if (same) return;
-        }
+        worlds(remoteWorlds,remoteWorlds);
+    }
+    /** Keep a still-loaded primary world's completed snapshots dormant for a later return through the portal. */
+    void worlds(List<W> remoteWorlds,List<W> loadedWorlds) {
+        if (sameIdentities(allowed,remoteWorlds) && sameIdentities(retained,loadedWorlds)) return;
+        List<W> previous=allowed;
         allowed=List.copyOf(remoteWorlds);
+        retained=List.copyOf(loadedWorlds);
         requests.keySet().removeIf(k -> !accepts(k.world));
         var next=new HashMap<>(published);
         for (var iterator=entries.keySet().iterator(); iterator.hasNext();) {
             Section<W> section=iterator.next();
-            if (!accepts(section.world)) {
+            if (!containsIdentity(retained,section.world)) {
                 iterator.remove();
                 if (next.remove(section)!=null) queueRebuild(section);
                 if (section.equals(working)) { job=null; working=null; }
-            }
+            } else if (containsIdentity(previous,section.world)!=accepts(section.world) && next.containsKey(section))
+                queueRebuild(section);
         }
         published=Map.copyOf(next);
     }
@@ -137,13 +142,13 @@ final class PortalNativeColorCache<W> {
     }
     void invalidateAll() { invalidateWhere(k -> true); }
     private void invalidateWhere(Predicate<Section<W>> affected) {
-        var next=new HashMap<>(published);
         for (var item:entries.entrySet()) if (affected.test(item.getKey())) {
-            item.getValue().dirty=true;
-            if (next.remove(item.getKey())!=null) queueRebuild(item.getKey());
-            if (item.getKey().equals(working)) { job=null; working=null; }
+            Entry entry=item.getValue(); entry.dirty=true; entry.generation++;
+            // Keep the last complete RGB field until its atomic replacement is ready. Erasing it
+            // here makes unrelated lava/chunk updates repeatedly rebuild the room with vanilla hue.
+            // A running capture finishes and is followed by another if its input changed meanwhile;
+            // repeated edits cannot restart a 97k-cell capture forever.
         }
-        published=Map.copyOf(next);
     }
     /** One shared time/read/flood budget and at most one full propagation volume, irrespective of demand. */
     void advance(long tick, ToDoubleFunction<Section<W>> priority) {
@@ -173,13 +178,23 @@ final class PortalNativeColorCache<W> {
             Entry entry=new Entry(); entry.order=serial++; entries.put(section,entry);
         }
         if (job==null) {
-            working=entries.entrySet().stream().filter(e -> e.getValue().dirty)
-                .min(Comparator.<Map.Entry<Section<W>,Entry>>comparingDouble(e -> priority.applyAsDouble(e.getKey()))
-                    .thenComparingLong(e -> e.getValue().order)).map(Map.Entry::getKey).orElse(null);
+            var candidates=entries.entrySet().stream().filter(e -> e.getValue().dirty && accepts(e.getKey().world)).toList();
+            boolean unbuilt=candidates.stream().anyMatch(e -> !published.containsKey(e.getKey()));
+            boolean refresh=candidates.stream().anyMatch(e -> published.containsKey(e.getKey()));
+            // Alternate initial captures with refreshes; within refreshes serve the oldest publication.
+            // A continuously changing nearest section must not starve the rest of the portal room.
+            boolean chooseRefresh=refresh && (!unbuilt || !lastWasRefresh);
+            working=candidates.stream().filter(e -> published.containsKey(e.getKey())==chooseRefresh)
+                .min(chooseRefresh
+                    ? Comparator.<Map.Entry<Section<W>,Entry>>comparingLong(e -> e.getValue().completedAt)
+                        .thenComparingDouble(e -> priority.applyAsDouble(e.getKey()))
+                    : Comparator.<Map.Entry<Section<W>,Entry>>comparingDouble(e -> priority.applyAsDouble(e.getKey()))
+                        .thenComparingLong(e -> e.getValue().order)).map(Map.Entry::getKey).orElse(null);
             if (working!=null) {
                 var reader=readers.apply(working.world);
                 if (reader!=null) {
                     Pos min=working.minimum(); job=new PortalColoredLightField.Job(reader,List.of(min,min.add(17,17,17)));
+                    captureGeneration=entries.get(working).generation; lastWasRefresh=chooseRefresh;
                 } else {
                     entries.get(working).capture="native reader unavailable";
                     entries.get(working).dirty=false;
@@ -191,9 +206,13 @@ final class PortalNativeColorCache<W> {
             reads=work.reads(); steps=work.steps(); Entry entry=entries.get(working);
             entry.capture=job.captureStatus();
             if (work.complete()) {
-                var next=new HashMap<>(published); next.put(working,new Snapshot(working.minimum(),job));
-                // Publish before requesting a mesh: every worker observes a complete field.
-                published=Map.copyOf(next); queueRebuild(working); entry.dirty=false; completed++;
+                Snapshot replacement=new Snapshot(working.minimum(),job), before=published.get(working);
+                if (before==null || !Arrays.equals(before.rgb,replacement.rgb)) {
+                    var next=new HashMap<>(published); next.put(working,replacement);
+                    // Publish before requesting a mesh: every worker observes a complete field.
+                    published=Map.copyOf(next); queueRebuild(working);
+                }
+                entry.dirty=entry.generation!=captureGeneration; entry.completedAt=tick; completed++;
                 job=null; working=null;
             }
         }
@@ -213,8 +232,9 @@ final class PortalNativeColorCache<W> {
         }
     }
     void clear() {
-        allowed=List.of(); requests.clear(); entries.clear(); published=Map.of(); dirty.clear();
+        allowed=List.of(); retained=List.of(); requests.clear(); entries.clear(); published=Map.of(); dirty.clear();
         job=null; working=null; completed=0; lastTick=Long.MIN_VALUE; reads=steps=rebuilt=0; elapsed=0;
+        lastWasRefresh=false;
     }
     int ready() { return published.size(); }
     int pending() { return requests.size()+(int)entries.values().stream().filter(e -> e.dirty).count(); }
@@ -227,10 +247,20 @@ final class PortalNativeColorCache<W> {
         return entries.entrySet().stream().map(e -> {
             var k=e.getKey(); Snapshot s=published.get(k);
             return Map.<String,Object>of("world",name.apply(k.world),"section",List.of(k.x,k.y,k.z),
-                "ready",s!=null,"rgb8Max",s==null ? 0 : s.maximum,"capture",e.getValue().capture);
+                "ready",s!=null,"refreshPending",e.getValue().dirty,"generation",e.getValue().generation,
+                "rgb8Max",s==null ? 0 : s.maximum,"capture",e.getValue().capture);
         }).toList();
     }
     private static int maximum(int a,int b) {
         return Math.max(a>>>16 & 255,b>>>16 & 255)<<16 | Math.max(a>>>8 & 255,b>>>8 & 255)<<8 | Math.max(a & 255,b & 255);
+    }
+    private static <W> boolean containsIdentity(List<W> worlds,W world) {
+        for (W candidate:worlds) if (candidate==world) return true;
+        return false;
+    }
+    private static <W> boolean sameIdentities(List<W> a,List<W> b) {
+        if (a.size()!=b.size()) return false;
+        for (int i=0;i<a.size();i++) if (a.get(i)!=b.get(i)) return false;
+        return true;
     }
 }

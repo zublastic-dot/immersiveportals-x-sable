@@ -60,17 +60,17 @@ class PortalNativeColorCacheTest {
         assertTrue(Math.abs((cache.sample(world,15.999999,8.5,8.5)>>>16)
             -(cache.sample(world,16.000001,8.5,8.5)>>>16))<=1);
     }
-    @Test void sameOpacitySourceReplacementAndRemovalInvalidatePublishedAndInflightResults() {
+    @Test void sameOpacitySourceReplacementAndRemovalRefreshWithoutLosingLastCompletePublication() {
         Object world=new Object(); var color=new AtomicReference<>(new Rgb(0,0,15));
         var cache=new PortalNativeColorCache<Object>(w -> p -> p.equals(TORCH)
             ? emitter(color.get()) : Cell.AIR,() -> 0);
         cache.worlds(List.of(world)); cache.sample(world,8.5,8.5,8.5); finish(cache,0,25);
         assertEquals(0xff,cache.sample(world,8.5,8.5,8.5));
         color.set(new Rgb(15,0,0)); cache.invalidate(world,TORCH);
-        assertNull(cache.sample(world,8.5,8.5,8.5));
+        assertEquals(0xff,cache.sample(world,8.5,8.5,8.5));
         finish(cache,25,30); color.set(Rgb.DARK); cache.invalidate(world,TORCH);
         finish(cache,30,60); assertEquals(0,cache.sample(world,8.5,8.5,8.5));
-        assertEquals(2,cache.completed,"The invalidated in-flight red snapshot must never publish");
+        assertTrue(cache.completed>=2,"Changing a capture's input must schedule a follow-up capture");
     }
     @Test void opaqueAndColoredFiltersUseDestinationGeometry() {
         Object world=new Object();
@@ -155,8 +155,44 @@ class PortalNativeColorCacheTest {
         cache.worlds(List.of(world)); cache.sample(world,8.5,8.5,8.5); finish(cache,0,25);
         assertEquals(0xff0000,cache.sample(world,8.5,8.5,8.5));
         emission.set(new Rgb(0,0,15)); cache.invalidateAll();
-        assertNull(cache.sample(world,8.5,8.5,8.5)); finish(cache,25,50);
+        assertEquals(0xff0000,cache.sample(world,8.5,8.5,8.5)); finish(cache,25,50);
         assertEquals(0xff,cache.sample(world,8.5,8.5,8.5));
+    }
+    @Test void unrelatedContinuousInvalidationsNeverEraseBlueOrRestartCaptureForever() {
+        Object world=new Object(); var color=new AtomicReference<>(new Rgb(0,0,15));
+        var cache=new PortalNativeColorCache<Object>(w -> p -> p.equals(TORCH) ? emitter(color.get()) : Cell.AIR,() -> 0);
+        cache.worlds(List.of(world)); cache.sample(world,8.5,8.5,8.5); finish(cache,0,25);
+        for (int tick=25;tick<70;tick++) {
+            cache.invalidate(world,TORCH.add(12,0,0)); cache.advance(tick,k -> 0);
+            assertEquals(0xff,cache.sample(world,8.5,8.5,8.5),"A pending refresh must never expose vanilla fallback");
+        }
+        assertTrue(cache.completed>2,"Frequent unrelated updates cannot cancel every capture");
+        color.set(new Rgb(15,0,0));
+        for (int tick=70;tick<115;tick++) {
+            cache.invalidate(world,TORCH); cache.advance(tick,k -> 0);
+        }
+        assertEquals(0xff0000,cache.sample(world,8.5,8.5,8.5),"Real source changes still replace the retained field");
+    }
+    @Test void crossingBackReusesStillLoadedWorldSnapshotWithoutASecondWarmup() {
+        Object nether=new Object(),other=new Object();
+        var cache=new PortalNativeColorCache<Object>(w -> p -> p.equals(TORCH) ? emitter(new Rgb(0,0,15)) : Cell.AIR,() -> 0);
+        cache.worlds(List.of(nether),List.of(nether,other));
+        cache.sample(nether,8.5,8.5,8.5); finish(cache,0,25);
+        long completed=cache.completed;
+        cache.worlds(List.of(other),List.of(nether,other));
+        assertFalse(cache.accepts(nether)); assertNull(cache.sample(nether,8.5,8.5,8.5));
+        assertEquals(1,cache.ready(),"Dormant snapshots retain their exact ClientLevel identity");
+        cache.worlds(List.of(nether),List.of(nether,other));
+        assertEquals(0xff,cache.sample(nether,8.5,8.5,8.5)); assertEquals(completed,cache.completed);
+    }
+    @Test void changingNearFieldCannotStarveInitialCaptureOfNeighboringField() {
+        Object world=new Object(); var cache=new PortalNativeColorCache<Object>(w -> p -> Cell.AIR,() -> 0);
+        cache.worlds(List.of(world)); cache.sample(world,.5,.5,.5); finish(cache,0,15);
+        cache.sample(world,16.5,.5,.5);
+        for (int tick=15;tick<65;tick++) {
+            cache.invalidate(world,new Pos(-15,0,0)); cache.advance(tick,k -> k.x);
+        }
+        assertEquals(0,cache.sample(world,16.5,.5,.5)); assertEquals(2,cache.ready());
     }
     @Test void invalidAndPrimaryRequestsCannotReadOrAllocateAnyField() {
         Object remote=new Object(),primary=new Object(); var calls=new AtomicInteger();

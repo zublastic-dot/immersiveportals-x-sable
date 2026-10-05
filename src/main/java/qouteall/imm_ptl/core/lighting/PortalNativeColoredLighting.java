@@ -2,6 +2,7 @@ package qouteall.imm_ptl.core.lighting;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.core.BlockPos;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -26,6 +27,9 @@ public final class PortalNativeColoredLighting {
     private static volatile Api api;
     private static volatile boolean active, failed;
     private static final AtomicBoolean CONFIG_CHANGED = new AtomicBoolean();
+    private static final PortalPrimaryColorContext<ClientLevel,Object> PRIMARY = new PortalPrimaryColorContext<>();
+    private static volatile ClientLevel primaryWorld;
+    private static LevelRenderer primaryRenderer;
     private static boolean initialized, checked;
     private static long tick;
     private static String state = "not initialized";
@@ -34,6 +38,7 @@ public final class PortalNativeColoredLighting {
     public static void init() {
         if (initialized) return;
         initialized = true;
+        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Pre.class, event -> publishPrimary());
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> update());
         NeoForge.EVENT_BUS.addListener(ChunkEvent.Load.class, event -> {
             if (event.getLevel() instanceof ClientLevel world) {
@@ -50,9 +55,46 @@ public final class PortalNativeColoredLighting {
     public static void blockChanged(ClientLevel world, BlockPos pos) {
         CACHE.invalidate(world,new Pos(pos.getX(),pos.getY(),pos.getZ()));
     }
-    public static void clear() { active=false; CACHE.clear(); state="no client world"; }
+    public static void clear() {
+        active=false; PRIMARY.clear(); primaryWorld=null; primaryRenderer=null; CACHE.clear(); state="no client world";
+    }
     /** Config setters may run on a resource-reload thread; only the next client tick touches cache state. */
     public static void configChanged() { CONFIG_CHANGED.set(true); }
+
+    /** Before native Colorful's Post tick, pin its singleton producer to the actual player world. */
+    private static void publishPrimary() {
+        var minecraft=Minecraft.getInstance();
+        if (minecraft.player==null || !ClientWorldLoader.getIsInitialized()) {
+            PRIMARY.clear(); primaryWorld=null; primaryRenderer=null; return;
+        }
+        if (!initializeApi()) return;
+        var world=(ClientLevel)minecraft.player.level();
+        var renderer=ClientWorldLoader.getWorldRenderer(world.dimension());
+        if (world==primaryWorld && renderer==primaryRenderer) return;
+        try {
+            Object accessor=api.level.invokeExact(world,renderer);
+            if (primaryWorld!=null && primaryWorld!=world) {
+                // IP retains both ClientLevels on an immersive crossing, so native LevelEvent.Unload
+                // is not guaranteed. Colorful's storage/view area is coordinate-only: equal X/Z in
+                // another dimension must not reuse it. Stop/join the old native producer first.
+                PRIMARY.clear();
+                Object engine=api.engine.invokeExact();
+                if (engine!=null) api.reset.invokeExact(engine);
+            }
+            PRIMARY.publish(world,accessor); primaryWorld=world; primaryRenderer=renderer;
+        } catch (Throwable failure) {
+            if (failure instanceof VirtualMachineError fatal) throw fatal;
+            if (failure instanceof ThreadDeath fatal) throw fatal;
+            failed=true; PRIMARY.clear();
+            com.mojang.logging.LogUtils.getLogger().warn("Primary Colorful world adapter unavailable",failure);
+        }
+    }
+    /** No world reads: a teleport mismatch yields null until Pre tick publishes the replacement accessor. */
+    public static Object primaryAccessor(Minecraft minecraft,Object original) {
+        if (api==null || failed) return original;
+        ClientLevel actual=minecraft.player==null ? null : (ClientLevel)minecraft.player.level();
+        return PRIMARY.select(actual);
+    }
 
     private static void update() {
         var minecraft=Minecraft.getInstance(); tick++;
@@ -64,7 +106,7 @@ public final class PortalNativeColoredLighting {
         // Minecraft.level is temporarily replaced by a portal render pass. Player.level is the stable owner.
         var primary=minecraft.player.level();
         var remote=ClientWorldLoader.getClientWorlds().stream().filter(world -> world!=primary).toList();
-        CACHE.worlds(remote); active=true;
+        CACHE.worlds(remote,List.copyOf(ClientWorldLoader.getClientWorlds())); active=true;
         if (CONFIG_CHANGED.getAndSet(false)) CACHE.invalidateAll();
         if (!minecraft.isPaused()) {
             var centers=new IdentityHashMap<ClientLevel,List<Pos>>();
@@ -113,7 +155,7 @@ public final class PortalNativeColoredLighting {
         if (!active || current==null || failed) return original;
         try {
             Object root=current.viewType.isInstance(view) ? current.root.invokeExact(view) : view;
-            if (!(root instanceof ClientLevel level) || !CACHE.accepts(level)) return original;
+            if (!(root instanceof ClientLevel level) || level==primaryWorld || !CACHE.accepts(level)) return original;
             Integer color=CACHE.sample(level,x,y,z);
             // A pending remote field deliberately uses vanilla's scalar fallback, never another world's RGB.
             return color==null ? null : current.color.invokeExact(color>>>16 & 255,color>>>8 & 255,color & 255);
@@ -128,6 +170,9 @@ public final class PortalNativeColoredLighting {
         }
     }
     private static boolean available() {
+        return initializeApi() && PortalColoredLightAdapter.available();
+    }
+    private static boolean initializeApi() {
         if (failed) return false;
         if (!checked) {
             checked=true;
@@ -138,7 +183,7 @@ public final class PortalNativeColoredLighting {
             try { api=new Api(); }
             catch (ReflectiveOperationException | LinkageError failure) { failed=true; return false; }
         }
-        return api!=null && PortalColoredLightAdapter.available();
+        return api!=null;
     }
     public static Map<String,Object> status() {
         return Map.ofEntries(Map.entry("active",active),Map.entry("state",state),
@@ -150,7 +195,7 @@ public final class PortalNativeColoredLighting {
     }
     private static final class Api {
         final Class<?> viewType;
-        final MethodHandle root,color;
+        final MethodHandle root,color,level,engine,reset;
         Api() throws ReflectiveOperationException {
             var lookup=MethodHandles.publicLookup(); var loader=PortalNativeColoredLighting.class.getClassLoader();
             viewType=Class.forName("dev.colorfullighting.compat.level.RenderLevelView",false,loader);
@@ -159,6 +204,12 @@ public final class PortalNativeColoredLighting {
             var rgb=Class.forName("me.erykczy.colorfullighting.common.util.ColorRGB8",false,loader);
             color=lookup.unreflect(rgb.getMethod("fromRGB8",int.class,int.class,int.class))
                 .asType(MethodType.methodType(Object.class,int.class,int.class,int.class));
+            var wrapper=Class.forName("me.erykczy.colorfullighting.accessors.LevelWrapper",false,loader);
+            level=lookup.unreflectConstructor(wrapper.getConstructor(ClientLevel.class,LevelRenderer.class))
+                .asType(MethodType.methodType(Object.class,ClientLevel.class,LevelRenderer.class));
+            var engineType=Class.forName("me.erykczy.colorfullighting.common.ColoredLightEngine",false,loader);
+            engine=lookup.unreflect(engineType.getMethod("getInstance")).asType(MethodType.methodType(Object.class));
+            reset=lookup.unreflect(engineType.getMethod("reset")).asType(MethodType.methodType(void.class,Object.class));
         }
     }
 }

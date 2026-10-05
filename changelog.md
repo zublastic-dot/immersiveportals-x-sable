@@ -1,3 +1,9 @@
+## 0.5.1-zublastic.62
+
+- Keep completed remote RGB snapshots visible until an updated field is ready, avoiding temporary neutral light during recapture.
+- Give Colorful Lighting a stable primary-world accessor across temporary portal render-world switches, preserving its native dynamic-light path.
+- Candidate .61 failed live acceptance: destination soul-torch color appeared but flickered during rebuilds, and local terrain showed color seams. This candidate requires fresh visual acceptance.
+
 ## 0.5.1-zublastic.61
 
 - Preserve destination-native Colorful Lighting block colors in portal views using bounded, world-scoped RGB snapshots. This compatibility path is separate from experimental light transport and shared sunlight.

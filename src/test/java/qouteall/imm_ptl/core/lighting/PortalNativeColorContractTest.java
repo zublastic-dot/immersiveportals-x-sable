@@ -30,6 +30,31 @@ class PortalNativeColorContractTest {
         }
         assertEquals(5,returns,"Resource/editor reload invalidation must cover every native setter return");
     }
+    @Test void installedNativeAccessorUsesTheMutableRenderPairAndHasTheGuardedMethod() throws IOException {
+        var wrapper=nativeClass("me/erykczy/colorfullighting/accessors/MinecraftWrapper");
+        var getter=method(wrapper,"getLevel","()Lme/erykczy/colorfullighting/common/accessors/LevelAccessor;");
+        boolean level=false,renderer=false;
+        for (var instruction:getter.instructions) if (instruction instanceof FieldInsnNode field) {
+            if (field.owner.equals("net/minecraft/client/Minecraft")) {
+                level|=field.name.equals("level"); renderer|=field.name.equals("levelRenderer");
+            }
+        }
+        assertTrue(level && renderer,"Pinned native version requires the paired player-world accessor bridge");
+    }
+    @Test void nativeWorldResetJoinsProducerBeforeClearingCoordinateOnlyStorageAndDynamicState() throws IOException {
+        var engine=nativeClass("me/erykczy/colorfullighting/common/ColoredLightEngine");
+        method(engine,"getInstance","()Lme/erykczy/colorfullighting/common/ColoredLightEngine;");
+        var reset=method(engine,"reset","()V");
+        boolean joined=false,cleared=false,dynamic=false;
+        for (var instruction:reset.instructions) if (instruction instanceof MethodInsnNode call) {
+            if (call.owner.equals("java/lang/Thread") && call.name.equals("join")) joined=true;
+            if (call.owner.endsWith("ColoredLightStorage") && call.name.equals("clear")) {
+                assertTrue(joined,"Old producer must finish before replacing its world storage"); cleared=true;
+            }
+            if (call.owner.endsWith("EntityLightManager") && call.name.equals("reset")) dynamic=true;
+        }
+        assertTrue(cleared && dynamic,"Crossing uses native lifecycle reset rather than dropping the primary sampler");
+    }
     @Test void workerCallbackIsIndependentOfExperimentAndCannotReadLiveBlocksOrGlobalMinecraftLevel() throws IOException {
         var node=new ClassNode();
         try (var input=getClass().getResourceAsStream("/qouteall/imm_ptl/core/lighting/PortalNativeColoredLighting.class")) {
