@@ -81,3 +81,31 @@ must identify the installed artifact, client versions and observed assembly.
 This is a client assembly-crash correction, not a claim of universal server
 light-engine isolation. `ServerChunkCache` overrides the inherited lighting
 getter, and SableScalableLux has a separate server plot-engine path.
+
+## Foreign-chunk block access with Lithium
+
+The installed Lithium 0.15.4 `world.inline_block_access.LevelMixin` replaces
+`Level.getBlockState` with a lookup that fetches a chunk's section array but
+indexes it with the caller world's section origin. The plot bridge deliberately
+returns a hosting-world chunk to parent-world block reads. With the reported
+parent minimum Y of -96 and hosting minimum Y of -64, a parent read at Y=205
+therefore reads the hosted section containing Y=237. This independently explains
+an air block result while the actual hosted block and its rendered geometry
+remain present. The same read path runs on the dedicated server.
+
+`IplLithiumBlockAccessMixin` wraps that one section-index call, using the already
+fetched chunk's index for foreign-world chunks and retaining the original call
+for same-world chunks. It leaves the chunk selection, empty-chunk handling,
+section bounds checks, fluid reads and all write paths intact. It is common-side,
+dimension agnostic, and does not require or bundle Lithium. Its lower priority
+allows the default-priority Lithium overwrite to be applied first; with vanilla
+block access the optional injection has no target and does nothing.
+
+The regression executes the installed Lithium lookup bytecode with the compiled
+production index handler in a small fixture, including the exact 205/237 case,
+different dimension height profiles, bounds, empty chunks and the unchanged
+same-owner path. Annotation and local-variable contracts bind the fixture to the
+runtime injection point. Plain JUnit does not apply the complete Minecraft mixin
+stack: live assembly, interactions and motion still need separate verification.
+Unexpected extra blocks in a later server save are not established as caused by
+this read-only mismatch, and this patch does not modify saved blocks.
