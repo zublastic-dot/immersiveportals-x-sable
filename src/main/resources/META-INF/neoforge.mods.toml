@@ -94,6 +94,10 @@ config="q_misc_util.mixins.json"
 [[mixins]]
 config="ipl_sable.mixins.json"
 
+# Optional ScalableLux targets use @Pseudo and do not make it a dependency.
+[[mixins]]
+config="ipl_sable_lighting.mixins.json"
+
 # A dependency - use the . to indicate dependency for a specific modid. Dependencies are optional.
 [[dependencies.immersive_portals_core]] #optional
 # the modid of the dependency

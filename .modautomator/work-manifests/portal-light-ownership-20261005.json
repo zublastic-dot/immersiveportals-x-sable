@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "work_id": "portal-light-ownership-20261005",
+  "lease_id": "portal-light-ownership-20261005",
+  "worker_id": "codex-portal-light-ownership-20261005",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-portal-light-ownership-20261005/portal-light-ownership-20261005",
+  "base_commit": "678984f0f08125362c34804237a0a77ba67feb74",
+  "resources": [
+    "domain:immersiveportals:hosted-lighting"
+  ],
+  "paths": [
+    "src/main/java/ipl/sable",
+    "src/main/resources/ipl_sable.mixins.json",
+    "src/main/resources/ipl_sable_lighting.mixins.json",
+    "src/main/resources/META-INF/neoforge.mods.toml",
+    "src/test/java/ipl/sable",
+    "build.gradle",
+    "gradle.properties",
+    "docs/ZUBLASTIC_HOSTED_LIGHTING.md"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Prevent client lighting crashes from foreign-world hosted chunks and wrong-coordinate empty render placeholders.",
+    "acceptance": [
+      "Regression reproduces and prevents foreign chunk lighting across different heights and minY.",
+      "Reproduce exact ScalableLux negative cache index and reject wrong-coordinate or placeholder lighting chunks while preserving real empty terrain.",
+      "Hosted lighting still updates; no clipping, swallowed exceptions, or global lighting disable.",
+      "Exact artifact and runtime acceptance limitations recorded."
+    ]
+  }
+}
