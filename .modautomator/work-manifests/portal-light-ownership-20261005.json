@@ -20,7 +20,7 @@
     "docs/ZUBLASTIC_HOSTED_LIGHTING.md"
   ],
   "value_case": {
-    "category": "correctness",
+    "category": "demonstrated_blocker",
     "statement": "Prevent client crashes when hosted Sable chunks and parent dimensions have different vertical ranges by preserving light-engine ownership.",
     "acceptance": [
       "Regression reproduces and prevents foreign chunk lighting across different heights and minY.",
