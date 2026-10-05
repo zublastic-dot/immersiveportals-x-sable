@@ -16,7 +16,7 @@ public abstract class IplLightChunkGetterMixin {
         // Generic chunk lookup deliberately exposes hosted plots to their parent for
         // rendering and interaction. A light engine must not use that foreign data.
         cir.setReturnValue(IplLightChunkOwnership.forWorld(
-            ((LightChunkGetter) (Object) this).getLevel(), cir.getReturnValue()
+            ((LightChunkGetter) (Object) this).getLevel(), x, z, cir.getReturnValue()
         ));
     }
 }

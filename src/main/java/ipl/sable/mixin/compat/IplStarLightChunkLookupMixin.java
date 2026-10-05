@@ -21,6 +21,6 @@ public abstract class IplStarLightChunkLookupMixin {
         int x, int z, CallbackInfoReturnable<ChunkAccess> cir
     ) {
         // ScalableLux's immediate FULL lookup bypasses ChunkSource.getChunkForLighting.
-        cir.setReturnValue(IplLightChunkOwnership.forWorld(world, cir.getReturnValue()));
+        cir.setReturnValue(IplLightChunkOwnership.forWorld(world, x, z, cir.getReturnValue()));
     }
 }

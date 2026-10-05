@@ -35,7 +35,8 @@ masks are not forwarded because their vertical indexing belongs to the parent.
 
 This does not resize arrays, swallow lighting exceptions, disable ScalableLux,
 or change ordinary chunk lookups. No dimension names are special-cased.
-Non-LevelChunk providers, including ProtoChunks, retain their existing path.
+Non-LevelChunk providers retain their existing path; ProtoChunks additionally
+must have the position requested by the lighting lookup.
 The two external mixins are client-only `@Pseudo` targets; ScalableLux remains
 optional and its implementation is not bundled.
 
@@ -45,6 +46,33 @@ The focused suite contains 16 tests: the exact 38/24 negative control, shifted
 origins with equal section counts, shorter parents, identical keys belonging to
 different world instances, crossing/owner stability, null and non-LevelChunk
 providers, and bytecode contracts binding the four actual guards.
+
+## Vacant plot placeholder correction (.65)
+
+The later `crash-2026-10-05_22.16.21-client.txt` failed in
+`StarLightEngine.getEmptinessMap` with index -7682292 against a 25-element
+cache. This is a separate horizontal-coordinate failure. The plot rendering
+lookup returns a same-world `EmptyLevelChunk` at (0,0) for vacant plot-grid
+positions. That sentinel passes .64's owner check. ScalableLux centers its 5x5
+cache on the requested coordinate, then uses the returned chunk's own position
+when handling section changes. For a request at (1280064,1280448), reading the
+sentinel at (0,0) yields exactly `12 - (1280064 + 5 * 1280448) = -7682292`.
+
+All four lighting boundaries now also require the chunk's position to match
+the query or packet position and reject `EmptyLevelChunk` missing-data
+sentinels. A real loaded chunk whose blocks are all air remains valid, including
+at (0,0). No lighting data is rebased, resized, synthesized or forwarded, and
+generic rendering/interaction lookups are unchanged. ScalableLux's existing
+missing-center path destroys the cache and returns without accessing the
+sentinel's position. This correction does not by itself establish the cause or
+repair of the separately reported immovable frame and disappearing blocks.
+
+Five additional tests cover coordinate mismatch, the same-world negative
+control, the matching-coordinate sentinel, retention of ordinary/hosted chunks,
+and the exact reported negative index. The latter executes the installed
+ScalableLux `setupEncodeOffset` and `getEmptinessMap` bytecode in a small fixture;
+the installed JAR must be present on the test runtime classpath. The fixture
+does not claim to apply mixins or reproduce a complete live assembly.
 
 Plain JUnit does not apply runtime mixins. A successful build and these tests
 do not by themselves prove a live Physics Assembler run. Runtime acceptance

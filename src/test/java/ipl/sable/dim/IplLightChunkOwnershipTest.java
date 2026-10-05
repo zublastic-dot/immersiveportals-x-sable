@@ -128,12 +128,12 @@ class IplLightChunkOwnershipTest {
             new Class<?>[]{LightChunk.class}, (proxy, method, args) -> {
                 throw new AssertionError("Ownership must not inspect or load non-LevelChunk data: " + method);
             });
-        assertTrue(IplLightChunkOwnership.belongsTo(null, provider));
-        assertSame(provider, IplLightChunkOwnership.forWorld(null, provider));
+        assertTrue(IplLightChunkOwnership.belongsTo(null, 15, -8, provider));
+        assertSame(provider, IplLightChunkOwnership.forWorld(null, 15, -8, provider));
     }
 
     @Test void productionHelperPreservesMissingLookupResults() {
-        assertTrue(IplLightChunkOwnership.belongsTo(null, null));
-        assertNull(IplLightChunkOwnership.forWorld(null, null));
+        assertTrue(IplLightChunkOwnership.belongsTo(null, 15, -8, null));
+        assertNull(IplLightChunkOwnership.forWorld(null, 15, -8, null));
     }
 }

@@ -26,7 +26,7 @@ public abstract class IplScalableLuxClientChunkMixin {
     private void ipl$ignoreForeignLightArrays(ChunkPos pos, LevelChunk chunk, CallbackInfo ci) {
         // Explicit chunks bypass both lookup guards. Never write parent-indexed
         // nibble arrays into a hosted chunk, even when section counts happen to match.
-        if (!IplLightChunkOwnership.belongsTo(ipl$lightOwner, chunk)) {
+        if (!IplLightChunkOwnership.belongsTo(ipl$lightOwner, pos.x, pos.z, chunk)) {
             ci.cancel();
         }
     }

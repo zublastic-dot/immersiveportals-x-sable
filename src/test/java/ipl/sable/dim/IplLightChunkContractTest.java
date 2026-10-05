@@ -82,6 +82,12 @@ class IplLightChunkContractTest {
         var filter = node.methods.stream().filter(m -> m.name.equals("forWorld")).findFirst().orElseThrow();
         assertTrue(calls(filter, "net/minecraft/world/level/chunk/LevelChunk", "getLevel"));
         assertTrue(calls(filter, HELPER, "select"));
+        assertTrue(calls(filter, "net/minecraft/world/level/chunk/ChunkAccess", "getPos"));
+        assertTrue(calls(filter, HELPER, "selectPosition"));
+        assertTrue(java.util.stream.StreamSupport.stream(filter.instructions.spliterator(), false)
+            .anyMatch(i -> i instanceof TypeInsnNode type && type.getOpcode() == Opcodes.INSTANCEOF
+                && type.desc.equals("net/minecraft/world/level/chunk/EmptyLevelChunk")),
+            "Render-only empty placeholders must not masquerade as loaded light chunks");
         for (var instruction : filter.instructions) {
             if (instruction instanceof MethodInsnNode call) {
                 assertFalse(List.of("getHeight", "getMinBuildHeight", "dimension").contains(call.name),

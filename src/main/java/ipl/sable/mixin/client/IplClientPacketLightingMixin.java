@@ -18,7 +18,7 @@ public abstract class IplClientPacketLightingMixin {
     private void ipl$ignoreForeignChunkLight(LevelChunk chunk, int x, int z, CallbackInfo ci) {
         // Packet masks use this listener world's min section, not the hosted world's.
         // Its own dimension-tagged packet will enable the hosted chunk's light.
-        if (!IplLightChunkOwnership.belongsTo(level, chunk)) {
+        if (!IplLightChunkOwnership.belongsTo(level, x, z, chunk)) {
             ci.cancel();
         }
     }
