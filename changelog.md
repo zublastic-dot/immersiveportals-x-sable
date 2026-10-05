@@ -1,3 +1,10 @@
+## 0.5.1-zublastic.61
+
+- Preserve destination-native Colorful Lighting block colors in portal views using bounded, world-scoped RGB snapshots. This compatibility path is separate from experimental light transport and shared sunlight.
+- Let non-colliding wall decorations receive portal light instead of treating torch cells as solid cubes. Solid and partial solid blocks remain conservative occluders.
+- Refresh lighting for all block-state changes, including torch replacements and redstone state changes.
+- Add `imm_ptl_client_debug portal_native_color` diagnostics. Build and live acceptance are recorded separately; this entry alone does not certify runtime results.
+
 # 0.5.1-zublastic.60
 
 - Refresh experimental portal RGB terrain after renderer reloads so changing shader mode does not leave stale uncolored meshes. Version .59 passed source recoloring but failed the live shader-toggle test.

@@ -319,7 +319,7 @@ public final class PortalShaderLighting {
         BlockPos b=new BlockPos(p.x(),p.y(),p.z());
         if(w.isOutsideBuildHeight(b)||!w.hasChunkAt(b)) return PortalLightSnapshot.Sample.UNKNOWN;
         var state=w.getBlockState(b);
-        boolean open=source?state.getLightBlock(w,b)<15:state.isAir();
+        boolean open=source?state.getLightBlock(w,b)<15:PortalReceivingCell.isOpen(state,w,b);
         return new PortalLightSnapshot.Sample(open?Cell.OPEN:Cell.CLOSED,
             new Light(w.getBrightness(LightLayer.SKY,b),lightSamples.block(w,b)));
     }

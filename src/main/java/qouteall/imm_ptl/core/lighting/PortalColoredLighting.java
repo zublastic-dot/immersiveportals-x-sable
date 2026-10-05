@@ -56,6 +56,7 @@ public final class PortalColoredLighting {
     public static void init() {
         if (initialized) return;
         initialized = true;
+        PortalNativeColoredLighting.init();
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> update());
         NeoForge.EVENT_BUS.addListener(ChunkEvent.Load.class, event -> {
             if (event.getLevel() instanceof ClientLevel world) dirty(world);
@@ -107,6 +108,7 @@ public final class PortalColoredLighting {
             || SHADER_ADMISSION.allows(world, IrisInterface.invoker.getShaderpackName());
     }
     public static void blockChanged(ClientLevel world, BlockPos pos) {
+        PortalNativeColoredLighting.blockChanged(world, pos);
         Pos p = new Pos(pos.getX(), pos.getY(), pos.getZ());
         ENTRIES.forEach((a, e) -> {
             if (a.target == world && (e.snapshot == null || e.snapshot.geometry().containsKey(p))) e.dirty = true;
@@ -204,7 +206,7 @@ public final class PortalColoredLighting {
         BlockPos b = new BlockPos(p.x(), p.y(), p.z());
         if (world.isOutsideBuildHeight(b) || !world.hasChunkAt(b)) return unavailableCell(source);
         var state = world.getBlockState(b);
-        boolean open = source ? state.getLightBlock(world, b) < 15 : state.isAir();
+        boolean open = source ? state.getLightBlock(world, b) < 15 : PortalReceivingCell.isOpen(state, world, b);
         return new PortalLightSnapshot.Sample(open ? Cell.OPEN : Cell.CLOSED, new Light(0, source ? strength : 0));
     }
     static PortalLightSnapshot.Sample unavailableCell(boolean source) {

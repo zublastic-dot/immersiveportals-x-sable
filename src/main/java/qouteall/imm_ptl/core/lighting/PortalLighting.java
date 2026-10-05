@@ -372,7 +372,7 @@ public final class PortalLighting {
         BlockPos block = new BlockPos(pos.x(), pos.y(), pos.z());
         if (world.isOutsideBuildHeight(block) || !world.hasChunkAt(block)) return PortalLightSnapshot.Sample.UNKNOWN;
         var state = world.getBlockState(block);
-        boolean open = source ? state.getLightBlock(world, block) < 15 : state.isAir();
+        boolean open = source ? state.getLightBlock(world, block) < 15 : PortalReceivingCell.isOpen(state, world, block);
         return new PortalLightSnapshot.Sample(open ? Cell.OPEN : Cell.CLOSED,
             new Light(world.getBrightness(LightLayer.SKY, block), lightSamples.block(world, block)));
     }

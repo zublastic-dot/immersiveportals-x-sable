@@ -27,6 +27,7 @@
   ],
   "client": [
     "colorful.MixinPortalColoredLightGate",
+    "colorful.MixinPortalColoredLightConfig",
     "colorful.MixinPortalColoredIrisCarrier",
     "dh.MixinDhPortalCancellation",
     "dh.MixinDhRenderParams",
@@ -54,7 +55,6 @@
     "iris.MixinIrisWorldRender",
     "iris.MixinIrisDhDepthOwnership",
     "iris.MixinIrisPortalShaderIncludes",
-    "iris.MixinIrisPortalSunGeometry",
     "iris.MixinIrisPortalShaderPreprocessor",
     "iris.MixinIrisSharedSunShadow",
     "iris.MixinIrisSharedSunCelestial",
