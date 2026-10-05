@@ -4,6 +4,7 @@
   "package": "ipl.sable.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "IplLightChunkGetterMixin",
     "SableSubLevelGetterBridgeMixin",
     "SableStartTrackingDedupeMixin",
     "SableCrossDimTrackingMixin",
@@ -79,6 +80,7 @@
     "IplPortalVolumeCacheInvalidationMixin"
   ],
   "client": [
+    "client.IplClientPacketLightingMixin",
     "client.VeilBufferLifecycleMixin",
     "client.VeilPacketContextLevelMixin",
     "client.SableAltContainerTickMixin",
