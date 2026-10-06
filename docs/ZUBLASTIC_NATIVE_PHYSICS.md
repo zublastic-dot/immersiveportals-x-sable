@@ -38,7 +38,7 @@ Supply both native paths to Gradle:
 
 ```
 ./gradlew --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2G \
-  -Psable_version=2.0.6 -Pneo_version=21.1.255 \
+  -Psable_version=2.0.6 -Pneo_version=21.1.256 \
   -PiplNativeResource=/path/to/sable_rapier_x86_64_windows.dll \
   -PiplLinuxNativeResource=/path/to/libsable_rapier_x86_64_linux.so \
   test build verifyIplNativeBundle
@@ -57,8 +57,11 @@ acceptance must be recorded before claiming the owner's frame is repaired.
 
 ## Candidate validation, 2026-10-06
 
-The final local build against Sable 2.0.6 / NeoForge 21.1.255 passed 622 tests,
-with 202 environment-dependent skips and no failures. The three required-hook
+Local full builds against Sable 2.0.6 with NeoForge 21.1.255 and 21.1.256 each
+passed 622 tests, with 202 environment-dependent skips and no failures. The
+21.1.256 run used a clean build: NeoGradle's incremental recompilation of the
+single changed loader overlay otherwise lost the cached Minecraft classes.
+That failed preparation did not reach project compilation or tests. The three required-hook
 contracts also passed against the repository's Sable 2.0.3 defaults. The loader,
 fused driver and native step gate each require exactly one injection match.
 
