@@ -1,0 +1,38 @@
+{
+  "schema_version": 2,
+  "work_id": "kinetic-appearance-20261006",
+  "lease_id": "kinetic-appearance-20261006",
+  "worker_id": "codex-kinetic-appearance-20261006",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-kinetic-appearance-20261006/kinetic-native-physics-20261006",
+  "base_commit": "3cc17b4b68b8d2a1e15063858814f8fb4ade70b5",
+  "resources": [
+    "domain:immersiveportals:native-physics"
+  ],
+  "paths": [
+    "src/main/java/ipl/sable/natives",
+    "src/main/java/ipl/sable/mixin/IplNativesOverrideMixin.java",
+    "src/main/java/ipl/sable/atlas/IplFusedStep.java",
+    "src/main/java/ipl/sable/mixin/IplFusedStepMixin.java",
+    "src/main/java/ipl/sable/mixin/IplRapierStepArmMixin.java",
+    "src/test/java/ipl/sable/natives",
+    "build.gradle",
+    "gradle.properties",
+    "docs/ZUBLASTIC_NATIVE_PHYSICS.md",
+    "natives/build-linux.sh",
+    "natives/tests",
+    ".github/workflows/zublastic-verify.yml",
+    "natives/rapier/src/voxel_collider.rs",
+    "natives/rapier/src/rope.rs",
+    ".gitattributes"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Restore hosted Sable physics on Linux with the same Atlas native backend used on Windows; prevent silent stock-backend mismatch.",
+    "acceptance": [
+      "Linux native ABI and multi-scene shared-world stepping verified.",
+      "Missing or unsupported backend cannot silently run hosted physics against stock separate scenes.",
+      "Exact build and runtime verification status recorded; live world not modified to make tests pass."
+    ]
+  }
+}

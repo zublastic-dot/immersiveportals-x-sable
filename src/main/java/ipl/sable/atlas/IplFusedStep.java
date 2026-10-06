@@ -55,6 +55,9 @@ public final class IplFusedStep {
      * first system per server tick drives the fused loop, later systems no-op.
      */
     public static void onTickPipelinePhysics(SubLevelPhysicsSystem system) {
+        // This driver advances one SHARED world. Stock per-dimension native scenes
+        // would leave every scene except the last one frozen.
+        ipl.sable.natives.IplRapierNatives.requireAvailable();
         MinecraftServer server = system.getLevel().getServer();
         long tick = server.getTickCount();
         if (tick == lastFusedTick) {

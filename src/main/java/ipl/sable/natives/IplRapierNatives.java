@@ -2,13 +2,12 @@ package ipl.sable.natives;
 
 /**
  * IPSable's extensions to the sable_rapier native surface (portal-physics spec phase 4).
- * The symbols live in the SAME DLL as Sable's natives (our local build — see
- * {@code IplNativesOverrideMixin} and {@code natives/build-windows.ps1}), namespaced under
+ * The symbols live in the SAME library as Sable's natives (our local build — see
+ * {@code IplNativesOverrideMixin} and the platform build scripts), namespaced under
  * this class so sable's own JNI ABI stays untouched.
  *
- * <p>Callers MUST check {@link #isAvailable()} first: when the custom natives failed to
- * load (non-Windows platform, kill switch, extraction error) these methods throw
- * {@link UnsatisfiedLinkError}.
+ * <p>The loader verifies a harmless extension call before publishing availability. Failure
+ * stops startup: stock natives cannot supply the hosted bodies' shared-world physics.
  */
 public final class IplRapierNatives {
 
@@ -16,13 +15,22 @@ public final class IplRapierNatives {
 
     private IplRapierNatives() {}
 
-    /** Set by {@code IplNativesOverrideMixin} once the IPSable-built DLL is loaded. */
-    public static void markAvailable() {
+    /** Probe the loaded extension before permitting any shared-world physics assumptions. */
+    public static void verifyAndMarkAvailable() {
+        // The native entry point rejects a null scene/negative body before dereferencing either.
+        IplNativeLibrary.checkAtlasProbeResult(setParentFrame(0L, -1, 0));
         available = true;
     }
 
     public static boolean isAvailable() {
         return available;
+    }
+
+    /** Required by code whose operation would corrupt physics under stock separate scenes. */
+    public static void requireAvailable() {
+        if (!available) {
+            throw IplNativeLibrary.unavailable("The required native backend has not been verified.", null);
+        }
     }
 
     /**
