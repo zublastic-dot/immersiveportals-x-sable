@@ -43,8 +43,7 @@ public final class IplShipNetherPortal {
 
     private record Pending(
         net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dim,
-        BlockPos anchor,
-        BoundingBox3ic bounds
+        ShipPortalAssemblyTransform transform
     ) {}
 
     /** Ship UUID → capture waiting for the rehome. Server thread only. */
@@ -57,10 +56,10 @@ public final class IplShipNetherPortal {
     /**
      * Post-{@code assembleBlocks}: QUEUE the portal capture. A fresh assembly still
      * lives in the parent level's embedded plot; SableRehomeOps moves it to the
-     * hosting dimension — INTO A DIFFERENT PLOT SLOT — a tick later. Capturing now
-     * would bake pre-rehome plot coordinates into the anchor, the shape translation
-     * and the placeholder writes (~2048 blocks off after the move: vanishing frames,
-     * integrity breaks). Capture runs from the rehome-complete hook instead.
+     * hosting dimension a tick later, possibly into a different X/Z plot slot.
+     * Retain the original assembly translation now: the hosting dimension may have
+     * a different vertical center, but rehome preserves every block's plot Y.
+     * Capture runs from the rehome-complete hook using the final X/Z slot.
      */
     public static void queueAssemblyCapture(
         ServerLevel level, BlockPos anchor, BoundingBox3ic bounds, ServerSubLevel ship
@@ -70,11 +69,13 @@ public final class IplShipNetherPortal {
         // coords; ship-on-ship portal capture is out of scope.
         if (Math.abs(anchor.getX()) >= 1_000_000 || Math.abs(anchor.getZ()) >= 1_000_000) return;
 
+        ShipPortalAssemblyTransform transform = new ShipPortalAssemblyTransform(
+            anchor, ship.getPlot().getCenterBlock(), bounds.toAABB());
         if (ipl.sable.dim.IplDimAgnostic.isHosted(ship)) {
-            captureNow(level, anchor, bounds, ship);
+            captureNow(level, transform, ship);
             return;
         }
-        PENDING.put(ship.getUniqueId(), new Pending(level.dimension(), anchor, bounds));
+        PENDING.put(ship.getUniqueId(), new Pending(level.dimension(), transform));
     }
 
     /**
@@ -85,22 +86,20 @@ public final class IplShipNetherPortal {
         Pending pending = PENDING.remove(hosted.getUniqueId());
         if (pending == null) return;
         if (parentLevel == null || parentLevel.dimension() != pending.dim()) return;
-        captureNow(parentLevel, pending.anchor(), pending.bounds(), hosted);
+        captureNow(parentLevel, pending.transform(), hosted);
     }
 
     /**
      * Attach every portal whose origin the assembly swallowed. Shapes translate
-     * world→plot by (plotAnchor − anchor) — the assembly transform is a pure
-     * translation ({@code angle=0, Rotation.NONE}), and the rehome's slot move
-     * preserves block offsets relative to the plot center.
+     * world→plot by the original assembly translation plus the rehome's X/Z slot
+     * translation. The source plot's vertical center remains authoritative.
      */
     private static void captureNow(
-        ServerLevel level, BlockPos anchor, BoundingBox3ic bounds, ServerSubLevel ship
+        ServerLevel level, ShipPortalAssemblyTransform transform, ServerSubLevel ship
     ) {
         if (ship.isRemoved()) return;
-        BlockPos plotAnchor = ship.getPlot().getCenterBlock();
-        Vec3i delta = plotAnchor.subtract(anchor);
-        AABB box = bounds.toAABB().inflate(1.0);
+        Vec3i delta = transform.deltaTo(ship.getPlot().getCenterBlock());
+        AABB box = transform.bounds().inflate(1.0);
 
         for (Portal portal : level.getEntitiesOfClass(Portal.class, box)) {
             if (portal.isRemoved()) continue;
