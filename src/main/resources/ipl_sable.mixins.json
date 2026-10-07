@@ -6,6 +6,7 @@
   "mixins": [
     "diagnostics.server.IplServerPacketIgnitionTraceMixin",
     "diagnostics.server.IplServerItemIgnitionTraceMixin",
+    "diagnostics.server.IplBlockReadTraceMixin",
     "IplLightChunkGetterMixin",
     "compat.IplLithiumBlockAccessMixin",
     "SableSubLevelGetterBridgeMixin",

@@ -31,6 +31,7 @@ public abstract class IplParentPlotChunkCacheMixin {
     @Inject(method = "getChunkNow", at = @At("HEAD"), cancellable = true, require = 0)
     private void ipl$hostedPlotChunkNow(int x, int z, CallbackInfoReturnable<LevelChunk> cir) {
         LevelChunk chunk = ipl$hostedPlotChunk(x, z);
+        ipl.sable.diagnostics.IplIgnitionTraceFacts.observeChunkRoute("chunk_cache.now", this.level, x, z, chunk);
         if (chunk != null) cir.setReturnValue(chunk);
     }
 
@@ -40,6 +41,7 @@ public abstract class IplParentPlotChunkCacheMixin {
     )
     private void ipl$hostedPlotChunk(int x, int z, CallbackInfoReturnable<LevelChunk> cir) {
         LevelChunk chunk = ipl$hostedPlotChunk(x, z);
+        ipl.sable.diagnostics.IplIgnitionTraceFacts.observeChunkRoute("chunk_cache.full", this.level, x, z, chunk);
         if (chunk != null) cir.setReturnValue(chunk);
     }
 
@@ -51,6 +53,7 @@ public abstract class IplParentPlotChunkCacheMixin {
         int x, int z, ChunkStatus status, boolean create, CallbackInfoReturnable<ChunkAccess> cir
     ) {
         LevelChunk chunk = ipl$hostedPlotChunk(x, z);
+        ipl.sable.diagnostics.IplIgnitionTraceFacts.observeChunkRoute("chunk_cache.status", this.level, x, z, chunk);
         if (chunk != null) cir.setReturnValue(chunk);
     }
 

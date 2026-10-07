@@ -22,6 +22,8 @@ public final class IplIgnitionTraceControl {
         initialized = true;
         NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, event -> event.getDispatcher().register(
             Commands.literal("ipl_ignite_trace").requires(s -> s.hasPermission(2))
+                .then(Commands.literal("probe").then(Commands.argument("target", BlockPosArgument.blockPos())
+                    .executes(c -> IplBlockReadProbe.run(c.getSource(), BlockPosArgument.getBlockPos(c, "target")))))
                 .then(Commands.literal("status").executes(c -> {
                     var w = IplIgnitionTrace.window(IplIgnitionTrace.Side.SERVER);
                     c.getSource().sendSuccess(() -> Component.literal(w == null ? "Ignition trace off" : w.status()), false);

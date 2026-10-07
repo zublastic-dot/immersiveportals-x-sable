@@ -46,3 +46,28 @@ The `.68` trace-free evidence established no generation attempt for the failed
 hosted ignition. It did not prove whether the interaction packet was received.
 The new trace is intended to resolve that boundary; deployment, hook acceptance
 and any diagnosed cause require separate live evidence.
+
+## Block-storage comparison (.70)
+
+The `.69` dedicated-server capture accepted the hosted click and resolved its
+owner, but the actual flint target read returned air. The exact storage lookup
+responsible was not established. `.70` adds observations of the chunk selected by
+the original block read, its owning dimension and height profile, and the raw
+section state. These observations are restricted to the clicked coordinate and
+eight distinct stages within the existing 64-event attempt budget. Optional
+hooks may be displaced by another mod; an absent stage does not prove a bypass.
+Repeated plot-resolution logs are deduplicated and likewise cannot prove absence
+of subsequent lookups.
+
+An operator can separately run:
+
+```
+/ipl_ignite_trace probe <x> <y> <z>
+```
+
+This probes one live hosted plot owned by the command source dimension. It
+compares loaded-only parent chunk-source, hosting chunk-source and direct plot
+reads, recording whether each is the same chunk. It neither generates chunks
+nor invokes the creating `Level.getBlockState` path; the real click trace covers
+that path separately. Output uses `[IPL-BLOCK-PROBE]`. The previous world-frame
+context is restored after the command. This diagnostic is not an ignition fix.
