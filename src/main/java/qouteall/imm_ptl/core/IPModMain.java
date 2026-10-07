@@ -102,6 +102,7 @@ public class IPModMain {
         ServerPerformanceMonitor.init();
         
         ImmPtlChunkTickets.init();
+        ipl.sable.diagnostics.IplIgnitionTraceControl.init();
         
         IPPortingLibCompat.init();
         

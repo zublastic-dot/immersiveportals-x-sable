@@ -1,6 +1,9 @@
 package qouteall.imm_ptl.core.block_manipulation;
 
 import com.mojang.logging.LogUtils;
+import ipl.sable.diagnostics.IplIgnitionTrace;
+import ipl.sable.diagnostics.IplIgnitionTraceFacts;
+import static ipl.sable.diagnostics.IplIgnitionTrace.Side.SERVER;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.FriendlyByteBuf;
@@ -88,7 +91,9 @@ public class BlockManipulationServer {
         ServerPlayer player,
         BlockPos requestPos
     ) {
-        if (!NeoForge.EVENT_BUS.post(new CrossPortalInteractionEvent(player)).canDo()) {
+        boolean eventAllowed = NeoForge.EVENT_BUS.post(new CrossPortalInteractionEvent(player)).canDo();
+        if (IplIgnitionTrace.isTracing(SERVER)) IplIgnitionTrace.event(SERVER, "remote.cross_portal_event", "allowed", eventAllowed);
+        if (!eventAllowed) {
             return false;
         }
         
@@ -100,8 +105,11 @@ public class BlockManipulationServer {
         if (player.level().dimension() == dimension) {
             // Frame-aware: plot-coordinate requests (Sable ship blocks) project to world
             // space through the owning sub-level's pose before measuring.
-            if (ipl.sable.SableBridge.frameAwareDistanceSqr(player.level(), playerPos, pos)
-                < distanceSquare) {
+            double distance = ipl.sable.SableBridge.frameAwareDistanceSqr(player.level(), playerPos, pos);
+            if (IplIgnitionTrace.isTracing(SERVER)) IplIgnitionTrace.event(SERVER, "remote.same_dimension_reach",
+                "player_pos", playerPos, "target", pos, "distance_squared", distance,
+                "maximum_squared_exclusive", distanceSquare);
+            if (distance < distanceSquare) {
                 return true;
             }
         }
@@ -118,7 +126,11 @@ public class BlockManipulationServer {
             double distSq = destLevel != null
                 ? ipl.sable.SableBridge.frameAwareDistanceSqr(destLevel, transformed, pos)
                 : transformed.distanceToSqr(pos);
-            return distSq < distanceSquare * portal.getScale() * portal.getScale();
+            double maximum = distanceSquare * portal.getScale() * portal.getScale();
+            if (IplIgnitionTrace.isTracing(SERVER)) IplIgnitionTrace.event(SERVER, "remote.portal_reach",
+                "portal", portal.getUUID(), "destination", dimension.location(), "transformed_player", transformed,
+                "distance_squared", distSq, "maximum_squared_exclusive", maximum);
+            return distSq < maximum;
         });
     }
     
@@ -193,15 +205,19 @@ public class BlockManipulationServer {
             FriendlyByteBuf buf = IPMcHelper.bytesToBuf(packetBytes);
             ServerboundUseItemOnPacket packet = ServerboundUseItemOnPacket.STREAM_CODEC.decode(buf);
 
-            ServerLevel world = player.server.getLevel(dimension);
-            Validate.notNull(world, "missing %s", dimension.location());
-            
-            withRedirect(
-                new Context(world, packet.getHitResult()),
-                () -> {
-                    doProcessUseItemOn(world, player, packet);
-                }
-            );
+            try (var trace = IplIgnitionTrace.begin(SERVER, player, packet.getHitResult(), "server.ip_remote.use_item_on");
+                 var facts = IplIgnitionTraceFacts.begin(player, packet.getHitResult())) {
+                ServerLevel world = player.server.getLevel(dimension);
+                if (IplIgnitionTrace.isTracing(SERVER)) IplIgnitionTrace.event(SERVER, "remote.received",
+                    "sequence", packet.getSequence(), "hand", packet.getHand(),
+                    "requested_level", dimension.location(), "resolved_level", IplIgnitionTraceFacts.level(world),
+                    "server_thread", player.server.isSameThread());
+                Validate.notNull(world, "missing %s", dimension.location());
+                withRedirect(
+                    new Context(world, packet.getHitResult()),
+                    () -> doProcessUseItemOn(world, player, packet)
+                );
+            }
         }
     }
     
@@ -268,15 +284,22 @@ public class BlockManipulationServer {
         
         ItemStack itemStack = player.getItemInHand(hand);
         
-        if (!itemStack.isItemEnabled(world.enabledFeatures())) {
+        boolean itemEnabled = itemStack.isItemEnabled(world.enabledFeatures());
+        if (IplIgnitionTrace.isTracing(SERVER)) IplIgnitionTrace.event(SERVER, "remote.item_enabled", "result", itemEnabled);
+        if (!itemEnabled) {
             return;
         }
         
         BlockPos blockPos = blockHitResult.getBlockPos();
         Direction direction = blockHitResult.getDirection();
         player.resetLastActionTime();
-        if (world.mayInteract(player, blockPos)) {
-            if (!canPlayerReach(dimension, player, blockPos)) {
+        boolean mayInteract = world.mayInteract(player, blockPos);
+        if (IplIgnitionTrace.isTracing(SERVER)) IplIgnitionTrace.event(SERVER, "remote.may_interact",
+            "level", IplIgnitionTraceFacts.level(world), "pos", blockPos.toShortString(), "result", mayInteract);
+        if (mayInteract) {
+            boolean reachable = canPlayerReach(dimension, player, blockPos);
+            if (IplIgnitionTrace.isTracing(SERVER)) IplIgnitionTrace.event(SERVER, "remote.can_reach", "result", reachable);
+            if (!reachable) {
                 LOGGER.error("Reject cross-portal action {} {} {}", player, world, blockPos);
                 return;
             }
@@ -288,6 +311,7 @@ public class BlockManipulationServer {
                 hand,
                 blockHitResult
             );
+            if (IplIgnitionTrace.isTracing(SERVER)) IplIgnitionTrace.event(SERVER, "remote.game_mode_return", "result", actionResult);
             if (actionResult.shouldSwing()) {
                 player.swing(hand, true);
             }

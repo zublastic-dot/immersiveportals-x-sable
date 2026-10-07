@@ -129,6 +129,18 @@ public abstract class MixinMultiPlayerGameMode implements IEClientPlayerInteract
                 }
             }
             else if (packet instanceof ServerboundUseItemOnPacket useItemOnPacket) {
+                if (ipl.sable.diagnostics.IplIgnitionTrace.isTracing(
+                    ipl.sable.diagnostics.IplIgnitionTrace.Side.CLIENT
+                )) {
+                    ipl.sable.diagnostics.IplIgnitionTrace.event(
+                        ipl.sable.diagnostics.IplIgnitionTrace.Side.CLIENT, "client.packet.redirect",
+                        "sequence", useItemOnPacket.getSequence(),
+                        "dimension", dimension.location(),
+                        "hand", useItemOnPacket.getHand(),
+                        "hit", useItemOnPacket.getHitResult().getBlockPos(),
+                        "face", useItemOnPacket.getHitResult().getDirection()
+                    );
+                }
                 FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
                 ServerboundUseItemOnPacket.STREAM_CODEC.encode(buf, useItemOnPacket);
 

@@ -7,12 +7,14 @@
   "work_branch": "work/codex-kinetic-appearance-20261006/kinetic-native-physics-20261006",
   "base_commit": "3cc17b4b68b8d2a1e15063858814f8fb4ade70b5",
   "resources": [
-    "domain:immersiveportals:native-physics"
+    "domain:immersiveportals:native-physics",
+    "domain:immersiveportals:ship-portals"
   ],
   "paths": [
     ".gitattributes",
     ".github/workflows/zublastic-verify.yml",
     "build.gradle",
+    "docs/ZUBLASTIC_IGNITION_TRACE.md",
     "docs/ZUBLASTIC_NATIVE_PHYSICS.md",
     "gradle.properties",
     "natives/build-linux.sh",
@@ -20,12 +22,22 @@
     "natives/rapier/src/voxel_collider.rs",
     "natives/tests",
     "src/main/java/ipl/sable/atlas/IplFusedStep.java",
+    "src/main/java/ipl/sable/diagnostics",
     "src/main/java/ipl/sable/mixin/IplFusedStepMixin.java",
+    "src/main/java/ipl/sable/mixin/IplHostedInteractionContextMixin.java",
     "src/main/java/ipl/sable/mixin/IplNativesOverrideMixin.java",
+    "src/main/java/ipl/sable/mixin/IplPlotBridgeMixin.java",
     "src/main/java/ipl/sable/mixin/IplRapierStepArmMixin.java",
+    "src/main/java/ipl/sable/mixin/diagnostics",
     "src/main/java/ipl/sable/natives",
     "src/main/java/ipl/sable/transit/IplShipNetherPortal.java",
     "src/main/java/ipl/sable/transit/ShipPortalAssemblyTransform.java",
+    "src/main/java/qouteall/imm_ptl/core/IPModMain.java",
+    "src/main/java/qouteall/imm_ptl/core/block_manipulation/BlockManipulationServer.java",
+    "src/main/java/qouteall/imm_ptl/core/mixin/client/interaction/MixinMultiPlayerGameMode.java",
+    "src/main/java/qouteall/imm_ptl/peripheral/mixin/common/nether_portal/MixinFlintAndSteelItem_CVB.java",
+    "src/main/resources/ipl_sable.mixins.json",
+    "src/test/java/ipl/sable/diagnostics",
     "src/test/java/ipl/sable/natives",
     "src/test/java/ipl/sable/transit/ShipPortalAssemblyTransformTest.java"
   ],

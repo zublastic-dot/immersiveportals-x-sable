@@ -51,6 +51,8 @@ public abstract class IplPlotBridgeMixin {
         // Universal packet bridge: the first hosted-plot resolution inside a modded
         // packet handler names the handler's ship and arms its world-frame context.
         ipl.sable.dim.IplWorldFrameContext.notifyPlotResolved(resolved);
+        ipl.sable.diagnostics.IplIgnitionTraceFacts.observePlot(
+            getLevel(), resolved, chunkX, chunkZ, original != null);
         return resolved;
     }
 
@@ -62,6 +64,8 @@ public abstract class IplPlotBridgeMixin {
     private LevelPlot ipl$bridgePlotByChunkPos(LevelPlot original, ChunkPos pos) {
         LevelPlot resolved = original != null ? original : ipl$hostingPlot(pos.x, pos.z);
         ipl.sable.dim.IplWorldFrameContext.notifyPlotResolved(resolved);
+        ipl.sable.diagnostics.IplIgnitionTraceFacts.observePlot(
+            getLevel(), resolved, pos.x, pos.z, original != null);
         return resolved;
     }
 
