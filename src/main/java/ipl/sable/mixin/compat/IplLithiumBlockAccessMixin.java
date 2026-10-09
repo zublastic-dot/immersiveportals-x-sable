@@ -23,6 +23,8 @@ public abstract class IplLithiumBlockAccessMixin {
     ) {
         // The plot bridge deliberately serves hosted chunks to parent-world callers.
         // Reuse the chunk Lithium already fetched: no second lookup or global override.
-        return chunk.getLevel() == caller ? original.call(caller, y) : chunk.getSectionIndex(y);
+        // Even the same Level can expose contextual parent bounds while its chunk
+        // retains immutable storage bounds. Level identity is not height identity.
+        return chunk.getSectionIndex(y);
     }
 }

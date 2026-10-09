@@ -215,10 +215,11 @@ public abstract class IplHostedWorldFrameRouterMixin extends Level {
             : super.getEntities(typeTest, area, predicate);
     }
 
-    // Scalar world bounds belong to the same explicit terrain frame as routed chunks. Chunk
-    // section reads remain safe because callers receive a parent LevelChunk whose own section
-    // accessor owns its height profile; returning hosting bounds here made generic external
-    // operations reject valid Nether/modded-dimension terrain before they ever read a chunk.
+    // Scalar world bounds belong to the same explicit terrain frame as routed chunks.
+    // ChunkAccess normally retains this mutable Level as its height accessor, so hosted
+    // storage must be pinned separately by IplHostingChunkHeightMixin (and Sable's initial
+    // array by IplHostingPlotHeightMixin). These scalar routes remain necessary for generic
+    // operations on Nether/modded-dimension terrain outside the hosted plot.
     @Override
     public int getMinBuildHeight() {
         ServerLevel self = (ServerLevel) (Object) this;
@@ -241,6 +242,14 @@ public abstract class IplHostedWorldFrameRouterMixin extends Level {
         ServerLevel parent = IplWorldFrameContext.current();
         return IplDimAgnostic.isHostingLevel(self) && parent != null && parent != self
             ? parent.getSectionsCount() : super.getSectionsCount();
+    }
+
+    @Override
+    public int getHeight() {
+        ServerLevel self = (ServerLevel) (Object) this;
+        ServerLevel parent = IplWorldFrameContext.current();
+        return IplDimAgnostic.isHostingLevel(self) && parent != null && parent != self
+            ? parent.getHeight() : super.getHeight();
     }
 
     // ------------------------------------------------------------------

@@ -27,6 +27,10 @@ public abstract class IplLevelAcceleratorOverrideMixin {
 
     @org.spongepowered.asm.mixin.Shadow(remap = false)
     @org.spongepowered.asm.mixin.Final
+    private int maxBuildHeight;
+
+    @org.spongepowered.asm.mixin.Shadow(remap = false)
+    @org.spongepowered.asm.mixin.Final
     private Level level;
 
     /**
@@ -91,8 +95,10 @@ public abstract class IplLevelAcceleratorOverrideMixin {
         // Indexing it with this accelerator's minSection shifts every read by the profile
         // delta (64 blocks for nether vs hosting), and the bounds gate is wrong too — so
         // an entity in the nether walking on a hosted ship reads ALL AIR and falls through.
-        // Read chunk-native, which uses the chunk's own profile.
-        if (chunk.getMinBuildHeight() != this.minBuildHeight) {
+        // Equal origins are insufficient: a shorter parent can share the hosting minimum
+        // while its cached maximum still rejects valid hosted blocks.
+        if (chunk.getMinBuildHeight() != this.minBuildHeight
+            || chunk.getMaxBuildHeight() != this.maxBuildHeight) {
             cir.setReturnValue(chunk.getBlockState(pos));
         }
     }

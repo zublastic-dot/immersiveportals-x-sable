@@ -324,30 +324,41 @@ public final class SableRehomeOps {
             plotXZ[0], plotXZ[1],
             pose.position().x(), pose.position().y(), pose.position().z());
 
+        // A failed height check leaves the legacy ship intact and allocates no twin.
+        SableTransitOps.preflightPlotCopy(source.getPlot(), hosting);
+
         // 1. Allocate the hosted twin (same UUID, identical pose). Physics enrolls it in the
         //    HOSTING pipeline; the block-copy cascade below populates mass/CoM before the next
         //    physics step, same proven ordering as executeTransit.
         ServerSubLevel hosted =
             (ServerSubLevel) hostingContainer.allocateSubLevel(uuid, plotXZ[0], plotXZ[1], pose);
 
-        // 2. Stamp parent/hosting (duck + persistent NBT) BEFORE block copy, so any observer
-        //    firing during the copy already sees the correct parent.
-        stampParent(hosted, parentLevel, hosting);
+        int blocksCopied;
+        try {
+            // 2. Stamp parent/hosting (duck + persistent NBT) BEFORE block copy, so any observer
+            //    firing during the copy already sees the correct parent.
+            stampParent(hosted, parentLevel, hosting);
 
-        // 2.5 Seed the twin's merged-mass baseline from the settled SOURCE tracker
-        //     (slot-translated). The fresh tracker's first upload otherwise null-baselines
-        //     lastCenterOfMass and jumps rotationPoint from the copied ship CoM to the
-        //     FIRST copied block's partial CoM without position compensation — shifting
-        //     the ship by R·(shipCoM − firstBlockCoM): the +0.5-along-facing assembly
-        //     offset that grew with size and vanished for single blocks. With the baseline
-        //     seeded, every upload during the copy walks the invariant-preserving path
-        //     (position += R·ΔCoM), and the final mapping equals the source mapping by
-        //     construction.
-        seedMassBaseline(source, hosted, slotDeltaX, slotDeltaZ);
+            // 2.5 Seed the twin's merged-mass baseline from the settled SOURCE tracker
+            //     (slot-translated). The fresh tracker's first upload otherwise null-baselines
+            //     lastCenterOfMass and jumps rotationPoint from the copied ship CoM to the
+            //     FIRST copied block's partial CoM without position compensation — shifting
+            //     the ship by R·(shipCoM − firstBlockCoM): the +0.5-along-facing assembly
+            //     offset that grew with size and vanished for single blocks. With the baseline
+            //     seeded, every upload during the copy walks the invariant-preserving path
+            //     (position += R·ΔCoM), and the final mapping equals the source mapping by
+            //     construction.
+            seedMassBaseline(source, hosted, slotDeltaX, slotDeltaZ);
 
-        // 3. Copy blocks + block entities (3-pass: place, notify, register tickers).
-        int blocksCopied = SableTransitOps.copyPlotBlocksPublic(
-            source.getPlot(), hosted.getPlot(), parentLevel, hosting);
+            // 3. Copy blocks + block entities (3-pass: place, notify, register tickers).
+            blocksCopied = SableTransitOps.copyPlotBlocksPublic(
+                source.getPlot(), hosted.getPlot(), parentLevel, hosting);
+        } catch (Throwable t) {
+            LOG.error("[IPL-REHOME] copy failed; keeping parent-dim original and rolling back hosted twin uuid={}",
+                uuid, t);
+            SableTransitOps.rollbackCopiedPlot(hostingContainer, hosted);
+            return;
+        }
 
         // 4. Relocate plot-resident entities (item frames, seats, hanging entities moved into
         //    the plot at assembly). Without this, removeSubLevel(REMOVED) deletes them.

@@ -8,6 +8,8 @@ import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.plot.PlotChunkHolder;
 import dev.ryanhcode.sable.sublevel.plot.ServerLevelPlot;
 import dev.ryanhcode.sable.sublevel.storage.SubLevelRemovalReason;
+import ipl.sable.dim.IplChunkStorageHeight;
+import ipl.sable.dim.IplPlotCopyHeight;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
@@ -122,6 +124,14 @@ public final class SableTransitOps {
         Vector3d sourceLinVel = new Vector3d(source.latestLinearVelocity);
         Vector3d sourceAngVel = new Vector3d(source.latestAngularVelocity);
 
+        // Reject an incompatible storage profile before creating a destination twin.
+        try {
+            preflightPlotCopy(source.getPlot(), destLevel);
+        } catch (Throwable t) {
+            LOG.error("[IPL-TRANSIT] plot does not fit destination storage; keeping source uuid={}", uuid, t);
+            return false;
+        }
+
         // 4. Allocate dest sub-level.
         ServerSubLevel dest;
         try {
@@ -134,8 +144,15 @@ public final class SableTransitOps {
         // 5. Copy blocks plot -> plot. Sable's handleBlockChange cascade fires on
         //    each setBlockState, rebuilding mass tracker, heatmap, floating-block
         //    state, and Aero's per-block-position state (balloons etc.) on dest.
-        int blocksCopied = copyPlotBlocks(source.getPlot(), dest.getPlot(),
-            source.getLevel(), destLevel);
+        int blocksCopied;
+        try {
+            blocksCopied = copyPlotBlocks(source.getPlot(), dest.getPlot(),
+                source.getLevel(), destLevel);
+        } catch (Throwable t) {
+            LOG.error("[IPL-TRANSIT] copy failed; keeping source and rolling back destination uuid={}", uuid, t);
+            rollbackCopiedPlot(destContainer, dest);
+            return false;
+        }
         LOG.info("[IPL-TRANSIT] copied {} blocks  uuid={}", blocksCopied, uuid);
 
         // 5b. Transfer velocity. Rotate source-dim world velocity vectors through the
@@ -350,12 +367,9 @@ public final class SableTransitOps {
      * That cascade is the load-bearing piece: it's why we don't need to do any
      * Sable-specific or Aero-specific state copy — block placement triggers it.
      *
-     * <p>Y-range handling: if the dest dimension has a smaller build height than the
-     * source dim's blocks (e.g., overworld -> nether for an airship above Y=128),
-     * out-of-range blocks are skipped with a warning. Phase 4 will reject the transit
-     * entirely if too much of the airship would be clipped — for now, a partial copy
-     * is better than a hard fail and matches what a player would expect from a
-     * "low ceiling" portal interaction.
+     * <p>All non-air source blocks must fit the destination's fixed chunk-storage
+     * height before any block is placed. A height mismatch aborts the transfer;
+     * callers retain the source and discard any allocated destination twin.
      */
     /** Exposed package-private wrapper for hosted rehome block-copy operations. */
     static int copyPlotBlocksPublic(
@@ -365,15 +379,27 @@ public final class SableTransitOps {
         return copyPlotBlocks(src, dst, srcLevel, dstLevel);
     }
 
+    /** Check before allocating a twin; copyPlotBlocks repeats this before placement. */
+    static void preflightPlotCopy(ServerLevelPlot src, ServerLevel dstLevel) {
+        IplPlotCopyHeight.requireFits(IplChunkStorageHeight.forChunk(dstLevel, -1),
+            src.getLoadedChunks().stream().map(PlotChunkHolder::getChunk).toList());
+    }
+
+    static void rollbackCopiedPlot(ServerSubLevelContainer container, ServerSubLevel copy) {
+        try {
+            container.removeSubLevel(copy, SubLevelRemovalReason.REMOVED);
+        } catch (Throwable rollbackFailure) {
+            LOG.error("[IPL-TRANSIT] rollback of destination failed for uuid={}", copy.getUniqueId(), rollbackFailure);
+        }
+    }
+
     private static int copyPlotBlocks(
         ServerLevelPlot src, ServerLevelPlot dst,
         ServerLevel srcLevel, ServerLevel dstLevel
     ) {
         int blocksCopied = 0;
-        int blocksSkippedOutOfYRange = 0;
-
-        int dstMinY = dstLevel.getMinBuildHeight();
-        int dstMaxY = dstLevel.getMaxBuildHeight();
+        var sourceChunks = src.getLoadedChunks().stream().map(PlotChunkHolder::getChunk).toList();
+        IplPlotCopyHeight.requireFits(IplChunkStorageHeight.forChunk(dstLevel, -1), sourceChunks);
 
         // Accumulate every placed block so we can run a SECOND notify pass after
         // all placement, exactly as Sable's own SubLevelAssemblyHelper.moveBlocks
@@ -407,8 +433,7 @@ public final class SableTransitOps {
         // was the only path that fired it.
         dev.ryanhcode.sable.platform.SableAssemblyPlatform.INSTANCE.setIgnoreOnPlace(dstLevel, true);
         try {
-        for (PlotChunkHolder srcHolder : src.getLoadedChunks()) {
-            LevelChunk srcChunk = srcHolder.getChunk();
+        for (LevelChunk srcChunk : sourceChunks) {
             ChunkPos srcChunkPos = srcChunk.getPos();
 
             // The block layout is plot-local. We want the same local layout in dst,
@@ -422,8 +447,7 @@ public final class SableTransitOps {
             }
             LevelChunk dstChunk = dst.getChunk(localChunkPos);
             if (dstChunk == null) {
-                LOG.warn("[IPL-TRANSIT] dst chunk alloc failed at local {}", localChunkPos);
-                continue;
+                throw new IllegalStateException("Destination plot chunk allocation failed at local " + localChunkPos);
             }
 
             // The block X/Z within a chunk is independent of which global chunk it
@@ -440,17 +464,6 @@ public final class SableTransitOps {
 
                 for (int ly = 0; ly < 16; ly++) {
                     int worldY = sectionBaseY + ly;
-                    if (worldY < dstMinY || worldY >= dstMaxY) {
-                        // Skip blocks outside dest dim's vertical range. Count for log.
-                        for (int lx = 0; lx < 16; lx++) {
-                            for (int lz = 0; lz < 16; lz++) {
-                                if (!section.getBlockState(lx, ly, lz).isAir()) {
-                                    blocksSkippedOutOfYRange++;
-                                }
-                            }
-                        }
-                        continue;
-                    }
                     for (int lx = 0; lx < 16; lx++) {
                         for (int lz = 0; lz < 16; lz++) {
                             BlockState state = section.getBlockState(lx, ly, lz);
@@ -483,6 +496,9 @@ public final class SableTransitOps {
                             // SubLevelAssemblyHelper.moveBlocks convention. The skipped
                             // neighbour updates are issued in the second pass below.
                             dstChunk.setBlockState(dstWorldPos, state, true);
+                            if (dstChunk.getBlockState(dstWorldPos) != state) {
+                                throw new IllegalStateException("Destination plot rejected block at " + dstWorldPos);
+                            }
                             blocksCopied++;
                             placed.add(new Placed(dstWorldPos, dstChunk, state));
 
@@ -494,9 +510,10 @@ public final class SableTransitOps {
                             // so we do NOT call onBlockChange ourselves here.
                             if (beTag != null) {
                                 BlockEntity dstBE = dstChunk.getBlockEntity(dstWorldPos);
-                                if (dstBE != null) {
-                                    dstBE.loadWithComponents(beTag, dstLevel.registryAccess());
+                                if (dstBE == null) {
+                                    throw new IllegalStateException("Destination plot has no block entity at " + dstWorldPos);
                                 }
+                                dstBE.loadWithComponents(beTag, dstLevel.registryAccess());
                             }
                         }
                     }
@@ -567,15 +584,6 @@ public final class SableTransitOps {
                 LOG.warn("[IPL-TRANSIT] failed to (re)register block-entity tickers for dest "
                     + "chunk {} -- copied machinery may not tick", ch.getPos(), t);
             }
-        }
-
-        if (blocksSkippedOutOfYRange > 0) {
-            LOG.warn(
-                "[IPL-TRANSIT] {} blocks skipped because they fell outside dest dim {} Y range [{}, {})",
-                blocksSkippedOutOfYRange,
-                dstLevel.dimension().location(),
-                dstMinY, dstMaxY
-            );
         }
 
         return blocksCopied;

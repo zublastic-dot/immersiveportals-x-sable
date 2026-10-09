@@ -324,7 +324,7 @@ public class BlockManipulationServer {
         );
         
         BlockPos offseted = blockPos.relative(direction);
-        if (offseted.getY() >= world.getMinBuildHeight() && offseted.getY() < world.getMaxBuildHeight()) {
+        if (!world.isOutsideBuildHeight(offseted)) {
             PacketRedirection.sendRedirectedMessage(
                 player,
                 dimension,
