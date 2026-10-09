@@ -26,6 +26,15 @@ public final class IplChunkStorageHeight {
         return select(original, true, dimension.minY(), dimension.height(), suppliedSectionCount);
     }
 
+    /**
+     * Recover world identity for tracking and packet routing, which historically cast
+     * the accessor to Level. Height calculations must keep using the fixed accessor.
+     */
+    public static LevelHeightAccessor unwrapOwner(LevelHeightAccessor accessor) {
+        while (accessor instanceof FixedOwnerHeight storage) accessor = storage.owner();
+        return accessor;
+    }
+
     static LevelHeightAccessor select(
         LevelHeightAccessor original, boolean hosting, int minY, int height, int suppliedSectionCount
     ) {

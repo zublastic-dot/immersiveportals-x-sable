@@ -2,15 +2,20 @@
 
 ## Status and requirement
 
-This describes source candidate `0.5.1-zublastic.71+ip-6.0.7`. The local
-NeoForge 21.1.256 / Sable 2.0.6 build passed 669 tests, with 202 skipped;
-both native bundles passed verification. Common position and packet guards are
-included. The fixed accessor preserves ScalableLux's lighting-owner capability
-while its height calculations remain immutable.
+This describes source candidate `0.5.1-zublastic.72+ip-6.0.7`. The local
+NeoForge 21.1.256 / Sable 2.0.6 build passed 672 tests, with 202 skipped;
+both native bundles passed verification. Full native storage bounds remain fixed;
+owner identity is unwrapped only for chunk tracking and packet routing.
 
-These results do not establish successful Mixin startup, deployment, or live
-acceptance. The runtime remains `.70` at this source checkpoint. Exact artifact
-hashes, CI and later runtime acceptance belong to their separate receipts.
+Live .71 in the retained -96..511 Lab world read OBSIDIAN at storage index140,
+accepted ignition and anchored a portal to the existing body. Broadcasting its
+updates then crashed because two existing IP ChunkHolder handlers cast the fixed
+height accessor directly to Level. Build .72 repairs both handlers; three new
+regressions execute their compiled consumer logic with the actual wrapper.
+
+The .72 candidate has not yet completed live acceptance at this source checkpoint.
+Do not infer live full-range or performance acceptance from automated coverage.
+Exact deployment, CI, crash and recovery evidence belong to separate receipts.
 
 The owner's requirement is support for any native Minecraft 1.21.1 legal
 dimension height range, without clipping a ship to the default Overworld or to
