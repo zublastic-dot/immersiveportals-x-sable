@@ -1,5 +1,22 @@
 # Adaptive hosting storage and focused runtime optimization
 
+## .76 nearby portal DH lifetime (2026-10-10)
+
+Live .75 crossings admitted both native-color remesh completions and drained
+their queues without renderer reloads. A separate DH lifetime problem remained:
+the departed dimension closed about 30 seconds after leaving and reopened when
+its portal was viewed again. It then had to rebuild its cached terrain.
+
+The candidate retains only already-loaded worlds associated with nearby direct
+portals, independent of the camera direction. Selection is bounded to four
+remote destinations, using distance to the opening, 64-block admission and
+80-block exit hysteresis. Weak identity snapshots expire after five seconds.
+Only DH's idle timer eviction is affected; explicit unload, server-key changes,
+disconnect and the existing short remote-camera tick lease remain intact.
+This bounds the number of retained worlds, not their total VRAM in bytes.
+Runtime acceptance must include a look-away interval beyond DH's 30-second
+timeout and an actual crossing back into the retained world.
+
 ## .75 portal crossing remesh correction (2026-10-10)
 
 The owner reported terrain rebuilding at the portal threshold after the .74
