@@ -1,3 +1,8 @@
+## 0.5.1-zublastic.75
+
+- Refresh Colorful Lighting's completed primary-world lighting through in-place Sodium section rebuilds, preserving visible terrain during portal crossings. Keep Sable's separate plot refresh and native fallback for unsupported contexts.
+- Includes .74's isolated DH depth-clamp correction for missing distant terrain in shader portal views. Live crossing acceptance is recorded separately.
+
 ## 0.5.1-zublastic.63
 
 - Preserve already-calculated destination RGB during the native lighting warm-up after a real portal crossing, including native dynamic-light contributions. Hand off to native lighting before its initial nearby-terrain remesh.

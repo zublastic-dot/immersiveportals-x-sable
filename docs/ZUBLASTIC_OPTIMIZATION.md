@@ -1,5 +1,27 @@
 # Adaptive hosting storage and focused runtime optimization
 
+## .75 portal crossing remesh correction (2026-10-10)
+
+The owner reported terrain rebuilding at the portal threshold after the .74
+settled-view repair. A finite crossing trace retained the same DH world wrapper,
+client level and buffer handler, with 160 then 163 selected buffers. DH GPU
+projection, shader programs and depth attachment stayed unchanged. Immediately
+after the crossing, Colorful Lighting's initial-propagation completion reloaded
+all three ordinary terrain renderers. Sodium consequently discarded its section
+manager and visible meshes. This evidence does not establish that every individual
+LOD mesh was unchanged or rule out another transition artifact.
+
+The .75 candidate wraps only Colorful Lighting 2.5.1's initial completion remesh.
+For the exact published primary world/accessor/generation with Sodium, it queues
+in-place rebuilds of already-loaded nonempty sections using each chunk's own
+height. A bounded queue retains first-build retries and rejects replaced owners.
+Owned and hosted Sable plots retain their separate native remesh callbacks.
+Native propagation/reset and warmup completion remain intact; unsupported or
+mismatched contexts retain the original call. Ordinary renderer reloads and DH
+cache lifetime are unchanged. Client diagnostics expose admitted completion
+batches and pending sections. Live threshold continuity must still be verified;
+this source entry is not an FPS or deployment claim.
+
 Candidate: `0.5.1-zublastic.73+ip-6.0.7`, Minecraft 1.21.1,
 NeoForge 21.1.256, Sable 2.0.6. This source checkpoint does not claim deployment
 or measured FPS/TPS improvement.

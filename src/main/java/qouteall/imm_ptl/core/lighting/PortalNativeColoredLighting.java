@@ -4,10 +4,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import qouteall.imm_ptl.core.ClientWorldLoader;
+import qouteall.imm_ptl.core.chunk_loading.ImmPtlClientChunkMap;
 import qouteall.imm_ptl.core.compat.sodium_compatibility.SodiumInterface;
 import qouteall.imm_ptl.core.portal.Portal;
 
@@ -29,10 +32,12 @@ public final class PortalNativeColoredLighting {
     private static final AtomicBoolean CONFIG_CHANGED = new AtomicBoolean();
     private static final PortalPrimaryColorContext<ClientLevel,Object> PRIMARY = new PortalPrimaryColorContext<>();
     private static final PortalColorWarmup<ClientLevel> WARMUP = new PortalColorWarmup<>();
+    private static final PortalColorCompletionRemesh<ClientLevel,LevelRenderer,LevelChunk> COMPLETION_REMESH =
+        new PortalColorCompletionRemesh<>();
     private static volatile ClientLevel primaryWorld;
     private static LevelRenderer primaryRenderer;
     private static boolean initialized, checked;
-    private static long tick;
+    private static long tick,completionRemeshBatches;
     private static String state = "not initialized";
     private PortalNativeColoredLighting() {}
 
@@ -57,7 +62,8 @@ public final class PortalNativeColoredLighting {
         CACHE.invalidate(world,new Pos(pos.getX(),pos.getY(),pos.getZ()));
     }
     public static void clear() {
-        active=false; PRIMARY.clear(); WARMUP.clear(); primaryWorld=null; primaryRenderer=null; CACHE.clear(); state="no client world";
+        active=false; PRIMARY.clear(); WARMUP.clear(); primaryWorld=null; primaryRenderer=null; CACHE.clear();
+        COMPLETION_REMESH.clear(); completionRemeshBatches=0; state="no client world";
     }
     /** Config setters may run on a resource-reload thread; only the next client tick touches cache state. */
     public static void configChanged() { CONFIG_CHANGED.set(true); }
@@ -106,9 +112,60 @@ public final class PortalNativeColoredLighting {
     public static long nativeWarmupGeneration(Object engine) { return WARMUP.token(primaryWorld,engine); }
     public static void nativeInitialLightReady(Object engine,long generation) { WARMUP.complete(primaryWorld,engine,generation); }
 
+    /** Only Colorful's consumed initial-completion call is admitted; ordinary renderer reloads stay intact. */
+    public static boolean nativeInitialLightReadyAndRemesh(Object engine,long generation,Object accessor) {
+        var minecraft=Minecraft.getInstance();
+        ClientLevel world=primaryWorld; LevelRenderer renderer=primaryRenderer;
+        boolean admitted=api!=null && !failed && minecraft.isSameThread()
+            && ClientWorldLoader.getIsInitialized()
+            && PortalColorCompletionRemesh.ownsCompletion(world,renderer,accessor,
+                minecraft.player==null ? null : minecraft.player.level(),PRIMARY.select(world),
+                world==null ? null : ClientWorldLoader.WORLD_RENDERER_MAP.get(world.dimension()),
+                generation,WARMUP.token(world,engine))
+            && ordinaryPrimaryWithContainer(world)
+            && SodiumInterface.invoker.isSodiumPresent() && world.getChunkSource() instanceof ImmPtlClientChunkMap;
+        return PortalColorCompletionRemesh.handoff(admitted,
+            () -> nativeInitialLightReady(engine,generation),
+            () -> {
+                // Preserve both Sable's own allChanged hook and IP's hosted hook without
+                // rebuilding any ordinary world renderer. Plot render data owns its remesh policy.
+                var owned=dev.ryanhcode.sable.api.sublevel.SubLevelContainer.getContainer(world).getAllSubLevels();
+                var hosted=ipl.sable.client.IplClientHostedLookup.getHostedSubLevelsFor(world);
+                var plots=PortalColorCompletionRemesh.distinctOwners(owned,hosted);
+                plots.removeIf(sub -> sub.isRemoved() || sub.getRenderData()==null);
+                if (!plots.isEmpty()) dev.ryanhcode.sable.sublevel.render.dispatcher.SubLevelRenderDispatcher.get().rebuild(plots);
+                // Snapshot already-loaded chunks only. Each chunk supplies its own full height;
+                // neither vanilla bounds nor the current camera/visible-section list is used.
+                for (var chunk:((ImmPtlClientChunkMap)world.getChunkSource()).getCopiedChunkList()) {
+                    if (chunk.getLevel()!=world) continue;
+                    var pos=chunk.getPos(); var sections=chunk.getSections();
+                    COMPLETION_REMESH.enqueueSections(world,renderer,chunk,pos.x,pos.z,
+                        chunk.getMinSection(),sections.length,index -> !sections[index].hasOnlyAir());
+                }
+                completionRemeshBatches++;
+            });
+    }
+
+    private static boolean ordinaryPrimaryWithContainer(ClientLevel world) {
+        if (ipl.sable.dim.IplDimAgnostic.isHostingLevel(world)) return false;
+        return dev.ryanhcode.sable.api.sublevel.SubLevelContainer.getContainer(world)!=null;
+    }
+
+    private static void rebuildCompletedNativeLight() {
+        COMPLETION_REMESH.drain(PortalColorCompletionRemesh.MAX_ATTEMPTS_PER_TICK,section -> {
+            // A world/renderer/chunk replacement invalidates this exact request; never create or load anything.
+            if (!section.stillOwned(ClientWorldLoader.WORLD_RENDERER_MAP.get(section.world().dimension()),
+                section.world().getChunkSource().getChunk(section.x(),section.z(),ChunkStatus.FULL,false),
+                ClientWorldLoader.getClientWorlds().stream().anyMatch(world -> world==section.world()))) return true;
+            return SodiumInterface.invoker.schedulePortalLightRebuild(
+                section.renderer(),section.x(),section.y(),section.z())!=SodiumInterface.PortalLightRebuild.RETRY;
+        });
+    }
+
     private static void update() {
         var minecraft=Minecraft.getInstance(); tick++;
         if (minecraft.player==null || !ClientWorldLoader.getIsInitialized()) { clear(); return; }
+        rebuildCompletedNativeLight();
         if (!available()) {
             active=false; CACHE.worlds(List.of()); rebuild();
             state=failed ? "optional adapter failed" : PortalColoredLightAdapter.reason(); return;
@@ -209,6 +266,8 @@ public final class PortalNativeColoredLighting {
     public static Map<String,Object> status() {
         return Map.ofEntries(Map.entry("active",active),Map.entry("state",state),
             Map.entry("primaryWarmup",WARMUP.applies(primaryWorld)),Map.entry("warmupGeneration",WARMUP.generation()),
+            Map.entry("completionRemeshPending",COMPLETION_REMESH.size()),
+            Map.entry("completionRemeshBatches",completionRemeshBatches),
             Map.entry("fields",CACHE.size()),Map.entry("ready",CACHE.ready()),Map.entry("pending",CACHE.pending()),
             Map.entry("completed",CACHE.completed),Map.entry("readsLastTick",CACHE.reads),Map.entry("stepsLastTick",CACHE.steps),
             Map.entry("nanosLastTick",CACHE.elapsed),Map.entry("maxNanosPerTick",PortalNativeColorCache.MAX_NANOS),
