@@ -221,6 +221,7 @@ public final class DhPortalRendering {
         private final float[] clearColor = new float[4];
         private final DhScopedContext.Scope scope;
         private final DhScopedContext.Scope shaderCoverageScope;
+        private final DhDepthClampScope depthClamp;
         private final long coveragePassId = ++coveragePassSequence;
         private boolean valid = true;
         private Vector3f lookDirection;
@@ -238,6 +239,10 @@ public final class DhPortalRendering {
             // Geometry uses its scoped fragment clip (or oblique fallback); preserve IP's stencil mask.
             GL11.glDisable(GL30.GL_CLIP_DISTANCE0);
             shaderCoverageScope = DhPortalShaderCoverage.enter(DhPortalRendering::shaderCoverageBlocks);
+            // IP clamps vanilla portal terrain, but DH has a much farther near plane.
+            // Clamped near LODs write depth zero, occlude distant terrain, and are
+            // then classified as sky by shader packs. Keep DH's native clipping.
+            depthClamp = DhDepthClampScope.enter();
         }
 
         @Override public void close() {
@@ -248,7 +253,13 @@ public final class DhPortalRendering {
                 GL11.glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
                 if (clipDistance) GL11.glEnable(GL30.GL_CLIP_DISTANCE0);
                 else GL11.glDisable(GL30.GL_CLIP_DISTANCE0);
-            } finally { shaderCoverageScope.close();scope.close(); }
+            } finally {
+                try { depthClamp.close(); }
+                finally {
+                    try { shaderCoverageScope.close(); }
+                    finally { scope.close(); }
+                }
+            }
         }
     }
 }

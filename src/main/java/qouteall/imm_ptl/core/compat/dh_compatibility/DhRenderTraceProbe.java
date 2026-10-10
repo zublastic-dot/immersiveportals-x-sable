@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL32;
 import qouteall.imm_ptl.core.compat.iris_compatibility.IrisInterface;
 import qouteall.imm_ptl.core.lighting.PortalSourceRefreshPolicy;
 import qouteall.imm_ptl.core.render.context_management.PortalRendering;
@@ -45,6 +46,7 @@ public final class DhRenderTraceProbe {
                 + " dhDepth=" + nativeRenderer.getActiveDepthTextureId() + " dhColor=" + nativeRenderer.getActiveColorTextureId()
                 + " depthClear=" + GL11.glGetDouble(GL11.GL_DEPTH_CLEAR_VALUE)
                 + " depthWrite=" + GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK)
+                + " depthClamp=" + GL11.glIsEnabled(GL32.GL_DEPTH_CLAMP)
                 + " scissor=" + GL11.glIsEnabled(GL11.GL_SCISSOR_TEST)
                 + " stencil=" + GL11.glIsEnabled(GL11.GL_STENCIL_TEST)
                 + " " + iris + " " + projection);

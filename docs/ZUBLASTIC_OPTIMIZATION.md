@@ -69,3 +69,39 @@ never obtain a smaller allocation by discarding occupied cells or pending work.
 Hosting eligibility/delivery is managed by ModAutomator. This runtime policy
 applies to the validated Sable/IP stack and does not install those mods into
 unrelated customer packs or change ordinary world-generation height.
+
+## .74 portal DH correctness prerequisite (2026-10-10)
+
+Owner testing stopped performance tuning because shader-enabled portal views
+showed nearby Nether terrain against an otherwise flat purple background.
+The same stationary view showed distant terrain with shaders disabled. Limiting
+portal recursion to one did not restore it. Temporarily disabling either the
+DH alpha-handoff correction or portal depth clamping restored distant terrain;
+restoring either diagnostic toggle reproduced the missing terrain.
+
+DH renders inside IP's depth-clamped vanilla terrain section-layer call. Its
+farther near plane means nearby LOD surfaces can clamp to depth zero. Our
+coverage correction admits those surfaces when nearby vanilla meshes are not
+ready. They occlude farther LODs, then Complementary's deferred stage treats
+LOD depth zero as sky. Matching matrices and depth attachments do not detect
+this state leak.
+
+The .74 correction saves/disables/restores depth clamping only around DH portal
+passes. It preserves the inherited state for vanilla terrain, nested passes and
+exceptional exits. It changes no fog, render distance, shader quality, world
+generation, dimension admission or alpha-handoff policy. The bounded DH trace
+now records depth-clamp state. A real OpenGL regression recreates the depth-zero
+occluder and sky classification, then checks distant pixels and scoped state
+restoration. This is a correctness change; no FPS improvement is claimed.
+
+Performance profiling remains a separate follow-up. Two 45-second JFR captures
+in the same Lab camera pose found render-thread allocations of approximately
+359 MiB/s without shaders and 218 MiB/s with shaders. Nonshader portal-light
+publication/immutable copying and repeated sampler-name regex compilation in
+the shader path are measured candidates, not implemented optimizations. The
+GPU also reported thermal slowdown while shaders were active. One-second FPS
+snapshots and these short CPU profiles are not general FPS guarantees.
+
+Live evidence is retained in the owner-side `portal-performance-20261010`
+artifact directory. Deployment and visual acceptance of .74 must be recorded
+separately from this source checkpoint.
