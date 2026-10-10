@@ -83,8 +83,10 @@ class PortalNativeColorContractTest {
         var hook=compiledClass("qouteall/imm_ptl/core/compat/mixin/colorful/MixinPortalColoredEngineLifecycle");
         var wrapper=method(hook,"ip_finishNativeWarmupBeforeRemesh",
             "(Ljava/lang/Object;Lcom/llamalad7/mixinextras/injector/wrapoperation/Operation;)V");
-        assertNotNull(wrapper.visibleParameterAnnotations);
-        assertTrue(wrapper.visibleParameterAnnotations[0].stream().anyMatch(a ->
+        // Mixin's @Coerce has CLASS retention: the receiver contract lives in this classfile attribute.
+        assertNotNull(wrapper.invisibleParameterAnnotations);
+        assertNotNull(wrapper.invisibleParameterAnnotations[0]);
+        assertTrue(wrapper.invisibleParameterAnnotations[0].stream().anyMatch(a ->
             a.desc.equals("Lorg/spongepowered/asm/mixin/injection/Coerce;")),"Optional native interface receiver must be explicitly coerced");
         var annotation=wrapper.visibleAnnotations.stream().filter(a -> a.desc.endsWith("/WrapOperation;")).findFirst().orElseThrow();
         assertEquals(java.util.List.of("onLightUpdate()V"),value(annotation,"method"));
