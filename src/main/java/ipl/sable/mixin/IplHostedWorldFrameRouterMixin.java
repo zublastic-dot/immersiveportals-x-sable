@@ -118,8 +118,11 @@ public abstract class IplHostedWorldFrameRouterMixin extends Level {
     public BlockState getBlockState(BlockPos pos) {
         ServerLevel target = ipl$worldFrameTarget(pos);
         BlockState result = target != null ? target.getBlockState(pos) : super.getBlockState(pos);
-        ipl.sable.diagnostics.IplIgnitionTraceFacts.observeRoute("world_frame.block_result", this, pos,
-            "routed_level", target == null ? "super" : target.dimension().location(), "result", result);
+        if (ipl.sable.diagnostics.IplIgnitionTrace.isTracing(
+            ipl.sable.diagnostics.IplIgnitionTrace.Side.SERVER)) {
+            ipl.sable.diagnostics.IplIgnitionTraceFacts.observeRoute("world_frame.block_result", this, pos,
+                "routed_level", target == null ? "super" : target.dimension().location(), "result", result);
+        }
         return result;
     }
 

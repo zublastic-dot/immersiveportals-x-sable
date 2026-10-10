@@ -98,6 +98,6 @@ public abstract class IplHostingServerPlotHeightMixin {
         ServerLevel level = ((ServerLevelPlot) (Object) this).getSubLevel().getLevel();
         if (!IplDimAgnostic.isHostingLevel(level)) return saved;
         var storage = level.dimensionType();
-        return IplPlotStorageMigration.stampSave(saved, storage.minY(), storage.height());
+        return IplPlotStorageMigration.stampOwnedSave(saved, storage.minY(), storage.height());
     }
 }

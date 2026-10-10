@@ -1,9 +1,15 @@
-﻿{
+{
   "required": true,
   "minVersion": "0.8",
   "package": "ipl.sable.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "IplAdaptiveHostingStorageMixin",
+    "IplHostingChunkSerializationMixin",
+    "IplDeferredAirSectionsMixin",
+    "IplDeferredAirSectionsPromotionMixin",
+    "IplDimensionTypeHeightAccessor",
+    "IplDimensionRegistrationInfoAccessor",
     "diagnostics.server.IplServerPacketIgnitionTraceMixin",
     "diagnostics.server.IplServerItemIgnitionTraceMixin",
     "diagnostics.server.IplBlockReadTraceMixin",

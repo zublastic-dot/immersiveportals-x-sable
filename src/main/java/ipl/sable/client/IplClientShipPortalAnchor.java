@@ -250,11 +250,8 @@ public final class IplClientShipPortalAnchor {
         for (ClientLevel level : ClientWorldLoader.getClientWorlds()) {
             var container = SubLevelContainer.getContainer(level);
             if (container == null) continue;
-            for (SubLevel sub : container.getAllSubLevels()) {
-                if (sub.getUniqueId().equals(shipId) && sub instanceof ClientSubLevel client) {
-                    return client;
-                }
-            }
+            SubLevel sub = container.getSubLevel(shipId);
+            if (sub instanceof ClientSubLevel client) return client;
         }
         return null;
     }

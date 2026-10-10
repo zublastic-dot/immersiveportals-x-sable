@@ -2,10 +2,11 @@
 
 ## Status and requirement
 
-This describes source candidate `0.5.1-zublastic.72+ip-6.0.7`. The local
-NeoForge 21.1.256 / Sable 2.0.6 build passed 672 tests, with 202 skipped;
-both native bundles passed verification. Full native storage bounds remain fixed;
-owner identity is unwrapped only for chunk tracking and packet routing.
+This describes source candidate `0.5.1-zublastic.73+ip-6.0.7`. Build .72
+established fixed storage indexing and passed normal assembly and ignition in
+the retained -96..511 Kinetic Lab world. Build .73 selects a smaller immutable
+storage profile at startup. Candidate source, automated tests, deployment and
+runtime acceptance are separate; consult exact artifact receipts for live state.
 
 Live .71 in the retained -96..511 Lab world read OBSIDIAN at storage index140,
 accepted ignition and anchored a portal to the existing body. Broadcasting its
@@ -13,14 +14,14 @@ updates then crashed because two existing IP ChunkHolder handlers cast the fixed
 height accessor directly to Level. Build .72 repairs both handlers; three new
 regressions execute their compiled consumer logic with the actual wrapper.
 
-The .72 candidate has not yet completed live acceptance at this source checkpoint.
-Do not infer live full-range or performance acceptance from automated coverage.
-Exact deployment, CI, crash and recovery evidence belong to separate receipts.
+The adaptive .73 candidate has not completed live acceptance at this source
+checkpoint. Do not infer live full-range or performance acceptance from automated
+coverage. Exact deployment, CI, crash and recovery evidence belong to receipts.
 
 The owner's requirement is support for any native Minecraft 1.21.1 legal
 dimension height range, without clipping a ship to the default Overworld or to
-the parent dimension currently serving its terrain interactions. The hosting
-dimension uses the full legal storage envelope:
+the parent dimension currently serving its terrain interactions. The legal
+storage envelope remains:
 
 | Property | Value |
 | --- | --- |
@@ -34,6 +35,45 @@ This envelope covers native profiles within those bounds, with section-aligned
 minimum and height. It does not extend Minecraft's coordinate representation or
 make an out-of-range custom dimension legal. Parent terrain retains its own
 profile, which can be shorter or have a different minimum.
+
+## Adaptive startup profile
+
+Before creating any level, the server reads resolved dimension types after
+world-generation modifiers. It unions all ordinary dimension ranges with saved
+hosting payload extents and any previously recorded adaptive profile. This is
+dimension agnostic: there is no special Nether/Overworld assumption. The hosting
+type alone changes; ordinary terrain types are untouched. An explicit registry
+payload sends that selected type to clients instead of relying on known-pack
+omission of the original maximum-height JSON.
+
+For parents within -96..511 and saved payload within that range, storage is
+38 sections with 40 padded light sections. The chosen profile is fixed for the
+whole server session. A world-local `ipl-storage-profile.json` records it
+atomically; later startups can expand for newly required dimensions or saved
+data but never automatically shrink a recorded adaptive profile. A first .72
+upgrade may reduce the maximum envelope after complete read-only inventory.
+
+The inventory covers Sable storage/holding files and ordinary hosting Anvil
+terrain, entities and POI, including external records. It validates framing,
+supported versions, positions and indexed work before persisting the profile.
+Unknown formats retain the full native envelope where safe; malformed data
+fails startup explicitly. Unsupported or large inventories are not silently
+truncated. There is bounded aggregate diagnostic output rather than a log line
+for every scanned chunk.
+
+Ordinary hosting chunk NBT also needs migration: `yPos`, postprocessing indices,
+upgrade indices and carving-mask offsets use the old origin. Heightmaps and
+light caches are invalidated for reconstruction. Out-of-range sections with
+only air blocks keep their full non-light NBT in a chunk-owned
+`ipl_sable:deferred_air_sections` archive. This preserves biome palettes and
+unknown section fields without allocating active section objects. The archive
+survives proto promotion and save/reload; expansion can restore those sections,
+with current active data taking precedence. Non-air blocks, entities, block
+entities, ticks and indexed work continue to require actual storage bounds.
+
+The archive is persistent save data, not a global cache or disposable sidecar.
+Returning an adapted world to .72 is not a supported lossless downgrade: .72
+does not preserve this new archive on save.
 
 ## Storage and terrain are separate coordinate contracts
 
@@ -105,13 +145,13 @@ ticker behavior remains subject to runtime checks.
 
 ## Allocation and packet cost
 
-Uniform storage allocates 254 section slots instead of the former 24: 230 extra
-slots, about 10.6 times the section count per hosted chunk. Empty palettes avoid
-allocating a dense block-state array for every empty section, but section
-objects, associated arrays, scans, and packet serialization still have a cost.
-Light masks address 256 padded sections instead of 26. Actual heap use, packet
-sizes, and timing depend on the ship and active lighting implementation and
-must be measured rather than inferred from the slot ratio.
+Build .72 allocates 254 section slots; .73 selects the required count, retaining
+254 when the union demands it. Empty palettes avoid a dense block-state array,
+but section objects, associated arrays, scans and serialization still cost work.
+For the intended 38-section profile, section count falls by 85.0% and light
+sections fall from 256 to 40. Actual whole-chunk heap, packet sizes and runtime
+depend on contents and the lighting implementation; measurements and limits are
+recorded in [ZUBLASTIC_OPTIMIZATION.md](ZUBLASTIC_OPTIMIZATION.md).
 
 Vanilla 1.21.1 `ClientboundLevelChunkPacketData` rejects a serialized chunk
 section buffer larger than **2,097,152 bytes (2 MiB)**. This is the section-buffer

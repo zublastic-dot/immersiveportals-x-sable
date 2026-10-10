@@ -4,6 +4,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
+import java.util.Optional;
+
 /** Preserves absolute section Y when Sable's index-keyed plot saves change storage profile. */
 public final class IplPlotStorageMigration {
     public static final String PROFILE_TAG = "ipl_sable:storage_profile";
@@ -52,6 +54,47 @@ public final class IplPlotStorageMigration {
         CompoundTag result = original.copy();
         writeProfile(result, storage);
         return result;
+    }
+
+    /** Sable's save() returned a newly allocated tag, owned exclusively by the caller. */
+    public static CompoundTag stampOwnedSave(CompoundTag owned, int minY, int height) {
+        Profile storage = profile(minY, height);
+        validateSectionsAndPositions(owned, storage, storage);
+        writeProfile(owned, storage);
+        return owned;
+    }
+
+    /**
+     * Conservative occupied extent, not the old allocated profile. Sable 2.0.6 only
+     * serializes non-air sections; retaining every supplied section also preserves
+     * unknown section payloads. Positioned payloads may exist without such a section.
+     */
+    public static Optional<IplAdaptiveStorageProfile.Bounds> occupiedBounds(CompoundTag plot) {
+        Profile source = readProfile(plot);
+        validateSectionsAndPositions(plot, source, source);
+        int low = Integer.MAX_VALUE;
+        int high = Integer.MIN_VALUE;
+        CompoundTag chunks = plot.getCompound("chunks");
+        for (String chunkKey : chunks.getAllKeys()) {
+            CompoundTag chunk = chunks.getCompound(chunkKey);
+            for (String indexKey : chunk.getCompound("sections").getAllKeys()) {
+                int section = Integer.parseInt(indexKey) + source.minSection();
+                low = Math.min(low, section);
+                high = Math.max(high, section);
+            }
+            for (String key : new String[] {"block_entities", "block_ticks", "fluid_ticks", "neoforge:aux_lights"}) {
+                if (!(chunk.get(key) instanceof ListTag entries)) continue;
+                for (Tag entry : entries) {
+                    CompoundTag position = (CompoundTag) entry; // validated above
+                    int y = key.equals("neoforge:aux_lights")
+                        ? packedY(position.getLong("pos")) : position.getInt("y");
+                    low = Math.min(low, y >> 4);
+                    high = Math.max(high, y >> 4);
+                }
+            }
+        }
+        return low == Integer.MAX_VALUE ? Optional.empty()
+            : Optional.of(new IplAdaptiveStorageProfile.Bounds(low << 4, (high - low + 1) << 4));
     }
 
     private static Profile readProfile(CompoundTag plot) {
@@ -107,6 +150,7 @@ public final class IplPlotStorageMigration {
             validatePositions(chunk, "block_entities", source, target, chunkKey);
             validatePositions(chunk, "block_ticks", source, target, chunkKey);
             validatePositions(chunk, "fluid_ticks", source, target, chunkKey);
+            validatePositions(chunk, "neoforge:aux_lights", source, target, chunkKey);
         }
     }
 
@@ -121,13 +165,23 @@ public final class IplPlotStorageMigration {
             if (!(entry instanceof CompoundTag position)) {
                 throw invalid(key + " contains a non-compound in chunk " + chunkKey);
             }
-            requireInt(position, "y", key + " in chunk " + chunkKey);
-            int y = position.getInt("y");
+            int y;
+            if (key.equals("neoforge:aux_lights")) {
+                if (!position.contains("pos", Tag.TAG_LONG)) {
+                    throw invalid(key + " has no packed position in chunk " + chunkKey);
+                }
+                y = packedY(position.getLong("pos"));
+            } else {
+                requireInt(position, "y", key + " in chunk " + chunkKey);
+                y = position.getInt("y");
+            }
             if (!source.contains(y) || !target.contains(y)) {
                 throw invalid(key + " Y=" + y + " is outside the source/destination storage in chunk " + chunkKey);
             }
         }
     }
+
+    private static int packedY(long position) { return (int) (position << 52 >> 52); }
 
     private static void requireCompound(CompoundTag tag, String key, String location) {
         if (!tag.contains(key, Tag.TAG_COMPOUND)) throw invalid(location + " has no compound " + key);

@@ -880,9 +880,8 @@ public final class IplShipPortalAnchor {
         for (ServerLevel level : server.getAllLevels()) {
             ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
             if (container == null) continue;
-            for (ServerSubLevel sub : container.getAllSubLevels()) {
-                if (sub.getUniqueId().equals(shipId)) return sub;
-            }
+            var sub = container.getSubLevel(shipId);
+            if (sub instanceof ServerSubLevel ship) return ship;
         }
         return null;
     }

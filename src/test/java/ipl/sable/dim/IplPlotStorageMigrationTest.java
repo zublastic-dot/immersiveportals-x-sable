@@ -108,6 +108,62 @@ class IplPlotStorageMigrationTest {
         assertThrows(IllegalStateException.class, () -> IplPlotStorageMigration.stampSave(plot(0), 2016, 32));
     }
 
+    @Test void sparseFullRangeShrinksWithoutMovingAbsoluteYOrMetadata() {
+        CompoundTag saved = IplPlotStorageMigration.stampSave(plot(121, 139, 158), -2032, 4064);
+        chunk(saved).put("block_entities", positions(-96, 511));
+        chunk(saved).put("block_ticks", positions(208));
+        chunk(saved).put("fluid_ticks", positions(-1));
+        chunk(saved).putString("neoforge:attachments", "opaque-preserved");
+        CompoundTag before = saved.copy();
+        CompoundTag shrunk = IplPlotStorageMigration.prepareForLoad(saved, -96, 608);
+        assertEquals(before, saved);
+        assertEquals(java.util.Set.of("0", "18", "37"), chunk(shrunk).getCompound("sections").getAllKeys());
+        for (String key : new String[] {"block_entities", "block_ticks", "fluid_ticks", "neoforge:attachments"}) {
+            assertEquals(chunk(saved).get(key), chunk(shrunk).get(key));
+        }
+        assertEquals(shrunk, IplPlotStorageMigration.prepareForLoad(shrunk, -96, 608));
+        assertEquals(new IplAdaptiveStorageProfile.Bounds(-96, 608),
+            IplPlotStorageMigration.occupiedBounds(saved).orElseThrow());
+    }
+
+    @Test void sparseScanDoesNotKeepOldAllocationFloorAndIncludesOrphanPositionPayloads() {
+        CompoundTag saved = IplPlotStorageMigration.stampSave(plot(139), -2032, 4064);
+        assertEquals(new IplAdaptiveStorageProfile.Bounds(192, 16),
+            IplPlotStorageMigration.occupiedBounds(saved).orElseThrow());
+        chunk(saved).put("block_ticks", positions(-1000));
+        chunk(saved).put("block_entities", positions(1000));
+        assertEquals(new IplAdaptiveStorageProfile.Bounds(-1008, 2016),
+            IplPlotStorageMigration.occupiedBounds(saved).orElseThrow());
+        assertTrue(IplPlotStorageMigration.occupiedBounds(plot()).isEmpty());
+    }
+
+    @Test void auxiliaryLightsConstrainShrinkingWithoutMovingPackedPosition() {
+        CompoundTag saved = IplPlotStorageMigration.stampSave(plot(139), -2032, 4064);
+        ListTag lights = new ListTag();
+        CompoundTag light = new CompoundTag();
+        light.putLong("pos", 2031L); // zero X/Z, signed twelve-bit Y
+        light.putByte("level", (byte) 12);
+        lights.add(light);
+        chunk(saved).put("neoforge:aux_lights", lights);
+        assertEquals(new IplAdaptiveStorageProfile.Bounds(192, 1840),
+            IplPlotStorageMigration.occupiedBounds(saved).orElseThrow());
+        assertThrows(IllegalStateException.class,
+            () -> IplPlotStorageMigration.prepareForLoad(saved, -96, 608));
+        light.putLong("pos", -96L & 0xfffL);
+        CompoundTag migrated = IplPlotStorageMigration.prepareForLoad(saved, -96, 608);
+        assertEquals(lights, chunk(migrated).get("neoforge:aux_lights"));
+    }
+
+    @Test void ownedSaveStampsWithoutDeepCopyButFailureNeverMutates() {
+        CompoundTag owned = plot(139);
+        assertSame(owned, IplPlotStorageMigration.stampOwnedSave(owned, -2032, 4064));
+        CompoundTag invalid = plot(254);
+        CompoundTag before = invalid.copy();
+        assertThrows(IllegalStateException.class,
+            () -> IplPlotStorageMigration.stampOwnedSave(invalid, -2032, 4064));
+        assertEquals(before, invalid);
+    }
+
     private static CompoundTag plot(int... indices) {
         CompoundTag plot = new CompoundTag();
         CompoundTag chunks = new CompoundTag();
