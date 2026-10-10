@@ -26,9 +26,11 @@ public abstract class IplRapierStepArmMixin {
             target = "Ldev/ryanhcode/sable/physics/impl/rapier/Rapier3D;step(JD)V"
         ),
         remap = false,
-        require = 0
+        require = 1,
+        allow = 1
     )
     private void ipl$armWorldStep(long sceneHandle, double timeStep, Operation<Void> original) {
+        ipl.sable.natives.IplRapierNatives.requireAvailable();
         if (IplFusedStep.STEP_ARMED) {
             original.call(sceneHandle, timeStep);
         }

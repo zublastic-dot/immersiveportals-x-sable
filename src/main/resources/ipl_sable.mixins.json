@@ -1,9 +1,18 @@
-﻿{
+{
   "required": true,
   "minVersion": "0.8",
   "package": "ipl.sable.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "IplAdaptiveHostingStorageMixin",
+    "IplHostingChunkSerializationMixin",
+    "IplDeferredAirSectionsMixin",
+    "IplDeferredAirSectionsPromotionMixin",
+    "IplDimensionTypeHeightAccessor",
+    "IplDimensionRegistrationInfoAccessor",
+    "diagnostics.server.IplServerPacketIgnitionTraceMixin",
+    "diagnostics.server.IplServerItemIgnitionTraceMixin",
+    "diagnostics.server.IplBlockReadTraceMixin",
     "IplLightChunkGetterMixin",
     "compat.IplLithiumBlockAccessMixin",
     "SableSubLevelGetterBridgeMixin",
@@ -56,6 +65,15 @@
     "IplHostedBeTickContextMixin",
     "IplHostedPhysicsTickContextMixin",
     "IplHostedWorldFrameRouterMixin",
+    "IplHostingChunkHeightMixin",
+    "IplHostingChunkHolderHeightMixin",
+    "IplHostingLightHeightMixin",
+    "IplHostingSkySourceHeightMixin",
+    "IplHostingPlotHeightMixin",
+    "IplHostingServerPlotHeightMixin",
+    "IplHostedPositionHeightMixin",
+    "IplHostedPacketHeightMixin",
+    "IplHostedBreakHeightMixin",
     "IplHostedInteractionContextMixin",
     "IplDisassemblyPortalRestoreMixin",
     "IplHostingChunkTrackersMixin",
@@ -126,7 +144,10 @@
     "client.IplStaffPortalBeamPassMixin",
     "client.IplStaffItemAimMixin",
     "client.IplHostedPlotEntityRenderMixin",
-    "client.IplLevelRendererEntityInvoker"
+    "client.IplLevelRendererEntityInvoker",
+    "diagnostics.client.IplMinecraftInteractionTraceMixin",
+    "diagnostics.client.IplClientInteractionTraceMixin",
+    "diagnostics.client.IplClientPacketTraceMixin"
   ],
   "injectors": {
     "defaultRequire": 0

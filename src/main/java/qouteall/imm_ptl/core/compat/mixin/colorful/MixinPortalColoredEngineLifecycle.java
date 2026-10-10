@@ -1,9 +1,12 @@
 package qouteall.imm_ptl.core.compat.mixin.colorful;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import qouteall.imm_ptl.core.lighting.PortalNativeColoredLighting;
@@ -21,10 +24,12 @@ public abstract class MixinPortalColoredEngineLifecycle {
     private void ip_captureWarmupGeneration(CallbackInfo ci) {
         ip_nativeWarmupGeneration=PortalNativeColoredLighting.nativeWarmupGeneration(this);
     }
-    @Inject(method="onLightUpdate()V",at=@At(value="INVOKE",
-        target="Lme/erykczy/colorfullighting/common/accessors/LevelAccessor;rebuildAllSections()V",
-        shift=At.Shift.BEFORE),require=1,remap=false)
-    private void ip_finishNativeWarmupBeforeRemesh(CallbackInfo ci) {
-        PortalNativeColoredLighting.nativeInitialLightReady(this,ip_nativeWarmupGeneration);
+    @WrapOperation(method="onLightUpdate()V",at=@At(value="INVOKE",
+        target="Lme/erykczy/colorfullighting/common/accessors/LevelAccessor;rebuildAllSections()V"),
+        require=1,remap=false)
+    private void ip_finishNativeWarmupBeforeRemesh(@Coerce Object accessor,Operation<Void> original) {
+        if (!PortalNativeColoredLighting.nativeInitialLightReadyAndRemesh(this,ip_nativeWarmupGeneration,accessor)) {
+            original.call(accessor);
+        }
     }
 }

@@ -48,4 +48,29 @@ class DhRenderTraceContractTest {
             assertTrue(found, name);
         }
     }
+
+    @Test void productionDhPassOwnsClampScopeAndTraceQueriesItAfterAdmission() throws IOException {
+        String clamp = "qouteall/imm_ptl/core/compat/dh_compatibility/DhDepthClampScope";
+        var pass = read("qouteall/imm_ptl/core/compat/dh_compatibility/DhPortalRendering$Pass");
+        var constructor = pass.methods.stream().filter(m -> m.name.equals("<init>")).findFirst().orElseThrow();
+        var close = pass.methods.stream().filter(m -> m.name.equals("close")).findFirst().orElseThrow();
+        assertTrue(java.util.stream.StreamSupport.stream(constructor.instructions.spliterator(), false)
+            .anyMatch(i -> i instanceof MethodInsnNode call && call.owner.equals(clamp) && call.name.equals("enter")));
+        assertTrue(java.util.stream.StreamSupport.stream(close.instructions.spliterator(), false)
+            .anyMatch(i -> i instanceof MethodInsnNode call && call.owner.equals(clamp) && call.name.equals("close")));
+
+        var probe = read("qouteall/imm_ptl/core/compat/dh_compatibility/DhRenderTraceProbe");
+        var sample = probe.methods.stream().filter(m -> m.name.equals("sample")).findFirst().orElseThrow();
+        int admission = -1, query = -1;
+        for (int i = 0; i < sample.instructions.size(); i++) {
+            var instruction = sample.instructions.get(i);
+            if (instruction instanceof MethodInsnNode call && call.owner.endsWith("/DhRenderTrace")
+                    && call.name.equals("reserve")) admission = i;
+            if (instruction instanceof LdcInsnNode constant && Integer.valueOf(0x864F).equals(constant.cst)
+                    && instruction.getNext() instanceof MethodInsnNode call
+                    && call.owner.equals("org/lwjgl/opengl/GL11") && call.name.equals("glIsEnabled")) query = i;
+        }
+        assertTrue(admission >= 0 && query > admission,
+            "Depth-clamp GL evidence must remain inside the finite trace admission");
+    }
 }

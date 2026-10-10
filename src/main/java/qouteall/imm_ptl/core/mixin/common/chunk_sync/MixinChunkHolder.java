@@ -1,6 +1,7 @@
 package qouteall.imm_ptl.core.mixin.common.chunk_sync;
 
 import ipl.sable.SableBridge;
+import ipl.sable.dim.IplChunkStorageHeight;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
@@ -34,7 +35,7 @@ public class MixinChunkHolder implements IEChunkHolder {
         argsOnly = true
     )
     private Packet<?> modifyPacket(Packet<?> packet) {
-        ServerLevel serverWorld = (ServerLevel) levelHeightAccessor;
+        ServerLevel serverWorld = (ServerLevel) IplChunkStorageHeight.unwrapOwner(levelHeightAccessor);
         return PacketRedirection.createRedirectedMessage(
             serverWorld.getServer(),
             serverWorld.dimension(),
@@ -68,7 +69,7 @@ public class MixinChunkHolder implements IEChunkHolder {
         )
     )
     private List<ServerPlayer> redirectGetPlayers(ChunkHolder.PlayerProvider playerProvider, ChunkPos chunkPos, boolean boundaryOnly) {
-        Level level = (Level) levelHeightAccessor;
+        Level level = (Level) IplChunkStorageHeight.unwrapOwner(levelHeightAccessor);
         if (SableBridge.isPlotChunk(level, chunkPos)) {
             // Defer to the original call; goes through MixinChunkMap_C @Inject -> Sable @Inject ->
             // sub-level trackers. The invocation here is a new INVOKE in this handler's bytecode,

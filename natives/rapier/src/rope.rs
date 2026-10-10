@@ -326,7 +326,7 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_rem
     _class: JClass<'local>,
     handle: jlong,
     id: jlong,
-) {
+) -> jlong {
     with_handle(handle, |scene| {
         let mut sable_data = scene.sable_data.write().unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut sim_data = scene.sim_data.write().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -343,7 +343,10 @@ pub extern "system" fn Java_dev_ryanhcode_sable_physics_impl_rapier_Rapier3D_rem
                 true,
             );
         }
-    })
+    });
+    // The installed Java declaration returns long, although RapierRopeHandle
+    // discards it. Match that ABI instead of exposing an undefined return value.
+    0
 }
 
 /// Sets the joint

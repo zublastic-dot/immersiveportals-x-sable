@@ -3,6 +3,9 @@ package ipl.sable.mixin;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import ipl.sable.dim.IplWorldFrameContext;
+import ipl.sable.diagnostics.IplIgnitionTrace;
+import ipl.sable.diagnostics.IplIgnitionTraceFacts;
+import static ipl.sable.diagnostics.IplIgnitionTrace.Side.SERVER;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerPlayerGameMode;
@@ -34,17 +37,31 @@ public abstract class IplHostedInteractionContextMixin {
         ServerPlayer player, Level level, ItemStack stack, InteractionHand hand,
         BlockHitResult hitResult, Operation<InteractionResult> original
     ) {
-        ServerLevel parent = level instanceof ServerLevel serverLevel
-            ? IplWorldFrameContext.resolveParentForPlotInteraction(serverLevel, hitResult.getBlockPos())
-            : null;
-        if (parent == null) {
-            return original.call(player, level, stack, hand, hitResult);
-        }
-        ServerLevel previous = IplWorldFrameContext.push(parent);
-        try {
-            return original.call(player, level, stack, hand, hitResult);
-        } finally {
-            IplWorldFrameContext.pop(previous);
+        try (var trace = IplIgnitionTrace.begin(SERVER, player, hitResult, "server.game_mode.use_item_on");
+             var facts = IplIgnitionTraceFacts.begin(player, hitResult)) {
+            if (IplIgnitionTrace.isTracing(SERVER)) IplIgnitionTrace.event(SERVER, "game_mode.enter",
+                "player_level", IplIgnitionTraceFacts.level(player.level()),
+                "argument_level", IplIgnitionTraceFacts.level(level), "hand", hand,
+                "secondary_use", player.isSecondaryUseActive(), "spectator", player.isSpectator());
+            ServerLevel parent = level instanceof ServerLevel serverLevel
+                ? IplWorldFrameContext.resolveParentForPlotInteraction(serverLevel, hitResult.getBlockPos())
+                : null;
+            if (IplIgnitionTrace.isTracing(SERVER)) IplIgnitionTrace.event(SERVER, "game_mode.frame",
+                "resolved_parent", IplIgnitionTraceFacts.level(parent),
+                "previous_frame", IplIgnitionTraceFacts.level(IplWorldFrameContext.current()));
+            InteractionResult result;
+            if (parent == null) {
+                result = original.call(player, level, stack, hand, hitResult);
+            } else {
+                ServerLevel previous = IplWorldFrameContext.push(parent);
+                try {
+                    result = original.call(player, level, stack, hand, hitResult);
+                } finally {
+                    IplWorldFrameContext.pop(previous);
+                }
+            }
+            if (IplIgnitionTrace.isTracing(SERVER)) IplIgnitionTrace.event(SERVER, "game_mode.return", "result", result);
+            return result;
         }
     }
 }

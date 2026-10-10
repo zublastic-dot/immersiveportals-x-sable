@@ -19,7 +19,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(value = SubLevelPhysicsSystem.class, remap = false)
 public abstract class IplFusedStepMixin {
 
-    @Inject(method = "tickPipelinePhysics", at = @At("HEAD"), cancellable = true, remap = false)
+    @Inject(method = "tickPipelinePhysics", at = @At("HEAD"), cancellable = true, remap = false,
+        require = 1, allow = 1)
     private void ipl$fuseStep(CallbackInfo ci) {
         IplFusedStep.onTickPipelinePhysics((SubLevelPhysicsSystem) (Object) this);
         ci.cancel();

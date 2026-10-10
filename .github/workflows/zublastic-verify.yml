@@ -6,6 +6,34 @@ on:
 permissions:
   contents: read
 jobs:
+  native-linux:
+    name: Linux Atlas JNI physics smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install the pinned native compiler
+        run: rustup toolchain install nightly-2026-01-29 --profile minimal
+      - name: Build the locked Linux Atlas backend
+        run: bash natives/build-linux.sh "$RUNNER_TEMP/ipl-native"
+      - name: Verify JNI against the exact Sable 2.0.6 release
+        run: |
+          curl --fail --location --retry 2 'https://maven.ryanhcode.dev/releases/dev/ryanhcode/sable/sable-neoforge-1.21.1/2.0.6/sable-neoforge-1.21.1-2.0.6.jar' --output "$RUNNER_TEMP/sable-2.0.6.jar"
+          echo "9c199157843bf953a47dff625fc5bb41c01a90538d35ad18e6996bbcb8a617c2  $RUNNER_TEMP/sable-2.0.6.jar" | sha256sum --check -
+          python3 natives/tests/run_smoke.py --native "$RUNNER_TEMP/ipl-native/libsable_rapier_x86_64_linux.so" --sable-jar "$RUNNER_TEMP/sable-2.0.6.jar" --output "$RUNNER_TEMP/native-smoke"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-atlas-native-smoke
+          path: |
+            ${{ runner.temp }}/ipl-native/*.so
+            ${{ runner.temp }}/ipl-native/*.txt
+            ${{ runner.temp }}/native-smoke/native-smoke-report.json
+            ${{ runner.temp }}/native-smoke/native-smoke.log
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -25,8 +53,8 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - name: Test against the supported DH artifact
-        run: bash gradlew --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2G -PdhCompileVersion=${{ matrix.artifact }} test
+      - name: Test the deployed Sable and NeoForge with the supported DH artifact
+        run: bash gradlew --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2G -Psable_version=2.0.6 -Pneo_version=21.1.256 -PdhCompileVersion=${{ matrix.artifact }} test
       - uses: actions/upload-artifact@v4
         if: always()
         with:

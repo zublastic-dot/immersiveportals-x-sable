@@ -1,3 +1,13 @@
+## 0.5.1-zublastic.76
+
+- Retain a bounded set of already-loaded nearby portal destinations during DH's idle cleanup, independently of camera direction. Preserve explicit unload and server-key replacement.
+- .75's native-color handoff passed both tested crossings without whole-renderer reloads; this candidate addresses the separate 30-second idle-cache expiry. Live acceptance remains separately recorded.
+
+## 0.5.1-zublastic.75
+
+- Refresh Colorful Lighting's completed primary-world lighting through in-place Sodium section rebuilds, preserving visible terrain during portal crossings. Keep Sable's separate plot refresh and native fallback for unsupported contexts.
+- Includes .74's isolated DH depth-clamp correction for missing distant terrain in shader portal views. Live crossing acceptance is recorded separately.
+
 ## 0.5.1-zublastic.63
 
 - Preserve already-calculated destination RGB during the native lighting warm-up after a real portal crossing, including native dynamic-light contributions. Hand off to native lighting before its initial nearby-terrain remesh.
