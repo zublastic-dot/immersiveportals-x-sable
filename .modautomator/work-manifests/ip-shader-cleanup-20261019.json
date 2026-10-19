@@ -1,0 +1,39 @@
+{
+  "schema_version": 2,
+  "work_id": "ip-shader-cleanup-20261019",
+  "lease_id": "ip-shader-cleanup-20261019",
+  "worker_id": "codex-ip-shader-cleanup",
+  "repository": "zublastic-dot/immersiveportals-x-sable",
+  "work_branch": "work/codex-ip-shader-cleanup/ip-shader-cleanup-20261019",
+  "base_commit": "6ac7c849c32808937de22ab1e9d0e0587fcaae64",
+  "resources": [
+    "domain:immersiveportals:shader-compile-lifecycle",
+    "repo:zublastic-dot/immersiveportals-x-sable:.modautomator/work-manifests/ip-shader-cleanup-20261019.json",
+    "repo:zublastic-dot/immersiveportals-x-sable:changelog.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:docs/ZUBLASTIC_SHADER_COMPILE_RECOVERY.md",
+    "repo:zublastic-dot/immersiveportals-x-sable:gradle.properties",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/mixin/client/render/shader/MixinProgram.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/main/java/qouteall/imm_ptl/core/render/ShaderCompilationContext.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/render/ShaderCompilationContextTest.java",
+    "repo:zublastic-dot/immersiveportals-x-sable:src/test/java/qouteall/imm_ptl/core/render/ShaderCompilationMixinContractTest.java",
+    "workspace:owner-pc:IPShaderCleanup-20261019",
+    "workspace:owner-pc:Repositories/kinetic-native-physics-20261006-immersiveportals-x-sable"
+  ],
+  "paths": [
+    "docs/ZUBLASTIC_SHADER_COMPILE_RECOVERY.md",
+    "gradle.properties",
+    "src/main/java/qouteall/imm_ptl/core/mixin/client/render/shader/MixinProgram.java",
+    "src/test/java/qouteall/imm_ptl/core/render/ShaderCompilationContextTest.java",
+    "src/test/java/qouteall/imm_ptl/core/render/ShaderCompilationMixinContractTest.java",
+    "changelog.md"
+  ],
+  "value_case": {
+    "category": "demonstrated_blocker",
+    "statement": "Prevent an unrelated shader compilation error from poisoning all subsequent IP/Iris shader compilations while preserving the original diagnostic.",
+    "acceptance": [
+      "Actual production source redirect recovers after IO/transform/compile failure and remains correct under nested and concurrent calls.",
+      "Exact enclosing-argument signature is validated against Minecraft 1.21.1 bytecode; no method overwrite or persistent shader identity remains.",
+      "Release preserves exact installed .76 native payloads and records build/artifact provenance; live deployment is separate."
+    ]
+  }
+}
