@@ -1,3 +1,8 @@
+## 0.5.1-zublastic.77
+
+- Capture shader identity from compile-method arguments instead of HEAD/RETURN ThreadLocals. A failed shader no longer poisons later shader compilations; the original compiler error is preserved.
+- Keep Iris's method body and local captures intact. Native physics payloads are unchanged from the exact installed .76 release; live acceptance is recorded separately.
+
 ## 0.5.1-zublastic.76
 
 - Retain a bounded set of already-loaded nearby portal destinations during DH's idle cleanup, independently of camera direction. Preserve explicit unload and server-key replacement.
